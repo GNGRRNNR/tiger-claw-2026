@@ -941,7 +941,6 @@ async function fetchAll() {
     updateLoopChart();
     updateSegChart();
     drawMap();
-    updateRouteVisibility(activeTab);
     document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
   } catch(e) {
     console.error('Fetch error:', e);
@@ -1424,12 +1423,15 @@ function initMap() {
   // Resize observer
   new ResizeObserver(() => lMap.invalidateSize()).observe(document.getElementById('courseMap'));
 
-  updateRouteVisibility(activeTab);
-  startAnimation();
+  // Delay route visibility + animation until tiles start loading
+  setTimeout(() => {
+    updateRouteVisibility(activeTab);
+    startAnimation();
+  }, 300);
 }
 
 function updateRouteVisibility(tab) {
-  if (!lMap) return;
+  if (!lMap || Object.keys(routeLayers).length === 0) return;
   const visible = new Set(ROUTE_TABS[tab] || ROUTE_TABS['50k']);
   const allPts = [];
   Object.entries(routeLayers).forEach(([name, { line, hit }]) => {
