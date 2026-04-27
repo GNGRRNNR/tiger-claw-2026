@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tiger Claw 2026 — Live Results</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --black: #0a0a0a;
+  --surface: #111111;
+  --surface2: #1a1a1a;
+  --surface3: #222222;
+  --border: #2a2a2a;
+  --border2: #333333;
+  --text: #f0f0f0;
+  --text-muted: #888;
+  --text-dim: #555;
+  --accent: #e8c14a;
+  --accent2: #c9a93a;
+  --pink: #f472b6;
+  --white-loop: #e2e8f0;
+  --yellow: #fbbf24;
+  --blue: #60a5fa;
+  --green: #4ade80;
+  --red: #f87171;
+  --orange: #fb923c;
+  --finished: #4ade80;
+  --dnf: #f87171;
+  --dns: #fb923c;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--black);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* HEADER */
+.header {
+  position: relative;
+  padding: 2rem 2rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header-left { display: flex; align-items: baseline; gap: 1rem; }
+
+.header h1 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.header .year {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(1.2rem, 3vw, 2rem);
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+}
+
+.header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+}
+
+.live-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #1a0000;
+  border: 1px solid #7f1d1d;
+  border-radius: 2rem;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--red);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.live-dot {
+  width: 7px; height: 7px;
+  background: var(--red);
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.last-updated {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+/* STATS BAR */
+.stats-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  background: var(--surface);
+}
+
+.stat-item {
+  padding: 0.8rem 1.5rem;
+  border-right: 1px solid var(--border);
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+.stat-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  margin-bottom: 0.2rem;
+}
+
+.stat-value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.6rem;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
+.stat-value.green { color: var(--green); }
+.stat-value.red-col { color: var(--red); }
+
+/* SEARCH + TABS */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  flex-wrap: wrap;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tab-btn:hover { color: var(--text); border-color: var(--accent); }
+.tab-btn.active { background: var(--accent); color: var(--black); border-color: var(--accent); }
+
+.search-wrap {
+  margin-left: auto;
+  position: relative;
+}
+
+.search-input {
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.8rem;
+  padding: 0.5rem 1rem 0.5rem 2rem;
+  width: 220px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.search-input:focus { border-color: var(--accent); }
+.search-input::placeholder { color: var(--text-dim); }
+
+.search-icon {
+  position: absolute;
+  left: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+/* MAP */
+.map-section {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+
+.map-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+
+.map-container {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  background: #0d1117;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+#courseMap {
+  width: 100%;
+  height: 100%;
+}
+
+.map-legend {
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.legend-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* CHARTS ROW */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+@media (max-width: 700px) {
+  .charts-row { grid-template-columns: 1fr; }
+}
+
+.chart-panel {
+  padding: 1.5rem;
+  border-right: 1px solid var(--border);
+}
+
+.chart-panel:last-child { border-right: none; }
+
+.chart-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+
+.chart-canvas-wrap {
+  position: relative;
+  height: 200px;
+}
+
+/* TABLE SECTION */
+.table-section { padding: 0; }
+
+.table-wrap { overflow-x: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+thead th {
+  background: var(--surface);
+  color: var(--text-dim);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+thead th:hover { color: var(--accent); }
+thead th.sort-asc::after { content: ' ▲'; color: var(--accent); }
+thead th.sort-desc::after { content: ' ▼'; color: var(--accent); }
+
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+
+tbody tr:hover { background: var(--surface2); }
+
+tbody td {
+  padding: 0.55rem 0.8rem;
+  white-space: nowrap;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+td.bib {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.1rem;
+  color: var(--text);
+  letter-spacing: 0.05em;
+}
+
+td.name {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+td.team-name {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.status-finished { background: #052e16; color: var(--finished); border: 1px solid #166534; }
+.status-dnf { background: #1f0000; color: var(--dnf); border: 1px solid #7f1d1d; }
+.status-dns { background: #1c1000; color: var(--dns); border: 1px solid #78350f; }
+.status-active { background: #052e16; color: #86efac; border: 1px solid #166534; }
+.status-blank { background: var(--surface3); color: var(--text-dim); border: 1px solid var(--border2); }
+
+.loop-tag {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.loop-pink { background: #500724; color: #f9a8d4; border: 1px solid #9d174d; }
+.loop-white { background: #1e293b; color: #e2e8f0; border: 1px solid #475569; }
+.loop-yellow { background: #422006; color: #fde68a; border: 1px solid #92400e; }
+
+.time-val { color: var(--text); }
+.elapsed-val { color: var(--accent); }
+.highlight-row td { background: #1a1500 !important; }
+
+.bigcat-icon { font-size: 0.9rem; }
+
+/* EMPTY STATE */
+.empty-state {
+  padding: 3rem;
+  text-align: center;
+  color: var(--text-dim);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.8rem;
+}
+
+/* LOADING */
+.loading-bar {
+  height: 2px;
+  background: var(--surface3);
+  position: relative;
+  overflow: hidden;
+}
+
+.loading-bar.active::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -40%;
+  width: 40%; height: 100%;
+  background: var(--accent);
+  animation: loading 1s infinite linear;
+}
+
+@keyframes loading {
+  to { left: 100%; }
+}
+
+.row-count {
+  padding: 0.5rem 1rem;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  font-family: 'DM Mono', monospace;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* RUNNER MODAL */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.modal-overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-runner-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.8rem;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.modal-bib {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.modal-close {
+  background: none;
+  border: 1px solid var(--border2);
+  color: var(--text-muted);
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.modal-close:hover { color: var(--text); border-color: var(--text-muted); }
+
+.modal-body { padding: 1.5rem; }
+
+.modal-section-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.timeline-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--surface2);
+  border-radius: 4px;
+  border-left: 3px solid var(--border2);
+}
+
+.timeline-item.done { border-left-color: var(--green); }
+.timeline-item.current { border-left-color: var(--accent); }
+.timeline-item.pending { opacity: 0.5; }
+
+.timeline-checkpoint {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 130px;
+}
+
+.timeline-time {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--accent);
+}
+
+.timeline-elapsed {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* RESPONSIVE */
+@media (max-width: 600px) {
+  .header { padding: 1rem; }
+  .controls { padding: 0.75rem 1rem; }
+  .search-input { width: 160px; }
+  .stat-item { padding: 0.6rem 1rem; min-width: 90px; }
+  .stat-value { font-size: 1.3rem; }
+  .map-section { padding: 1rem; }
+  .map-container { height: 220px; }
+  .charts-row { grid-template-columns: 1fr; }
+  .chart-panel { border-right: none; border-bottom: 1px solid var(--border); }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <h1>Tiger Claw</h1>
+    <span class="year">2026</span>
+  </div>
+  <div class="header-right">
+    <div class="live-badge"><div class="live-dot"></div> Live</div>
+    <div class="last-updated">Updated: <span id="lastUpdated">--</span></div>
+  </div>
+</div>
+
+<div class="loading-bar" id="loadingBar"></div>
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stat-item">
+    <div class="stat-label">50k Runners</div>
+    <div class="stat-value" id="stat50kTotal">--</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-label">50k Finished</div>
+    <div class="stat-value green" id="stat50kFinished">--</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-label">Ascent Runners</div>
+    <div class="stat-value" id="statAscentTotal">--</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-label">Ascent Finished</div>
+    <div class="stat-value green" id="statAscentFinished">--</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-label">Ambush Teams</div>
+    <div class="stat-value" id="statAmbushTeams">--</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-label">On Course</div>
+    <div class="stat-value green" id="statOnCourse">--</div>
+  </div>
+  <div class="stat-item">
+    <div class="stat-label">DNF</div>
+    <div class="stat-value red-col" id="statDNF">--</div>
+  </div>
+</div>
+
+<!-- CONTROLS -->
+<div class="controls">
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="50k">50k</button>
+    <button class="tab-btn" data-tab="ascent">Ascent</button>
+    <button class="tab-btn" data-tab="ambush">Ambush</button>
+    <button class="tab-btn" data-tab="bigcat">🐅 Big Cat</button>
+  </div>
+  <div class="search-wrap">
+    <span class="search-icon">⌕</span>
+    <input type="text" class="search-input" id="searchInput" placeholder="Search bib or name…">
+  </div>
+</div>
+
+<!-- MAP -->
+<div class="map-section">
+  <div class="map-title">Course Map — Live Positions</div>
+  <div class="map-container">
+    <canvas id="courseMap"></canvas>
+  </div>
+  <div class="map-legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div>Start / Finish</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#4ade80;opacity:0.6"></div>Green CP</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f472b6"></div>Pink Loop</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#e2e8f0"></div>White Loop</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fbbf24"></div>Yellow Loop</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#60a5fa"></div>Blue Summit</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div>Red CP</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#e8c14a;width:8px;height:8px;border-radius:2px"></div>Runner</div>
+  </div>
+</div>
+
+<!-- CHARTS -->
+<div class="charts-row">
+  <div class="chart-panel">
+    <div class="chart-title">Loop Order Distribution</div>
+    <div class="chart-canvas-wrap"><canvas id="loopChart"></canvas></div>
+  </div>
+  <div class="chart-panel">
+    <div class="chart-title">Avg Segment Times</div>
+    <div class="chart-canvas-wrap"><canvas id="segChart"></canvas></div>
+  </div>
+</div>
+
+<!-- TABLE -->
+<div class="table-section">
+  <div class="table-wrap" id="tableWrap">
+    <div class="empty-state" id="emptyState">Loading race data…</div>
+  </div>
+  <div class="row-count" id="rowCount"></div>
+</div>
+
+<!-- RUNNER MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-runner-name" id="modalName">--</div>
+        <div class="modal-bib" id="modalBib">--</div>
+      </div>
+      <button class="modal-close" id="modalClose">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const CSV = {
+  ascent: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKzvda8NY-cieHJDTBRBCQSqNuJ8BIq5LJ3n1Hswz-LMXS6bvxAJf5Tn52z5RGQ4zzB8feOfB7pNvP/pub?gid=0&single=true&output=csv',
+  fiftyk: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKzvda8NY-cieHJDTBRBCQSqNuJ8BIq5LJ3n1Hswz-LMXS6bvxAJf5Tn52z5RGQ4zzB8feOfB7pNvP/pub?gid=1023891274&single=true&output=csv',
+  ambush: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKzvda8NY-cieHJDTBRBCQSqNuJ8BIq5LJ3n1Hswz-LMXS6bvxAJf5Tn52z5RGQ4zzB8feOfB7pNvP/pub?gid=1246600417&single=true&output=csv'
+};
+
+const REFRESH_MS = 45000;
+
+const RACE_STARTS = {
+  ascent: new Date('2026-05-08T18:00:00-07:00'),
+  fiftyk: new Date('2026-05-09T07:00:00-07:00'),
+  ambush: new Date('2026-05-09T10:00:00-07:00'),
+};
+
+const CHECKPOINTS = [
+  { id: 'start',  label: 'Start / Finish', lat: 47.527708, lng: -122.034216, color: '#4ade80', r: 8 },
+  { id: 'green',  label: 'Green CP',        lat: 47.529832, lng: -121.996694, color: '#4ade80', r: 6 },
+  { id: 'pink',   label: 'Pink Loop',       lat: 47.526687, lng: -121.997090, color: '#f472b6', r: 6 },
+  { id: 'white',  label: 'White Loop',      lat: 47.527259, lng: -121.998629, color: '#e2e8f0', r: 6 },
+  { id: 'yellow', label: 'Yellow Loop',     lat: 47.527324, lng: -121.998865, color: '#fbbf24', r: 6 },
+  { id: 'blue',   label: 'Blue Summit',     lat: 47.508742, lng: -121.985226, color: '#60a5fa', r: 7 },
+  { id: 'red',    label: 'Red CP',          lat: 47.529776, lng: -121.996875, color: '#f87171', r: 6 },
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let data = { ascent: [], fiftyk: [], ambush: [] };
+let activeTab = '50k';
+let sortCol = null, sortDir = 'asc';
+let filterText = '';
+let loopChartInst = null, segChartInst = null;
+let mapCanvas, mapCtx;
+
+// ============================================================
+// CSV PARSING
+// ============================================================
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim());
+  return lines.slice(1).map(line => {
+    const vals = line.split(',').map(v => v.trim());
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = vals[i] || '');
+    return obj;
+  });
+}
+
+// ============================================================
+// TIME HELPERS
+// ============================================================
+function parseTS(str) {
+  if (!str || str === '') return null;
+  const d = new Date(str);
+  return isNaN(d) ? null : d;
+}
+
+function fmtTime(str) {
+  const d = parseTS(str);
+  if (!d) return '';
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+}
+
+function fmtElapsed(str) {
+  if (!str || str === '' || str.startsWith('-')) return '';
+  // Handle HH:MM:SS format from sheets
+  if (/^\d+:\d{2}:\d{2}/.test(str)) {
+    const parts = str.split(':');
+    const h = parseInt(parts[0]);
+    const m = parseInt(parts[1]);
+    const s = parseInt(parts[2]);
+    if (h === 0) return `${m}:${String(s).padStart(2,'0')}`;
+    return `${h}h ${m}m`;
+  }
+  // Handle decimal fraction (Google Sheets serial time)
+  const n = parseFloat(str);
+  if (!isNaN(n) && n > 0 && n < 5) {
+    const totalSec = Math.round(n * 86400);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h === 0) return `${m}:${String(s).padStart(2,'0')}`;
+    return `${h}h ${m}m`;
+  }
+  return '';
+}
+
+function elapsedMs(str) {
+  if (!str || str === '' || str.startsWith('-')) return null;
+  if (/^\d+:\d{2}:\d{2}/.test(str)) {
+    const parts = str.split(':');
+    return (parseInt(parts[0])*3600 + parseInt(parts[1])*60 + parseInt(parts[2])) * 1000;
+  }
+  const n = parseFloat(str);
+  if (!isNaN(n) && n > 0 && n < 5) return Math.round(n * 86400 * 1000);
+  return null;
+}
+
+// ============================================================
+// STATUS
+// ============================================================
+function statusBadge(status) {
+  const s = (status || '').toUpperCase();
+  if (s === 'FINISHED') return `<span class="status-badge status-finished">Finished</span>`;
+  if (s === 'DNF') return `<span class="status-badge status-dnf">DNF</span>`;
+  if (s === 'DNS') return `<span class="status-badge status-dns">DNS</span>`;
+  if (s !== '') return `<span class="status-badge status-active">${status}</span>`;
+  return `<span class="status-badge status-blank">On Course</span>`;
+}
+
+function loopTag(color) {
+  if (!color) return '';
+  const c = color.toLowerCase();
+  if (c === 'pink') return `<span class="loop-tag loop-pink">P</span>`;
+  if (c === 'white') return `<span class="loop-tag loop-white">W</span>`;
+  if (c === 'yellow') return `<span class="loop-tag loop-yellow">Y</span>`;
+  return `<span class="loop-tag loop-white">${color.charAt(0)}</span>`;
+}
+
+// ============================================================
+// FETCH DATA
+// ============================================================
+async function fetchAll() {
+  document.getElementById('loadingBar').classList.add('active');
+  try {
+    const [ascentRes, fiftyRes, ambushRes] = await Promise.allSettled([
+      fetch(CSV.ascent + '&t=' + Date.now()),
+      fetch(CSV.fiftyk + '&t=' + Date.now()),
+      fetch(CSV.ambush + '&t=' + Date.now()),
+    ]);
+
+    if (ascentRes.status === 'fulfilled' && ascentRes.value.ok)
+      data.ascent = parseCSV(await ascentRes.value.text());
+    if (fiftyRes.status === 'fulfilled' && fiftyRes.value.ok)
+      data.fiftyk = parseCSV(await fiftyRes.value.text());
+    if (ambushRes.status === 'fulfilled' && ambushRes.value.ok)
+      data.ambush = parseCSV(await ambushRes.value.text());
+
+    updateStats();
+    renderTable();
+    updateLoopChart();
+    updateSegChart();
+    drawMap();
+    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+  } catch(e) {
+    console.error('Fetch error:', e);
+  }
+  document.getElementById('loadingBar').classList.remove('active');
+}
+
+// ============================================================
+// STATS
+// ============================================================
+function updateStats() {
+  const f50 = data.fiftyk.filter(r => r.Bib && r.Bib !== '');
+  const fa = data.ascent.filter(r => r.BIB && r.BIB !== '');
+  const amb = data.ambush.filter(r => r.Bib && r.Bib !== '');
+  const teams = new Set(amb.map(r => r['Team Name']).filter(Boolean));
+
+  document.getElementById('stat50kTotal').textContent = f50.length || '--';
+  document.getElementById('stat50kFinished').textContent = f50.filter(r => (r.Status||'').toUpperCase()==='FINISHED').length;
+  document.getElementById('statAscentTotal').textContent = fa.length || '--';
+  document.getElementById('statAscentFinished').textContent = fa.filter(r => (r.STATUS||'').toUpperCase()==='FINISHED').length;
+  document.getElementById('statAmbushTeams').textContent = teams.size || '--';
+
+  const onCourse = f50.filter(r => {
+    const s = (r.Status||'').toUpperCase();
+    return s !== 'FINISHED' && s !== 'DNF' && s !== 'DNS' && r.Bib;
+  }).length;
+  document.getElementById('statOnCourse').textContent = onCourse;
+
+  const dnf = [...f50, ...fa].filter(r => {
+    return (r.Status||r.STATUS||'').toUpperCase() === 'DNF';
+  }).length;
+  document.getElementById('statDNF').textContent = dnf;
+}
+
+// ============================================================
+// LOOP CHART
+// ============================================================
+function updateLoopChart() {
+  const orders = {};
+  data.fiftyk.forEach(r => {
+    const l1 = r['First Loop'] || '';
+    const l2 = r['Second Loop'] || '';
+    const l3 = r['Third Loop'] || '';
+    if (l1 && l2 && l3) {
+      const key = `${l1.charAt(0)}-${l2.charAt(0)}-${l3.charAt(0)}`;
+      orders[key] = (orders[key]||0)+1;
+    }
+  });
+
+  const labels = Object.keys(orders);
+  const vals = Object.values(orders);
+  const colors = ['#f472b6','#fbbf24','#60a5fa','#4ade80','#e2e8f0','#fb923c'];
+
+  if (!labels.length) return;
+
+  if (loopChartInst) {
+    loopChartInst.data.labels = labels;
+    loopChartInst.data.datasets[0].data = vals;
+    loopChartInst.update();
+    return;
+  }
+
+  loopChartInst = new Chart(document.getElementById('loopChart'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: vals, backgroundColor: colors, borderColor: '#111', borderWidth: 2 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#888', font: { family: 'DM Mono', size: 11 }, padding: 10 } }
+      }
+    }
+  });
+}
+
+// ============================================================
+// SEGMENT CHART
+// ============================================================
+function updateSegChart() {
+  const loops = { Pink: [], White: [], Yellow: [] };
+  const descents = { D1: [], D2: [], D3: [] };
+
+  data.fiftyk.forEach(r => {
+    [['First Loop','First Loop Elapsed'],['Second Loop','Second Loop Elapsed'],['Third Loop','Third Loop Elapsed']].forEach(([colorCol, elapsedCol]) => {
+      const color = r[colorCol] || '';
+      const ms = elapsedMs(r[elapsedCol]);
+      if (color && ms && ms > 0 && loops[color]) loops[color].push(ms);
+    });
+    const d1 = elapsedMs(r['First Blue Descent Elapsed']);
+    const d2 = elapsedMs(r['Second Blue Descent Elapsed']);
+    const d3 = elapsedMs(r['Third Blue Descent Elapsed']);
+    if (d1 && d1>0) descents.D1.push(d1);
+    if (d2 && d2>0) descents.D2.push(d2);
+    if (d3 && d3>0) descents.D3.push(d3);
+  });
+
+  const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+  const toMin = ms => Math.round(ms/60000);
+
+  const labels = ['Pink Loop','White Loop','Yellow Loop','Descent 1','Descent 2','Descent 3'];
+  const vals = [
+    toMin(avg(loops.Pink)), toMin(avg(loops.White)), toMin(avg(loops.Yellow)),
+    toMin(avg(descents.D1)), toMin(avg(descents.D2)), toMin(avg(descents.D3))
+  ];
+  const bgs = ['#f472b6','#cbd5e1','#fbbf24','#60a5fa','#818cf8','#a5b4fc'];
+
+  if (segChartInst) {
+    segChartInst.data.datasets[0].data = vals;
+    segChartInst.update();
+    return;
+  }
+
+  segChartInst = new Chart(document.getElementById('segChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: vals,
+        backgroundColor: bgs,
+        borderRadius: 3,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#666', font: { family: 'DM Mono', size: 10 } }, grid: { color: '#1a1a1a' } },
+        y: {
+          beginAtZero: true,
+          ticks: { color: '#666', font: { family: 'DM Mono', size: 10 }, callback: v => v + 'm' },
+          grid: { color: '#1a1a1a' }
+        }
+      }
+    }
+  });
+}
+
+// ============================================================
+// COURSE MAP
+// ============================================================
+function initMap() {
+  mapCanvas = document.getElementById('courseMap');
+  mapCtx = mapCanvas.getContext('2d');
+  resizeMap();
+  window.addEventListener('resize', () => { resizeMap(); drawMap(); });
+}
+
+function resizeMap() {
+  const container = mapCanvas.parentElement;
+  mapCanvas.width = container.clientWidth;
+  mapCanvas.height = container.clientHeight;
+}
+
+function latLngToXY(lat, lng, bounds, w, h) {
+  const pad = 0.1;
+  const latRange = bounds.maxLat - bounds.minLat;
+  const lngRange = bounds.maxLng - bounds.minLng;
+  const x = ((lng - bounds.minLng) / lngRange) * (w * (1 - 2*pad)) + w * pad;
+  const y = ((bounds.maxLat - lat) / latRange) * (h * (1 - 2*pad)) + h * pad;
+  return { x, y };
+}
+
+function drawMap() {
+  if (!mapCtx) return;
+  const w = mapCanvas.width, h = mapCanvas.height;
+  mapCtx.clearRect(0, 0, w, h);
+
+  // Background
+  mapCtx.fillStyle = '#0d1117';
+  mapCtx.fillRect(0, 0, w, h);
+
+  // Grid
+  mapCtx.strokeStyle = '#1a2030';
+  mapCtx.lineWidth = 1;
+  for (let i = 0; i < w; i += 40) { mapCtx.beginPath(); mapCtx.moveTo(i,0); mapCtx.lineTo(i,h); mapCtx.stroke(); }
+  for (let i = 0; i < h; i += 40) { mapCtx.beginPath(); mapCtx.moveTo(0,i); mapCtx.lineTo(w,i); mapCtx.stroke(); }
+
+  const lats = CHECKPOINTS.map(c => c.lat);
+  const lngs = CHECKPOINTS.map(c => c.lng);
+  const bounds = {
+    minLat: Math.min(...lats) - 0.005,
+    maxLat: Math.max(...lats) + 0.005,
+    minLng: Math.min(...lngs) - 0.005,
+    maxLng: Math.max(...lngs) + 0.005,
+  };
+
+  const pos = {};
+  CHECKPOINTS.forEach(cp => {
+    pos[cp.id] = latLngToXY(cp.lat, cp.lng, bounds, w, h);
+  });
+
+  // Draw course lines
+  const courseLines = [
+    ['start','green'],['green','pink'],['green','white'],['green','yellow'],
+    ['pink','blue'],['white','blue'],['yellow','blue'],
+    ['blue','red'],['red','start']
+  ];
+
+  mapCtx.lineWidth = 1.5;
+  courseLines.forEach(([a, b]) => {
+    const pa = pos[a], pb = pos[b];
+    if (!pa || !pb) return;
+    mapCtx.strokeStyle = '#2a3a4a';
+    mapCtx.setLineDash([4, 4]);
+    mapCtx.beginPath();
+    mapCtx.moveTo(pa.x, pa.y);
+    mapCtx.lineTo(pb.x, pb.y);
+    mapCtx.stroke();
+  });
+  mapCtx.setLineDash([]);
+
+  // Draw runner positions based on last known checkpoint
+  const runnerPositions = getRunnerPositions();
+  runnerPositions.forEach(rp => {
+    const p = pos[rp.cp];
+    if (!p) return;
+    // Offset slightly so runners don't all stack
+    const offsetX = (Math.random() - 0.5) * 12;
+    const offsetY = (Math.random() - 0.5) * 12;
+    mapCtx.beginPath();
+    mapCtx.arc(p.x + offsetX, p.y + offsetY, 4, 0, Math.PI*2);
+    mapCtx.fillStyle = '#e8c14a';
+    mapCtx.fill();
+    mapCtx.strokeStyle = '#0d1117';
+    mapCtx.lineWidth = 1;
+    mapCtx.stroke();
+  });
+
+  // Draw checkpoints
+  CHECKPOINTS.forEach(cp => {
+    const p = pos[cp.id];
+    if (!p) return;
+
+    // Outer ring
+    mapCtx.beginPath();
+    mapCtx.arc(p.x, p.y, cp.r + 3, 0, Math.PI*2);
+    mapCtx.fillStyle = cp.color + '22';
+    mapCtx.fill();
+
+    // Main dot
+    mapCtx.beginPath();
+    mapCtx.arc(p.x, p.y, cp.r, 0, Math.PI*2);
+    mapCtx.fillStyle = cp.color;
+    mapCtx.fill();
+    mapCtx.strokeStyle = '#0d1117';
+    mapCtx.lineWidth = 2;
+    mapCtx.stroke();
+
+    // Label
+    mapCtx.fillStyle = cp.color;
+    mapCtx.font = `500 10px "DM Mono"`;
+    mapCtx.textAlign = 'center';
+    mapCtx.fillText(cp.label, p.x, p.y - cp.r - 5);
+  });
+}
+
+function getRunnerPositions() {
+  const positions = [];
+  data.fiftyk.forEach(r => {
+    if (!r.Bib || (r.Status||'').toUpperCase() === 'DNS') return;
+    const s = (r.Status||'').toUpperCase();
+    if (s === 'FINISHED') { positions.push({ cp: 'start', bib: r.Bib }); return; }
+
+    // Determine last known checkpoint
+    if (r['FINISH TIME (Scan)']) { positions.push({ cp: 'start', bib: r.Bib }); return; }
+    if (r['Red Checkpoint In']) { positions.push({ cp: 'red', bib: r.Bib }); return; }
+    if (r['Third Loop Top']) { positions.push({ cp: 'blue', bib: r.Bib }); return; }
+    if (r['Third Loop Bottom']) { positions.push({ cp: r['Third Loop'] ? r['Third Loop'].toLowerCase() : 'green', bib: r.Bib }); return; }
+    if (r['Second Loop Top']) { positions.push({ cp: 'blue', bib: r.Bib }); return; }
+    if (r['Second Loop Bottom']) { positions.push({ cp: r['Second Loop'] ? r['Second Loop'].toLowerCase() : 'green', bib: r.Bib }); return; }
+    if (r['First Loop Top']) { positions.push({ cp: 'blue', bib: r.Bib }); return; }
+    if (r['First Loop Bottom']) { positions.push({ cp: r['First Loop'] ? r['First Loop'].toLowerCase() : 'green', bib: r.Bib }); return; }
+    if (r['Green Checkpoint']) { positions.push({ cp: 'green', bib: r.Bib }); return; }
+    positions.push({ cp: 'start', bib: r.Bib });
+  });
+  return positions;
+}
+
+// ============================================================
+// TABLE RENDERING
+// ============================================================
+function getTableData() {
+  const tab = activeTab;
+  let rows = [];
+
+  if (tab === '50k') {
+    rows = data.fiftyk.filter(r => r.Bib && r.Bib !== '');
+  } else if (tab === 'ascent') {
+    rows = data.ascent.filter(r => r.BIB && r.BIB !== '');
+  } else if (tab === 'ambush') {
+    rows = data.ambush.filter(r => r.Bib && r.Bib !== '');
+  } else if (tab === 'bigcat') {
+    // Big Cat: match ascent runners who also have 50k data by name
+    const ascentMap = {};
+    data.ascent.forEach(r => { if (r.NAME) ascentMap[r.NAME.trim().toUpperCase()] = r; });
+    rows = data.fiftyk.filter(r => {
+      return r.Name && ascentMap[r.Name.trim().toUpperCase()];
+    }).map(r50 => {
+      const ra = ascentMap[r50.Name.trim().toUpperCase()];
+      const ascentMs = elapsedMs(ra['ELAPSED TIME']);
+      const fiftykMs = elapsedMs(r50['Total Elapsed Time']);
+      const totalMs = (ascentMs && fiftykMs) ? ascentMs + fiftykMs : null;
+      return {
+        Name: r50.Name,
+        'Ascent Time': ra['ELAPSED TIME'],
+        '50k Time': r50['Total Elapsed Time'],
+        _totalMs: totalMs,
+        Status: (ra.STATUS||'').toUpperCase() === 'FINISHED' && (r50.Status||'').toUpperCase() === 'FINISHED' ? 'FINISHED' : 'In Progress'
+      };
+    });
+  }
+
+  // Filter
+  if (filterText) {
+    const f = filterText.toLowerCase();
+    rows = rows.filter(r => {
+      const bib = (r.Bib || r.BIB || '').toLowerCase();
+      const name = (r.Name || r.NAME || r.name || '').toLowerCase();
+      const team = (r['Team Name'] || '').toLowerCase();
+      return bib.includes(f) || name.includes(f) || team.includes(f);
+    });
+  }
+
+  return rows;
+}
+
+function renderTable() {
+  const wrap = document.getElementById('tableWrap');
+  const rows = getTableData();
+  const tab = activeTab;
+
+  if (!rows.length) {
+    wrap.innerHTML = `<div class="empty-state">${filterText ? 'No runners match your search.' : 'No data yet — waiting for race day!'}</div>`;
+    document.getElementById('rowCount').textContent = '';
+    return;
+  }
+
+  let html = '<table><thead><tr>';
+
+  if (tab === '50k') {
+    html += `<th data-col="Bib">Bib</th><th data-col="Name">Name</th><th data-col="Status">Status</th>
+      <th data-col="Green Checkpoint">Green CP</th>
+      <th>Lp1</th><th>L1 Bot</th><th>L1 Top</th><th data-col="First Loop Elapsed">L1 Time</th>
+      <th data-col="First Blue Descent Elapsed">D1</th>
+      <th>Lp2</th><th>L2 Bot</th><th>L2 Top</th><th data-col="Second Loop Elapsed">L2 Time</th>
+      <th data-col="Second Blue Descent Elapsed">D2</th>
+      <th>Lp3</th><th>L3 Bot</th><th>L3 Top</th><th data-col="Third Loop Elapsed">L3 Time</th>
+      <th data-col="Third Blue Descent Elapsed">D3</th>
+      <th data-col="Red Checkpoint In">Red CP</th>
+      <th data-col="FINISH TIME (Scan)">Finish</th>
+      <th data-col="Total Elapsed Time">Total Time</th>`;
+  } else if (tab === 'ascent') {
+    html += `<th data-col="BIB">Bib</th><th data-col="NAME">Name</th><th data-col="STATUS">Status</th>
+      <th data-col="FINISH TIME (SCAN)">Finish Scan</th><th data-col="ELAPSED TIME">Elapsed</th>`;
+  } else if (tab === 'ambush') {
+    html += `<th data-col="Bib">Bib</th><th data-col="Team Name">Team</th><th data-col="Name">Name</th>
+      <th data-col="Status">Status</th>
+      <th data-col="Green Checkpoint">Green CP</th>
+      <th>Loop</th><th>Bot</th><th>Top</th>
+      <th data-col="Loop Elapsed">Loop Time</th>
+      <th data-col="Blue Descent Elapsed">Descent</th>
+      <th data-col="Red Checkpoint In">Red In</th>
+      <th data-col="Red Checkpoint Out">Red Out</th>
+      <th data-col="FINISH TIME (Scan)">Finish</th>
+      <th data-col="Team Elapsed Time">Team Time</th>`;
+  } else if (tab === 'bigcat') {
+    html += `<th data-col="Name">Name</th><th>Ascent Time</th><th>50k Time</th><th data-col="_totalMs">Total Time</th><th>Status</th>`;
+  }
+
+  html += '</tr></thead><tbody>';
+
+  // Sort
+  if (sortCol) {
+    rows.sort((a, b) => {
+      let va = a[sortCol] || '', vb = b[sortCol] || '';
+      if (sortCol === '_totalMs') { va = a._totalMs||Infinity; vb = b._totalMs||Infinity; return sortDir==='asc'?va-vb:vb-va; }
+      const na = parseFloat(va), nb = parseFloat(vb);
+      if (!isNaN(na) && !isNaN(nb)) return sortDir==='asc'?na-nb:nb-na;
+      return sortDir==='asc'?va.localeCompare(vb):vb.localeCompare(va);
+    });
+  }
+
+  rows.forEach(r => {
+    const isHighlight = filterText && (
+      (r.Bib||r.BIB||'').toLowerCase().includes(filterText.toLowerCase()) ||
+      (r.Name||r.NAME||'').toLowerCase().includes(filterText.toLowerCase())
+    );
+
+    html += `<tr class="${isHighlight?'highlight-row':''}" data-bib="${r.Bib||r.BIB||''}" data-tab="${tab}">`;
+
+    if (tab === '50k') {
+      const isBigCat = data.ascent.some(a => (a.NAME||'').trim().toUpperCase() === (r.Name||'').trim().toUpperCase());
+      html += `<td class="bib">${r.Bib||''}</td>
+        <td class="name">${r.Name||''}${isBigCat?' <span class="bigcat-icon">🐅</span>':''}</td>
+        <td>${statusBadge(r.Status)}</td>
+        <td class="time-val">${fmtTime(r['Green Checkpoint'])}</td>
+        <td>${loopTag(r['First Loop'])}</td>
+        <td class="time-val">${fmtTime(r['First Loop Bottom'])}</td>
+        <td class="time-val">${fmtTime(r['First Loop Top'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['First Loop Elapsed'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['First Blue Descent Elapsed'])}</td>
+        <td>${loopTag(r['Second Loop'])}</td>
+        <td class="time-val">${fmtTime(r['Second Loop Bottom'])}</td>
+        <td class="time-val">${fmtTime(r['Second Loop Top'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['Second Loop Elapsed'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['Second Blue Descent Elapsed'])}</td>
+        <td>${loopTag(r['Third Loop'])}</td>
+        <td class="time-val">${fmtTime(r['Third Loop Bottom'])}</td>
+        <td class="time-val">${fmtTime(r['Third Loop Top'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['Third Loop Elapsed'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['Third Blue Descent Elapsed'])}</td>
+        <td class="time-val">${fmtTime(r['Red Checkpoint In'])}</td>
+        <td class="time-val">${fmtTime(r['FINISH TIME (Scan)'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['Total Elapsed Time'])}</td>`;
+    } else if (tab === 'ascent') {
+      html += `<td class="bib">${r.BIB||''}</td>
+        <td class="name">${r.NAME||''}</td>
+        <td>${statusBadge(r.STATUS)}</td>
+        <td class="time-val">${fmtTime(r['FINISH TIME (SCAN)'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['ELAPSED TIME'])}</td>`;
+    } else if (tab === 'ambush') {
+      html += `<td class="bib">${r.Bib||''}</td>
+        <td class="team-name">${r['Team Name']||''}</td>
+        <td class="name">${r.Name||''}</td>
+        <td>${statusBadge(r.Status)}</td>
+        <td class="time-val">${fmtTime(r['Green Checkpoint'])}</td>
+        <td>${loopTag(r['Loop Color'])}</td>
+        <td class="time-val">${fmtTime(r['Loop Bottom'])}</td>
+        <td class="time-val">${fmtTime(r['Loop Top'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['Loop Elapsed'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['Blue Descent Elapsed'])}</td>
+        <td class="time-val">${fmtTime(r['Red Checkpoint In'])}</td>
+        <td class="time-val">${fmtTime(r['Red Checkpoint Out'])}</td>
+        <td class="time-val">${fmtTime(r['FINISH TIME (Scan)'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['Team Elapsed Time'])}</td>`;
+    } else if (tab === 'bigcat') {
+      html += `<td class="name">${r.Name||''} 🐅</td>
+        <td class="elapsed-val">${fmtElapsed(r['Ascent Time'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['50k Time'])}</td>
+        <td class="elapsed-val">${r._totalMs ? fmtElapsed(String(r._totalMs/86400000)) : ''}</td>
+        <td>${statusBadge(r.Status)}</td>`;
+    }
+
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+
+  // Sort icons on headers
+  wrap.querySelectorAll('th[data-col]').forEach(th => {
+    const col = th.getAttribute('data-col');
+    if (col === sortCol) th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+    th.addEventListener('click', () => {
+      if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortCol = col; sortDir = 'asc'; }
+      renderTable();
+    });
+  });
+
+  // Row click → modal
+  wrap.querySelectorAll('tbody tr').forEach(tr => {
+    tr.style.cursor = 'pointer';
+    tr.addEventListener('click', () => {
+      const bib = tr.getAttribute('data-bib');
+      const t = tr.getAttribute('data-tab');
+      openModal(bib, t);
+    });
+  });
+
+  document.getElementById('rowCount').textContent = `Showing ${rows.length} runner${rows.length!==1?'s':''}`;
+}
+
+// ============================================================
+// RUNNER MODAL
+// ============================================================
+function openModal(bib, tab) {
+  let runner = null;
+  if (tab === '50k') runner = data.fiftyk.find(r => r.Bib === bib);
+  else if (tab === 'ascent') runner = data.ascent.find(r => r.BIB === bib);
+  else if (tab === 'ambush') runner = data.ambush.find(r => r.Bib === bib);
+  if (!runner) return;
+
+  const name = runner.Name || runner.NAME || `Bib ${bib}`;
+  const status = runner.Status || runner.STATUS || '';
+
+  document.getElementById('modalName').textContent = name;
+  document.getElementById('modalBib').textContent = `Bib #${bib} · ${status || 'On Course'}`;
+
+  let bodyHTML = '';
+
+  if (tab === '50k') {
+    bodyHTML += `<div class="modal-section-title">Race Timeline</div>
+    <div class="modal-timeline">`;
+
+    const checkpoints = [
+      { label: 'Start', time: null, always: true },
+      { label: 'Green Checkpoint', time: runner['Green Checkpoint'] },
+      { label: `Loop 1 (${runner['First Loop']||'?'}) — Bottom`, time: runner['First Loop Bottom'] },
+      { label: `Loop 1 Top (Blue)`, time: runner['First Loop Top'] },
+      { label: `Loop 2 (${runner['Second Loop']||'?'}) — Bottom`, time: runner['Second Loop Bottom'] },
+      { label: `Loop 2 Top (Blue)`, time: runner['Second Loop Top'] },
+      { label: `Loop 3 (${runner['Third Loop']||'?'}) — Bottom`, time: runner['Third Loop Bottom'] },
+      { label: `Loop 3 Top (Blue)`, time: runner['Third Loop Top'] },
+      { label: 'Red Checkpoint', time: runner['Red Checkpoint In'] },
+      { label: 'Finish Line', time: runner['FINISH TIME (Scan)'] },
+    ];
+
+    let lastScanned = -1;
+    checkpoints.forEach((cp, i) => { if (cp.time) lastScanned = i; });
+
+    checkpoints.forEach((cp, i) => {
+      const done = cp.time || cp.always;
+      const isCurrent = i === lastScanned + (lastScanned === checkpoints.length-1 ? 0 : 1);
+      const cls = cp.time ? 'done' : (isCurrent ? 'current' : 'pending');
+      bodyHTML += `<div class="timeline-item ${cls}">
+        <div class="timeline-checkpoint">${cp.label}</div>
+        <div class="timeline-time">${cp.time ? fmtTime(cp.time) : (isCurrent ? '▶ On the way…' : '—')}</div>
+      </div>`;
+    });
+
+    bodyHTML += `</div>`;
+    bodyHTML += `<div class="modal-section-title">Segment Times</div>
+    <div class="modal-timeline">
+      ${runner['First Loop Elapsed'] ? `<div class="timeline-item done"><div class="timeline-checkpoint">Loop 1 Elapsed</div><div class="timeline-time">${fmtElapsed(runner['First Loop Elapsed'])}</div></div>` : ''}
+      ${runner['First Blue Descent Elapsed'] ? `<div class="timeline-item done"><div class="timeline-checkpoint">Descent 1</div><div class="timeline-time">${fmtElapsed(runner['First Blue Descent Elapsed'])}</div></div>` : ''}
+      ${runner['Second Loop Elapsed'] ? `<div class="timeline-item done"><div class="timeline-checkpoint">Loop 2 Elapsed</div><div class="timeline-time">${fmtElapsed(runner['Second Loop Elapsed'])}</div></div>` : ''}
+      ${runner['Second Blue Descent Elapsed'] ? `<div class="timeline-item done"><div class="timeline-checkpoint">Descent 2</div><div class="timeline-time">${fmtElapsed(runner['Second Blue Descent Elapsed'])}</div></div>` : ''}
+      ${runner['Third Loop Elapsed'] ? `<div class="timeline-item done"><div class="timeline-checkpoint">Loop 3 Elapsed</div><div class="timeline-time">${fmtElapsed(runner['Third Loop Elapsed'])}</div></div>` : ''}
+      ${runner['Total Elapsed Time'] ? `<div class="timeline-item done"><div class="timeline-checkpoint">Total Elapsed</div><div class="timeline-time">${fmtElapsed(runner['Total Elapsed Time'])}</div></div>` : ''}
+    </div>`;
+  } else if (tab === 'ascent') {
+    bodyHTML += `<div class="modal-section-title">Ascent Results</div>
+    <div class="modal-timeline">
+      <div class="timeline-item done"><div class="timeline-checkpoint">Start (6:00 PM)</div><div class="timeline-time">May 8, 2026</div></div>
+      ${runner['FINISH TIME (SCAN)'] ? `<div class="timeline-item done"><div class="timeline-checkpoint">Summit Finish</div><div class="timeline-time">${fmtTime(runner['FINISH TIME (SCAN)'])}</div></div>` : '<div class="timeline-item current"><div class="timeline-checkpoint">Summit</div><div class="timeline-time">▶ On the way…</div></div>'}
+      ${runner['ELAPSED TIME'] ? `<div class="timeline-item done"><div class="timeline-checkpoint">Elapsed Time</div><div class="timeline-time">${fmtElapsed(runner['ELAPSED TIME'])}</div></div>` : ''}
+    </div>`;
+  } else if (tab === 'ambush') {
+    bodyHTML += `<div class="modal-section-title">Team: ${runner['Team Name']||'Unknown'}</div>
+    <div class="modal-timeline">
+      <div class="timeline-item done"><div class="timeline-checkpoint">Start (10:00 AM)</div><div class="timeline-time">May 9, 2026</div></div>
+      ${runner['Green Checkpoint'] ? `<div class="timeline-item done"><div class="timeline-checkpoint">Green CP</div><div class="timeline-time">${fmtTime(runner['Green Checkpoint'])}</div></div>` : ''}
+      ${runner['Loop Bottom'] ? `<div class="timeline-item done"><div class="timeline-checkpoint">${runner['Loop Color']||'?'} Loop Bottom</div><div class="timeline-time">${fmtTime(runner['Loop Bottom'])}</div></div>` : ''}
+      ${runner['Loop Top'] ? `<div class="timeline-item done"><div class="timeline-checkpoint">Blue Summit</div><div class="timeline-time">${fmtTime(runner['Loop Top'])}</div></div>` : ''}
+      ${runner['Red Checkpoint In'] ? `<div class="timeline-item done"><div class="timeline-checkpoint">Red CP In</div><div class="timeline-time">${fmtTime(runner['Red Checkpoint In'])}</div></div>` : ''}
+      ${runner['FINISH TIME (Scan)'] ? `<div class="timeline-item done"><div class="timeline-checkpoint">Finish</div><div class="timeline-time">${fmtTime(runner['FINISH TIME (Scan)'])}</div></div>` : ''}
+      ${runner['Team Elapsed Time'] ? `<div class="timeline-item done"><div class="timeline-checkpoint">Team Total</div><div class="timeline-time">${fmtElapsed(runner['Team Elapsed Time'])}</div></div>` : ''}
+    </div>`;
+  }
+
+  document.getElementById('modalBody').innerHTML = bodyHTML;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+// ============================================================
+// EVENTS
+// ============================================================
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeTab = btn.getAttribute('data-tab');
+    sortCol = null;
+    renderTable();
+    drawMap();
+  });
+});
+
+document.getElementById('searchInput').addEventListener('input', e => {
+  filterText = e.target.value.trim();
+  renderTable();
+});
+
+document.getElementById('modalClose').addEventListener('click', () => {
+  document.getElementById('modalOverlay').classList.remove('open');
+});
+
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalOverlay')) {
+    document.getElementById('modalOverlay').classList.remove('open');
+  }
+});
+
+// ============================================================
+// INIT
+// ============================================================
+initMap();
+fetchAll();
+setInterval(fetchAll, REFRESH_MS);
+</script>
+</body>
+</html>
