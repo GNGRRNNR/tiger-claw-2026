@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tiger Claw 2026 — Live Results</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
-<script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root {
@@ -448,15 +448,6 @@ td.team-name {
   to { left: 100%; }
 }
 
-.mapboxgl-popup-content {
-  background: transparent !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-}
-.mapboxgl-popup-tip { display: none !important; }
-.mapboxgl-ctrl-bottom-left { font-size: 9px !important; }
-.mapboxgl-ctrl-attrib { background: rgba(0,0,0,0.6) !important; color: #555 !important; font-size: 9px !important; }
   padding: 0.5rem 1rem;
   font-size: 0.65rem;
   color: var(--text-dim);
@@ -647,8 +638,8 @@ td.team-name {
 <!-- CONTROLS -->
 <div class="controls">
   <div class="tabs">
-    <button class="tab-btn active" data-tab="ascent">Ascent</button>
-    <button class="tab-btn" data-tab="50k">50k</button>
+    <button class="tab-btn" data-tab="ascent">Ascent</button>
+    <button class="tab-btn active" data-tab="50k">50k</button>
     <button class="tab-btn" data-tab="ambush">Ambush</button>
     <button class="tab-btn" data-tab="bigcat">🐅 Big Cat</button>
   </div>
@@ -799,7 +790,8 @@ const CHECKPOINTS = [
 // STATE
 // ============================================================
 let data = { ascent: [], fiftyk: [], ambush: [] };
-let activeTab = 'ascent';
+let activeTab = '50k';
+let previousTab = '50k';
 let sortCol = null, sortDir = 'asc';
 let filterText = '';
 let genderFilter = 'all';
@@ -949,6 +941,7 @@ async function fetchAll() {
     updateLoopChart();
     updateSegChart();
     drawMap();
+    updateRouteVisibility(activeTab);
     document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
   } catch(e) {
     console.error('Fetch error:', e);
@@ -1306,51 +1299,21 @@ const SEGMENT_INFO = {
   red_finish:  { label: 'RED FINISH',      color: '#f87171' },
 };
 
-function highlightSegment(routeName) {
-  const routeStyles = {
-    green_start:  '#4ade80', ascent: '#a78bfa', pink: '#f472b6',
-    white: '#e2e8f0', yellow: '#fbbf24', blue_descent: '#60a5fa', red_finish: '#f87171',
-  };
-  Object.entries(routePolylines).forEach(([name, line]) => {
-    if (name === routeName) {
-      line.setStyle({ opacity: 1, weight: 7, dashArray: null, color: routeStyles[name] || '#fff' });
-      line.bringToFront();
-    } else {
-      line.setStyle({ opacity: 0.12, weight: 2 });
-    }
-  });
-}
-
-function resetSegmentStyles() {
-  const styles = {
-    green_start:  { color: '#4ade80', weight: 4, opacity: 0.8, dashArray: '5 4' },
-    ascent:       { color: '#a78bfa', weight: 4, opacity: 0.8, dashArray: '5 4' },
-    pink:         { color: '#f472b6', weight: 4, opacity: 0.8, dashArray: '5 4' },
-    white:        { color: '#e2e8f0', weight: 4, opacity: 0.8, dashArray: '5 4' },
-    yellow:       { color: '#fbbf24', weight: 4, opacity: 0.8, dashArray: '5 4' },
-    blue_descent: { color: '#60a5fa', weight: 4, opacity: 0.8, dashArray: '5 4' },
-    red_finish:   { color: '#f87171', weight: 4, opacity: 0.8, dashArray: '5 4' },
-  };
-  Object.entries(routePolylines).forEach(([name, line]) => {
-    line.setStyle(styles[name] || { color: '#888', weight: 4, opacity: 0.8 });
-  });
-}
-
 function openSegmentFocus(routeName) {
   activeSegment = routeName;
   const info = SEGMENT_INFO[routeName];
   if (!info) return;
 
-  const panel = document.getElementById('segmentFocus');
-  panel.style.display = 'block';
+  // Show panel
+  document.getElementById('segmentFocus').style.display = 'block';
   document.getElementById('segFocusTitle').textContent = info.label;
+  document.getElementById('segFocusTitle').style.color = info.color;
+  document.getElementById('elevLoadingMsg').textContent = '';
 
-  // Highlight selected, dim others
+  // Highlight map segment
   highlightSegment(routeName);
 
-  // Zoom handled inside highlightSegment via Mapbox fitBounds
-
-  // Find runners on this segment
+  // Find runners currently on this segment
   const runnersOnSeg = [];
   data.fiftyk.forEach(r => {
     if (!r.Bib) return;
@@ -1372,9 +1335,8 @@ function openSegmentFocus(routeName) {
   });
 
   // Runner list
-  const listEl = document.getElementById('segRunnerList');
-  listEl.innerHTML = runnersOnSeg.length === 0
-    ? `<div style="color:var(--text-dim);font-size:0.75rem;font-family:'DM Mono',monospace;">No runners currently on this segment</div>`
+  document.getElementById('segRunnerList').innerHTML = runnersOnSeg.length === 0
+    ? `<div style="color:var(--text-dim);font-size:0.75rem;font-family:'DM Mono',monospace;">No runners on this segment yet</div>`
     : runnersOnSeg.map(rp => `
         <div style="display:flex;align-items:center;gap:0.6rem;padding:0.3rem 0.5rem;background:var(--surface3);border-radius:3px;border-left:2px solid ${rp.color}">
           <span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:${rp.color}">#${rp.bib}</span>
@@ -1382,11 +1344,10 @@ function openSegmentFocus(routeName) {
           <span style="font-size:0.65rem;color:var(--text-dim);margin-left:auto">${Math.round(rp.progress*100)}% through</span>
         </div>`).join('');
 
-  // Stats with units
+  // Stats
   const distM = GPX_DISTANCES[routeName] || 0;
   const elevs = ELEVATION_DATA[routeName];
   let statsText = `${fmtDist(distM)} · ${runnersOnSeg.length} runner${runnersOnSeg.length!==1?'s':''} on segment`;
-
   if (elevs && elevs.length > 1) {
     let gain = 0;
     for (let i = 1; i < elevs.length; i++) { const d = elevs[i]-elevs[i-1]; if (d>0) gain+=d; }
@@ -1394,207 +1355,118 @@ function openSegmentFocus(routeName) {
     statsText = `${fmtDist(distM)} · +${fmtElev(gain)} gain · ${fmtElev(minE)}–${fmtElev(maxE)} · ${runnersOnSeg.length} runner${runnersOnSeg.length!==1?'s':''} on segment`;
     showElevationProfile(routeName, elevs, runnersOnSeg, info.color);
   }
-
   document.getElementById('segFocusStats').textContent = statsText;
-  document.getElementById('elevLoadingMsg').textContent = '';
 }
 
-document.getElementById('segFocusClose').addEventListener('click', () => {
-  document.getElementById('segmentFocus').style.display = 'none';
-  activeSegment = null;
-  if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
-  resetSegmentStyles();
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('segFocusClose').addEventListener('click', () => {
+    document.getElementById('segmentFocus').style.display = 'none';
+    activeSegment = null;
+    if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
+    resetSegmentStyles(); // restores routes for current tab and re-fits bounds
+  });
 });
-let mbMap = null;
-let runnerMarkers = {};   // bib_key -> mapbox Marker
-let animationFrame = null;
-let smoothPositions = {};
-
-// Route visibility by tab
-const ROUTE_TABS = {
-  ascent:  ['ascent'],
-  '50k':   ['green_start','pink','white','yellow','blue_descent','red_finish'],
-  ambush:  ['green_start','pink','white','yellow','blue_descent','red_finish'],
-  bigcat:  ['ascent','green_start','pink','white','yellow','blue_descent','red_finish'],
-};
-
-mapboxgl.accessToken = 'pk.eyJ1IjoiZ25ncnJubnIiLCJhIjoiY21vaGdsaWtqMDFuNTJwcHQ0em83bWltaCJ9.DdC1VfJKIjSpNo3uLDLNLw';
 
 function initMap() {
-  mbMap = new mapboxgl.Map({
-    container: 'courseMap',
-    style: 'mapbox://styles/mapbox/satellite-streets-v12',
-    center: [-121.998, 47.518],
-    zoom: 12.5,
-    pitch: 55,
-    bearing: -20,
-    antialias: true,
+  lMap = L.map('courseMap', { zoomControl: true, attributionControl: true })
+    .setView([47.518, -122.005], 13);
+
+  // Esri satellite tiles — fast, free, no key
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles © Esri', maxZoom: 18
+  }).addTo(lMap);
+
+  // Label overlay
+  L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+    opacity: 0.5, maxZoom: 18
+  }).addTo(lMap);
+
+  // Add tooltip CSS
+  const s = document.createElement('style');
+  s.textContent = `
+    .tc-tip { background:#111!important;border:1px solid #333!important;color:#f0f0f0!important;
+      font-family:'DM Mono',monospace;font-size:11px;padding:4px 8px;border-radius:4px;box-shadow:none!important; }
+    .tc-tip::before { border-top-color:#333!important; }
+    .leaflet-control-attribution { font-size:9px!important;background:rgba(0,0,0,0.6)!important;color:#555!important; }
+    .runner-dot { background:transparent;border:none;box-shadow:none; }
+  `;
+  document.head.appendChild(s);
+
+  // Draw GPX routes
+  Object.entries(GPX_ROUTES).forEach(([name, pts]) => {
+    const color = ROUTE_COLORS[name] || '#888';
+    const line = L.polyline(pts, { color, weight: 3.5, opacity: 0.9, dashArray: '6 4' }).addTo(lMap);
+    const hit  = L.polyline(pts, { color: 'transparent', weight: 18, opacity: 0 }).addTo(lMap);
+    const label = SEGMENT_INFO[name]?.label || name;
+    hit.bindTooltip(`<b style="color:${color}">${label}</b><br><span style="color:#aaa;font-size:10px">Click to focus</span>`,
+      { className: 'tc-tip', sticky: true });
+    hit.on('click', () => openSegmentFocus(name));
+    line.on('click', () => openSegmentFocus(name));
+    routeLayers[name] = { line, hit };
   });
 
-  mbMap.addControl(new mapboxgl.NavigationControl(), 'top-right');
-  mbMap.addControl(new mapboxgl.ScaleControl({ unit: 'imperial' }), 'bottom-left');
-
-  mbMap.on('load', () => {
-    // Add 3D terrain
-    mbMap.addSource('mapbox-dem', {
-      type: 'raster-dem',
-      url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-      tileSize: 512,
-      maxzoom: 14
+  // Checkpoint markers
+  CHECKPOINTS.forEach(cp => {
+    const icon = L.divIcon({
+      className: 'runner-dot',
+      html: `<div style="width:${cp.r*2+4}px;height:${cp.r*2+4}px;background:${cp.color};border:2px solid #0a0a0a;border-radius:50%;box-shadow:0 0 8px ${cp.color}88"></div>`,
+      iconSize: [cp.r*2+4, cp.r*2+4], iconAnchor: [cp.r+2, cp.r+2]
     });
-    mbMap.setTerrain({ source: 'mapbox-dem', exaggeration: 1.8 });
-
-    // Sky layer for realism
-    mbMap.addLayer({
-      id: 'sky',
-      type: 'sky',
-      paint: {
-        'sky-type': 'atmosphere',
-        'sky-atmosphere-sun': [0.0, 90.0],
-        'sky-atmosphere-sun-intensity': 15
-      }
-    });
-
-    // Add each route as a GeoJSON source + layer
-    const routeColors = {
-      green_start:  '#4ade80',
-      ascent:       '#a78bfa',
-      pink:         '#f472b6',
-      white:        '#e2e8f0',
-      yellow:       '#fbbf24',
-      blue_descent: '#60a5fa',
-      red_finish:   '#f87171',
-    };
-
-    Object.entries(GPX_ROUTES).forEach(([name, pts]) => {
-      const geojson = {
-        type: 'Feature',
-        geometry: { type: 'LineString', coordinates: pts.map(([lat,lon]) => [lon, lat]) }
-      };
-      mbMap.addSource(`route-${name}`, { type: 'geojson', data: geojson });
-
-      // Glow/shadow layer
-      mbMap.addLayer({
-        id: `route-${name}-glow`,
-        type: 'line',
-        source: `route-${name}`,
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: {
-          'line-color': routeColors[name] || '#fff',
-          'line-width': 10,
-          'line-opacity': 0.25,
-          'line-blur': 4
-        }
-      });
-
-      // Main route line
-      mbMap.addLayer({
-        id: `route-${name}`,
-        type: 'line',
-        source: `route-${name}`,
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: {
-          'line-color': routeColors[name] || '#fff',
-          'line-width': 3.5,
-          'line-opacity': 0.95
-        }
-      });
-
-      // Click handler
-      mbMap.on('click', `route-${name}`, () => openSegmentFocus(name));
-      mbMap.on('mouseenter', `route-${name}`, () => { mbMap.getCanvas().style.cursor = 'pointer'; });
-      mbMap.on('mouseleave', `route-${name}`, () => { mbMap.getCanvas().style.cursor = ''; });
-    });
-
-    // Add checkpoint markers
-    CHECKPOINTS.forEach(cp => {
-      const el = document.createElement('div');
-      el.style.cssText = `
-        width:${cp.r*2+4}px;height:${cp.r*2+4}px;
-        background:${cp.color};
-        border:2px solid #0a0a0a;
-        border-radius:50%;
-        box-shadow:0 0 10px ${cp.color}99;
-        cursor:pointer;
-      `;
-      const popup = new mapboxgl.Popup({ offset: 15, closeButton: false })
-        .setHTML(`<div style="font-family:'DM Mono',monospace;font-size:11px;color:#f0f0f0;background:#111;padding:4px 8px;border-radius:4px"><b style="color:${cp.color}">${cp.label}</b></div>`);
-      new mapboxgl.Marker(el)
-        .setLngLat([cp.lng, cp.lat])
-        .setPopup(popup)
-        .addTo(mbMap);
-    });
-
-    // Initial route visibility
-    updateRouteVisibility(activeTab);
-    startAnimation();
+    L.marker([cp.lat, cp.lng], { icon })
+      .bindTooltip(`<b style="color:${cp.color}">${cp.label}</b>`, { className: 'tc-tip', direction: 'top' })
+      .addTo(lMap);
   });
+
+  // Fit to all routes
+  const allPts = Object.values(GPX_ROUTES).flat();
+  lMap.fitBounds(allPts, { padding: [30, 30] });
 
   // Resize observer
-  const resizeObs = new ResizeObserver(() => mbMap.resize());
-  resizeObs.observe(document.getElementById('courseMap'));
+  new ResizeObserver(() => lMap.invalidateSize()).observe(document.getElementById('courseMap'));
+
+  updateRouteVisibility(activeTab);
+  startAnimation();
 }
 
 function updateRouteVisibility(tab) {
-  if (!mbMap || !mbMap.isStyleLoaded()) return;
-  const visible = ROUTE_TABS[tab] || ROUTE_TABS['50k'];
-  Object.keys(GPX_ROUTES).forEach(name => {
-    const vis = visible.includes(name) ? 'visible' : 'none';
-    if (mbMap.getLayer(`route-${name}`)) {
-      mbMap.setLayoutProperty(`route-${name}`, 'visibility', vis);
-      mbMap.setLayoutProperty(`route-${name}-glow`, 'visibility', vis);
+  if (!lMap) return;
+  const visible = new Set(ROUTE_TABS[tab] || ROUTE_TABS['50k']);
+  const allPts = [];
+  Object.entries(routeLayers).forEach(([name, { line, hit }]) => {
+    if (visible.has(name)) {
+      if (!lMap.hasLayer(line)) { lMap.addLayer(line); lMap.addLayer(hit); }
+      GPX_ROUTES[name].forEach(p => allPts.push(p));
+    } else {
+      if (lMap.hasLayer(line)) { lMap.removeLayer(line); lMap.removeLayer(hit); }
     }
   });
-
-  // Fly to appropriate bounds
-  const pts = visible.flatMap(n => (GPX_ROUTES[n]||[]).map(([lat,lon]) => [lon,lat]));
-  if (pts.length > 0) {
-    const lngs = pts.map(p => p[0]), lats = pts.map(p => p[1]);
-    mbMap.fitBounds([[Math.min(...lngs), Math.min(...lats)],[Math.max(...lngs), Math.max(...lats)]], {
-      padding: 60, pitch: 55, bearing: -20, duration: 800
-    });
-  }
+  if (allPts.length) lMap.fitBounds(allPts, { padding: [30, 30], animate: true, duration: 0.5 });
 }
 
 function highlightSegment(routeName) {
-  if (!mbMap || !mbMap.isStyleLoaded()) return;
-  Object.keys(GPX_ROUTES).forEach(name => {
-    if (mbMap.getLayer(`route-${name}`)) {
-      if (name === routeName) {
-        mbMap.setPaintProperty(`route-${name}`, 'line-width', 6);
-        mbMap.setPaintProperty(`route-${name}`, 'line-opacity', 1);
-        mbMap.setPaintProperty(`route-${name}-glow`, 'line-opacity', 0.5);
-      } else {
-        mbMap.setPaintProperty(`route-${name}`, 'line-opacity', 0.1);
-        mbMap.setPaintProperty(`route-${name}-glow`, 'line-opacity', 0.05);
-      }
+  if (!lMap) return;
+  Object.entries(routeLayers).forEach(([name, { line }]) => {
+    if (name === routeName) {
+      line.setStyle({ opacity: 1, weight: 6, dashArray: null });
+      line.bringToFront();
+    } else {
+      line.setStyle({ opacity: 0.12, weight: 2 });
     }
   });
-
-  // Fly to segment
-  const pts = (GPX_ROUTES[routeName]||[]).map(([lat,lon]) => [lon,lat]);
-  if (pts.length > 0) {
-    const lngs = pts.map(p => p[0]), lats = pts.map(p => p[1]);
-    mbMap.fitBounds([[Math.min(...lngs), Math.min(...lats)],[Math.max(...lngs), Math.max(...lats)]], {
-      padding: 80, pitch: 60, bearing: -15, duration: 1000
-    });
-  }
+  const pts = GPX_ROUTES[routeName];
+  if (pts) lMap.fitBounds(pts, { padding: [50, 50], animate: true, duration: 0.4 });
 }
 
 function resetSegmentStyles() {
-  if (!mbMap || !mbMap.isStyleLoaded()) return;
-  Object.keys(GPX_ROUTES).forEach(name => {
-    if (mbMap.getLayer(`route-${name}`)) {
-      mbMap.setPaintProperty(`route-${name}`, 'line-width', 3.5);
-      mbMap.setPaintProperty(`route-${name}`, 'line-opacity', 0.95);
-      mbMap.setPaintProperty(`route-${name}-glow`, 'line-opacity', 0.25);
-    }
+  if (!lMap) return;
+  Object.entries(routeLayers).forEach(([name, { line }]) => {
+    line.setStyle({ color: ROUTE_COLORS[name]||'#888', weight: 3.5, opacity: 0.9, dashArray: '6 4' });
   });
   updateRouteVisibility(activeTab);
 }
 
 // ============================================================
-// SMOOTH ANIMATION LOOP
+// SMOOTH ANIMATION
 // ============================================================
 function startAnimation() {
   if (animationFrame) clearTimeout(animationFrame);
@@ -1607,97 +1479,88 @@ function animateStep() {
 }
 
 function updateRunnerPositions() {
-  if (!mbMap || !mbMap.isStyleLoaded()) return;
-
+  if (!lMap) return;
   const allRunners = [];
 
   data.fiftyk.forEach(r => {
     if (!r.Bib) return;
     const pos = getRunnerRouteAndProgress(r, '50k');
     if (!pos) return;
-    let lat, lng, segment;
-    if (pos.fixed) { lat = pos.lat; lng = pos.lng; segment = pos.segment; }
-    else { const p = interpolateAlongRoute(pos.route, pos.progress); lat = p.lat; lng = p.lng; segment = pos.segment; }
+    const p = pos.fixed ? { lat: pos.lat, lng: pos.lng } : interpolateAlongRoute(pos.route, pos.progress);
     const key = `50k_${r.Bib}`;
     if (smoothPositions[key]) {
-      lat = smoothPositions[key].lat * 0.7 + lat * 0.3;
-      lng = smoothPositions[key].lng * 0.7 + lng * 0.3;
+      p.lat = smoothPositions[key].lat * 0.7 + p.lat * 0.3;
+      p.lng = smoothPositions[key].lng * 0.7 + p.lng * 0.3;
     }
-    smoothPositions[key] = { lat, lng };
-    allRunners.push({ lat, lng, bib: r.Bib, name: r.Name||'', segment, color: '#e8c14a', key });
+    smoothPositions[key] = p;
+    allRunners.push({ ...p, bib: r.Bib, name: r.Name||'', segment: pos.segment||'', color: '#e8c14a', key });
   });
 
   data.ascent.forEach(r => {
     if (!r.BIB) return;
     const pos = getRunnerRouteAndProgress(r, 'ascent');
     if (!pos) return;
-    let lat, lng, segment;
-    if (pos.fixed) { lat = pos.lat; lng = pos.lng; segment = pos.segment; }
-    else { const p = interpolateAlongRoute(pos.route, pos.progress); lat = p.lat; lng = p.lng; segment = pos.segment; }
+    const p = pos.fixed ? { lat: pos.lat, lng: pos.lng } : interpolateAlongRoute(pos.route, pos.progress);
     const key = `asc_${r.BIB}`;
     if (smoothPositions[key]) {
-      lat = smoothPositions[key].lat * 0.7 + lat * 0.3;
-      lng = smoothPositions[key].lng * 0.7 + lng * 0.3;
+      p.lat = smoothPositions[key].lat * 0.7 + p.lat * 0.3;
+      p.lng = smoothPositions[key].lng * 0.7 + p.lng * 0.3;
     }
-    smoothPositions[key] = { lat, lng };
-    allRunners.push({ lat, lng, bib: r.BIB, name: r.NAME||'', segment, color: '#a78bfa', key });
+    smoothPositions[key] = p;
+    allRunners.push({ ...p, bib: r.BIB, name: r.NAME||'', segment: pos.segment||'', color: '#a78bfa', key });
   });
 
   data.ambush.forEach(r => {
     if (!r.Bib) return;
     const pos = getRunnerRouteAndProgress(r, 'ambush');
     if (!pos) return;
-    let lat, lng, segment;
-    if (pos.fixed) { lat = pos.lat; lng = pos.lng; segment = pos.segment; }
-    else { const p = interpolateAlongRoute(pos.route, pos.progress); lat = p.lat; lng = p.lng; segment = pos.segment; }
+    const p = pos.fixed ? { lat: pos.lat, lng: pos.lng } : interpolateAlongRoute(pos.route, pos.progress);
     const key = `amb_${r.Bib}`;
     if (smoothPositions[key]) {
-      lat = smoothPositions[key].lat * 0.7 + lat * 0.3;
-      lng = smoothPositions[key].lng * 0.7 + lng * 0.3;
+      p.lat = smoothPositions[key].lat * 0.7 + p.lat * 0.3;
+      p.lng = smoothPositions[key].lng * 0.7 + p.lng * 0.3;
     }
-    smoothPositions[key] = { lat, lng };
-    allRunners.push({ lat, lng, bib: r.Bib, name: r.Name||'', segment, color: '#fb923c', key });
+    smoothPositions[key] = p;
+    allRunners.push({ ...p, bib: r.Bib, name: r.Name||'', segment: pos.segment||'', color: '#fb923c', key });
   });
 
-  // Update or create Mapbox markers
   const seenKeys = new Set();
   allRunners.forEach(rp => {
     seenKeys.add(rp.key);
     if (runnerMarkers[rp.key]) {
-      // Move existing marker smoothly
-      runnerMarkers[rp.key].setLngLat([rp.lng, rp.lat]);
+      runnerMarkers[rp.key].setLatLng([rp.lat, rp.lng]);
     } else {
-      // Create new marker
-      const el = document.createElement('div');
-      el.style.cssText = `display:flex;flex-direction:column;align-items:center;cursor:pointer;`;
-      el.innerHTML = `
-        <div style="background:rgba(10,10,10,0.9);color:${rp.color};font-family:'DM Mono',monospace;font-size:9px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid ${rp.color}55;white-space:nowrap;">#${rp.bib}</div>
-        <div style="width:10px;height:10px;background:${rp.color};border:2px solid #0a0a0a;border-radius:50%;box-shadow:0 0 6px ${rp.color}cc;margin-top:1px;"></div>`;
-      const popup = new mapboxgl.Popup({ offset: 20, closeButton: false, maxWidth: '200px' })
-        .setHTML(`<div style="font-family:'DM Mono',monospace;font-size:11px;color:#f0f0f0;background:#111;padding:6px 8px;border-radius:4px;border-left:3px solid ${rp.color}">
-          <b style="color:${rp.color}">#${rp.bib}</b> ${rp.name}<br>
-          <span style="color:#888;font-size:10px">${rp.segment||''}</span>
-        </div>`);
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([rp.lng, rp.lat])
-        .setPopup(popup)
-        .addTo(mbMap);
-      runnerMarkers[rp.key] = marker;
+      const icon = L.divIcon({
+        className: 'runner-dot',
+        html: `<div style="display:flex;flex-direction:column;align-items:center">
+          <div style="background:rgba(10,10,10,0.9);color:${rp.color};font-family:'DM Mono',monospace;font-size:9px;font-weight:700;padding:1px 3px;border-radius:2px;border:1px solid ${rp.color}55;white-space:nowrap">#${rp.bib}</div>
+          <div style="width:9px;height:9px;background:${rp.color};border:1.5px solid #0a0a0a;border-radius:50%;box-shadow:0 0 5px ${rp.color}99;margin-top:1px"></div>
+        </div>`,
+        iconSize: [32, 22], iconAnchor: [16, 20]
+      });
+      const m = L.marker([rp.lat, rp.lng], { icon, zIndexOffset: 100 })
+        .bindTooltip(`<b style="color:${rp.color}">#${rp.bib}</b> ${rp.name}<br><span style="color:#aaa;font-size:10px">${rp.segment}</span>`,
+          { className: 'tc-tip', direction: 'top', offset: [0, -18] })
+        .addTo(lMap);
+      runnerMarkers[rp.key] = m;
     }
   });
 
-  // Remove markers for runners no longer active
   Object.keys(runnerMarkers).forEach(key => {
-    if (!seenKeys.has(key)) {
-      runnerMarkers[key].remove();
-      delete runnerMarkers[key];
-    }
+    if (!seenKeys.has(key)) { lMap.removeLayer(runnerMarkers[key]); delete runnerMarkers[key]; }
   });
 }
 
-function drawMap() {
-  updateRunnerPositions();
-}
+function drawMap() { updateRunnerPositions(); }
+
+// Route visibility by tab
+const ROUTE_TABS = {
+  ascent:  ['ascent'],
+  '50k':   ['green_start','pink','white','yellow','blue_descent','red_finish'],
+  ambush:  ['green_start','pink','white','yellow','blue_descent','red_finish'],
+  bigcat:  ['ascent','green_start','pink','white','yellow','blue_descent','red_finish'],
+};
+
 
 // ============================================================
 // TABLE RENDERING
@@ -2140,11 +2003,18 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+    previousTab = activeTab;
     activeTab = btn.getAttribute('data-tab');
     sortCol = null;
+    // Close segment focus if open
+    if (activeSegment) {
+      document.getElementById('segmentFocus').style.display = 'none';
+      activeSegment = null;
+      if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
+    }
     renderTable();
-    drawMap();
     updateRouteVisibility(activeTab);
+    drawMap();
   });
 });
 
