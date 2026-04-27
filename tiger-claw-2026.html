@@ -640,6 +640,14 @@ td.team-name {
       <option value="F">Women</option>
       <option value="NB">Non-Binary</option>
     </select>
+    <div style="display:flex;border:1px solid var(--border2);border-radius:4px;overflow:hidden;">
+      <button id="unitsMiles" onclick="setUnits('imperial')" style="
+        background:var(--accent);color:var(--black);border:none;padding:0.5rem 0.75rem;
+        font-family:'DM Mono',monospace;font-size:0.75rem;font-weight:700;cursor:pointer;">mi/ft</button>
+      <button id="unitsKm" onclick="setUnits('metric')" style="
+        background:var(--surface3);color:var(--text-muted);border:none;padding:0.5rem 0.75rem;
+        font-family:'DM Mono',monospace;font-size:0.75rem;cursor:pointer;">km/m</button>
+    </div>
     <div class="search-wrap">
       <span class="search-icon">⌕</span>
       <input type="text" class="search-input" id="searchInput" placeholder="Search bib or name…">
@@ -773,6 +781,37 @@ let activeTab = 'ascent';
 let sortCol = null, sortDir = 'asc';
 let filterText = '';
 let genderFilter = 'all';
+let units = 'imperial'; // 'imperial' or 'metric'
+
+function setUnits(u) {
+  units = u;
+  document.getElementById('unitsMiles').style.background = u === 'imperial' ? 'var(--accent)' : 'var(--surface3)';
+  document.getElementById('unitsMiles').style.color = u === 'imperial' ? 'var(--black)' : 'var(--text-muted)';
+  document.getElementById('unitsKm').style.background = u === 'metric' ? 'var(--accent)' : 'var(--surface3)';
+  document.getElementById('unitsKm').style.color = u === 'metric' ? 'var(--black)' : 'var(--text-muted)';
+  // Refresh segment focus if open
+  if (activeSegment) openSegmentFocus(activeSegment);
+}
+
+function fmtDist(meters) {
+  if (units === 'imperial') return (meters * 0.000621371).toFixed(1) + ' mi';
+  return (meters / 1000).toFixed(1) + ' km';
+}
+
+function fmtElev(meters) {
+  if (units === 'imperial') return Math.round(meters * 3.281) + ' ft';
+  return Math.round(meters) + ' m';
+}
+
+function fmtElevAxis(meters) {
+  if (units === 'imperial') return Math.round(meters * 3.281) + 'ft';
+  return Math.round(meters) + 'm';
+}
+
+function fmtDistAxis(km) {
+  if (units === 'imperial') return (km * 0.621371).toFixed(1) + 'mi';
+  return km.toFixed(1) + 'km';
+}
 let loopChartInst = null, segChartInst = null;
 let mapCanvas, mapCtx;
 
@@ -1138,16 +1177,23 @@ function showElevationProfile(routeName, elevations, runnerPositions, routeColor
   }
   const totalKm = distKm[distKm.length-1];
 
-  // Convert to feet for display
-  const elevFt = elevations.map(e => e ? Math.round(e * 3.281) : null);
+  // Convert elevation to display units
+  const elevDisplay = elevations.map(e => units === 'imperial' ? Math.round(e * 3.281) : Math.round(e));
+  const elevUnit = units === 'imperial' ? 'ft' : 'm';
+  const distUnit = units === 'imperial' ? 'mi' : 'km';
 
-  // Runner position markers on the profile
-  const runnerAnnotations = runnerPositions.map(rp => ({
-    x: rp.progress * totalKm,
-    y: elevFt[Math.round(rp.progress * (elevFt.length-1))] || 0,
-    bib: rp.bib,
-    color: rp.color
-  }));
+  // Runner dots on profile — find elevation at their progress position
+  const runnerDots = runnerPositions.map(rp => {
+    const idx = Math.min(Math.round(rp.progress * (elevDisplay.length - 1)), elevDisplay.length - 1);
+    const dist = units === 'imperial' ? distKm[idx] * 0.621371 : distKm[idx];
+    return { x: idx, dist: dist.toFixed(2), elev: elevDisplay[idx], bib: rp.bib, color: rp.color };
+  });
+
+  // X-axis labels in correct units
+  const xLabels = distKm.map((d, i) => {
+    const val = units === 'imperial' ? (d * 0.621371).toFixed(2) : d.toFixed(2);
+    return val;
+  });
 
   if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
 
@@ -1155,25 +1201,25 @@ function showElevationProfile(routeName, elevations, runnerPositions, routeColor
   elevChartInst = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: distKm.map(d => d.toFixed(2)),
+      labels: xLabels,
       datasets: [
         {
-          label: 'Elevation (ft)',
-          data: elevFt,
+          label: `Elevation (${elevUnit})`,
+          data: elevDisplay,
           borderColor: routeColor,
-          backgroundColor: routeColor + '22',
-          borderWidth: 2,
+          backgroundColor: routeColor + '33',
+          borderWidth: 2.5,
           pointRadius: 0,
           fill: true,
-          tension: 0.3,
+          tension: 0.4,
         },
-        // Runner position dots
+        // Runner position dots on profile
         {
           label: 'Runners',
-          data: runnerAnnotations.map(ra => ({ x: ra.x.toFixed(2), y: ra.y })),
-          borderColor: '#e8c14a',
-          backgroundColor: '#e8c14a',
-          pointRadius: 6,
+          data: runnerDots.map(rd => ({ x: xLabels[rd.x], y: rd.elev })),
+          borderColor: '#0a0a0a',
+          backgroundColor: runnerDots.map(rd => rd.color),
+          pointRadius: 7,
           pointStyle: 'circle',
           showLine: false,
           pointBorderColor: '#0a0a0a',
@@ -1188,13 +1234,13 @@ function showElevationProfile(routeName, elevations, runnerPositions, routeColor
         legend: { display: false },
         tooltip: {
           callbacks: {
-            title: ctx => `${ctx[0].label} km`,
+            title: ctx => `${ctx[0].label} ${distUnit}`,
             label: ctx => {
               if (ctx.datasetIndex === 1) {
-                const ra = runnerAnnotations[ctx.dataIndex];
-                return ra ? `#${ra.bib}` : '';
+                const rd = runnerDots[ctx.dataIndex];
+                return rd ? `#${rd.bib} — ${rd.elev}${elevUnit}` : '';
               }
-              return `${ctx.parsed.y} ft`;
+              return `${ctx.parsed.y}${elevUnit}`;
             }
           }
         }
@@ -1203,15 +1249,19 @@ function showElevationProfile(routeName, elevations, runnerPositions, routeColor
         x: {
           type: 'category',
           ticks: {
-            color: '#666',
+            color: '#555',
             font: { family: 'DM Mono', size: 9 },
-            maxTicksLimit: 8,
-            callback: (val, i) => distKm[i] ? `${distKm[i].toFixed(1)}km` : ''
+            maxTicksLimit: 7,
+            callback: (val, i) => {
+              // Only show every Nth label
+              const step = Math.ceil(xLabels.length / 6);
+              return i % step === 0 ? `${xLabels[i]}${distUnit}` : '';
+            }
           },
           grid: { color: '#1a1a1a' }
         },
         y: {
-          ticks: { color: '#666', font: { family: 'DM Mono', size: 9 }, callback: v => `${v}ft` },
+          ticks: { color: '#555', font: { family: 'DM Mono', size: 9 }, callback: v => `${v}${elevUnit}` },
           grid: { color: '#1a1a1a' }
         }
       }
@@ -1223,16 +1273,46 @@ function showElevationProfile(routeName, elevations, runnerPositions, routeColor
 // SEGMENT FOCUS
 // ============================================================
 const SEGMENT_INFO = {
-  green_start: { label: 'Start → Green Checkpoint', color: '#4ade80' },
-  ascent:      { label: 'Ascent Route', color: '#a78bfa' },
-  pink:        { label: 'Pink Loop', color: '#f472b6' },
-  white:       { label: 'White Loop', color: '#e2e8f0' },
-  yellow:      { label: 'Yellow Loop', color: '#fbbf24' },
-  blue_descent:{ label: 'Blue Summit Descent', color: '#60a5fa' },
-  red_finish:  { label: 'Red Checkpoint → Finish', color: '#f87171' },
+  green_start: { label: 'GREEN SEGMENT',   color: '#4ade80' },
+  ascent:      { label: 'ASCENT COURSE',   color: '#a78bfa' },
+  pink:        { label: 'PINK ROUTE',      color: '#f472b6' },
+  white:       { label: 'WHITE ROUTE',     color: '#e2e8f0' },
+  yellow:      { label: 'YELLOW ROUTE',    color: '#fbbf24' },
+  blue_descent:{ label: 'BLUE DESCENT',    color: '#60a5fa' },
+  red_finish:  { label: 'RED FINISH',      color: '#f87171' },
 };
 
-async function openSegmentFocus(routeName) {
+function highlightSegment(routeName) {
+  const routeStyles = {
+    green_start:  '#4ade80', ascent: '#a78bfa', pink: '#f472b6',
+    white: '#e2e8f0', yellow: '#fbbf24', blue_descent: '#60a5fa', red_finish: '#f87171',
+  };
+  Object.entries(routePolylines).forEach(([name, line]) => {
+    if (name === routeName) {
+      line.setStyle({ opacity: 1, weight: 7, dashArray: null, color: routeStyles[name] || '#fff' });
+      line.bringToFront();
+    } else {
+      line.setStyle({ opacity: 0.12, weight: 2 });
+    }
+  });
+}
+
+function resetSegmentStyles() {
+  const styles = {
+    green_start:  { color: '#4ade80', weight: 4, opacity: 0.8, dashArray: '5 4' },
+    ascent:       { color: '#a78bfa', weight: 4, opacity: 0.8, dashArray: '5 4' },
+    pink:         { color: '#f472b6', weight: 4, opacity: 0.8, dashArray: '5 4' },
+    white:        { color: '#e2e8f0', weight: 4, opacity: 0.8, dashArray: '5 4' },
+    yellow:       { color: '#fbbf24', weight: 4, opacity: 0.8, dashArray: '5 4' },
+    blue_descent: { color: '#60a5fa', weight: 4, opacity: 0.8, dashArray: '5 4' },
+    red_finish:   { color: '#f87171', weight: 4, opacity: 0.8, dashArray: '5 4' },
+  };
+  Object.entries(routePolylines).forEach(([name, line]) => {
+    line.setStyle(styles[name] || { color: '#888', weight: 4, opacity: 0.8 });
+  });
+}
+
+function openSegmentFocus(routeName) {
   activeSegment = routeName;
   const info = SEGMENT_INFO[routeName];
   if (!info) return;
@@ -1241,77 +1321,80 @@ async function openSegmentFocus(routeName) {
   panel.style.display = 'block';
   document.getElementById('segFocusTitle').textContent = info.label;
 
-  // Zoom map to segment
+  // Highlight selected, dim others
+  highlightSegment(routeName);
+
+  // Zoom map to segment bounds
   const pts = GPX_ROUTES[routeName];
   if (pts && leafletMap) {
-    leafletMap.fitBounds(pts, { padding: [40, 40], maxZoom: 15 });
+    leafletMap.fitBounds(pts, { padding: [60, 60], maxZoom: 15 });
   }
 
   // Find runners on this segment
   const runnersOnSeg = [];
-  // Check all runner animation states
-  [...data.fiftyk, ...data.ascent, ...data.ambush].forEach(r => {
-    const bib = r.Bib || r.BIB;
-    const name = r.Name || r.NAME || '';
-    if (!bib) return;
-
-    // Check 50k
-    let pos = null;
-    if (r.Bib) pos = getRunnerRouteAndProgress(r, '50k');
-    else if (r.BIB) pos = getRunnerRouteAndProgress(r, 'ascent');
-    else pos = getRunnerRouteAndProgress(r, 'ambush');
-
-    if (pos && !pos.fixed && pos.route === GPX_ROUTES[routeName]) {
-      runnersOnSeg.push({ bib, name, progress: pos.progress, segment: pos.segment,
-        color: r.Bib ? '#e8c14a' : r.BIB ? '#a78bfa' : '#fb923c' });
-    }
+  data.fiftyk.forEach(r => {
+    if (!r.Bib) return;
+    const pos = getRunnerRouteAndProgress(r, '50k');
+    if (pos && !pos.fixed && pos.route === GPX_ROUTES[routeName])
+      runnersOnSeg.push({ bib: r.Bib, name: r.Name||'', progress: pos.progress, color: '#e8c14a' });
+  });
+  data.ascent.forEach(r => {
+    if (!r.BIB) return;
+    const pos = getRunnerRouteAndProgress(r, 'ascent');
+    if (pos && !pos.fixed && pos.route === GPX_ROUTES[routeName])
+      runnersOnSeg.push({ bib: r.BIB, name: r.NAME||'', progress: pos.progress, color: '#a78bfa' });
+  });
+  data.ambush.forEach(r => {
+    if (!r.Bib) return;
+    const pos = getRunnerRouteAndProgress(r, 'ambush');
+    if (pos && !pos.fixed && pos.route === GPX_ROUTES[routeName])
+      runnersOnSeg.push({ bib: r.Bib, name: r.Name||'', progress: pos.progress, color: '#fb923c' });
   });
 
   // Runner list
   const listEl = document.getElementById('segRunnerList');
-  if (runnersOnSeg.length === 0) {
-    listEl.innerHTML = `<div style="color:var(--text-dim);font-size:0.75rem;font-family:'DM Mono',monospace;">No runners currently on this segment</div>`;
-  } else {
-    listEl.innerHTML = runnersOnSeg.map(rp => `
-      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.3rem 0.5rem;background:var(--surface3);border-radius:3px;border-left:2px solid ${rp.color}">
-        <span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:${rp.color}">#${rp.bib}</span>
-        <span style="font-size:0.78rem;color:var(--text)">${rp.name}</span>
-        <span style="font-size:0.65rem;color:var(--text-dim);margin-left:auto">${Math.round(rp.progress*100)}%</span>
-      </div>`).join('');
+  listEl.innerHTML = runnersOnSeg.length === 0
+    ? `<div style="color:var(--text-dim);font-size:0.75rem;font-family:'DM Mono',monospace;">No runners currently on this segment</div>`
+    : runnersOnSeg.map(rp => `
+        <div style="display:flex;align-items:center;gap:0.6rem;padding:0.3rem 0.5rem;background:var(--surface3);border-radius:3px;border-left:2px solid ${rp.color}">
+          <span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:${rp.color}">#${rp.bib}</span>
+          <span style="font-size:0.78rem;color:var(--text)">${rp.name}</span>
+          <span style="font-size:0.65rem;color:var(--text-dim);margin-left:auto">${Math.round(rp.progress*100)}% through</span>
+        </div>`).join('');
+
+  // Stats with units
+  const distM = GPX_DISTANCES[routeName] || 0;
+  const elevs = ELEVATION_DATA[routeName];
+  let statsText = `${fmtDist(distM)} · ${runnersOnSeg.length} runner${runnersOnSeg.length!==1?'s':''} on segment`;
+
+  if (elevs && elevs.length > 1) {
+    let gain = 0;
+    for (let i = 1; i < elevs.length; i++) { const d = elevs[i]-elevs[i-1]; if (d>0) gain+=d; }
+    const minE = Math.min(...elevs), maxE = Math.max(...elevs);
+    statsText = `${fmtDist(distM)} · +${fmtElev(gain)} gain · ${fmtElev(minE)}–${fmtElev(maxE)} · ${runnersOnSeg.length} runner${runnersOnSeg.length!==1?'s':''} on segment`;
+    showElevationProfile(routeName, elevs, runnersOnSeg, info.color);
   }
 
-  // Stats
-  const distKm = ((GPX_DISTANCES[routeName] || 0) / 1000).toFixed(1);
-  document.getElementById('segFocusStats').textContent = `${distKm} km · ${runnersOnSeg.length} runner${runnersOnSeg.length !== 1 ? 's' : ''} on segment`;
-
-  // Fetch elevation and show profile
-  const elevations = await fetchRouteElevation(routeName);
-  if (elevations) {
-    const stats = calcRouteStats(routeName, elevations);
-    if (stats) {
-      document.getElementById('segFocusStats').textContent =
-        `${distKm} km · +${stats.gainFt}ft gain · ${stats.minM*3.281|0}–${stats.maxM*3.281|0}ft · ${runnersOnSeg.length} runner${runnersOnSeg.length !== 1 ? 's' : ''} on segment`;
-    }
-    showElevationProfile(routeName, elevations, runnersOnSeg, info.color);
-  }
+  document.getElementById('segFocusStats').textContent = statsText;
+  document.getElementById('elevLoadingMsg').textContent = '';
 }
 
 document.getElementById('segFocusClose').addEventListener('click', () => {
   document.getElementById('segmentFocus').style.display = 'none';
   activeSegment = null;
   if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
-  // Zoom back to full course
+  resetSegmentStyles();
   if (leafletMap) {
-    const allPts = Object.values(GPX_ROUTES).flat();
-    leafletMap.fitBounds(allPts, { padding: [30, 30] });
+    leafletMap.fitBounds(Object.values(GPX_ROUTES).flat(), { padding: [30, 30] });
   }
 });
 let leafletMap = null;
 let runnerMarkers = [];
 let cpMarkers = [];
+let routePolylines = {}; // routeName -> L.polyline instance
 let animationFrame = null;
 let lastDataTime = null;
-let runnerAnimState = {}; // bib -> { lat, lng, targetLat, targetLng, route, progress }
+let runnerAnimState = {};
 
 function initMap() {
   leafletMap = L.map('courseMap', {
@@ -1372,13 +1455,14 @@ function initMap() {
   Object.entries(GPX_ROUTES).forEach(([name, pts]) => {
     const style = routeStyles[name] || { color: '#888', weight: 2, opacity: 0.6 };
     const line = L.polyline(pts, { ...style, dashArray: '5 4', weight: 4 }).addTo(leafletMap);
+    routePolylines[name] = line; // store reference for dimming
 
     // Invisible thick overlay for easier clicking
     const hitLine = L.polyline(pts, { color: 'transparent', weight: 20, opacity: 0 }).addTo(leafletMap);
 
     const info = SEGMENT_INFO[name];
     if (info) {
-      hitLine.bindTooltip(`<b style="color:${style.color}">${info.label}</b><br><span style="color:#aaa;font-size:10px">Click to focus segment</span>`, {
+      hitLine.bindTooltip(`<b style="color:${style.color};font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:0.1em">${info.label}</b><br><span style="color:#aaa;font-size:10px">Click to focus segment</span>`, {
         className: 'tc-tooltip', sticky: true
       });
       hitLine.on('click', () => openSegmentFocus(name));
@@ -1746,9 +1830,14 @@ function drawMap() {
 // TABLE RENDERING
 // ============================================================
 function getGender(row, tab) {
-  // Try all possible column name variations
-  const g = row['GENDER'] || row['Gender'] || row['gender'] || '';
-  return g.trim().toUpperCase();
+  // Try every possible key — column name varies by tab and sheet export
+  for (const key of Object.keys(row)) {
+    if (key.trim().toUpperCase() === 'GENDER') {
+      const v = (row[key]||'').trim().toUpperCase();
+      if (v) return v;
+    }
+  }
+  return '';
 }
 
 // Fix BIB text/number mismatch in gender filter
