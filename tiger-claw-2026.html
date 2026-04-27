@@ -675,7 +675,14 @@ td.team-name {
 
 <!-- MAP -->
 <div class="map-section">
-  <div class="map-title">Course Map — Live Positions <span class="map-resize-hint">↕ drag bottom edge to resize</span></div>
+  <div class="map-title">
+    Course Map — Live Positions
+    <span class="map-resize-hint">↕ drag bottom edge to resize</span>
+    <div style="display:flex;border:1px solid var(--border2);border-radius:4px;overflow:hidden;margin-left:auto">
+      <button id="btn3d" onclick="setMapDimension('3d')" style="background:var(--accent);color:var(--black);border:none;padding:0.3rem 0.6rem;font-family:'DM Mono',monospace;font-size:0.7rem;font-weight:700;cursor:pointer">3D</button>
+      <button id="btn2d" onclick="setMapDimension('2d')" style="background:var(--surface3);color:var(--text-muted);border:none;padding:0.3rem 0.6rem;font-family:'DM Mono',monospace;font-size:0.7rem;cursor:pointer">2D</button>
+    </div>
+  </div>
   <div class="map-container">
     <div id="courseMap" style="width:100%;height:100%;"></div>
   </div>
@@ -1448,6 +1455,8 @@ function initMap() {
     mapReady = true;
     updateRouteVisibility(activeTab);
     startAnimation();
+    // Cinematic fly-in from I-90
+    setTimeout(flyIn, 500);
   });
 
   new ResizeObserver(() => mbMap && mbMap.resize()).observe(document.getElementById('courseMap'));
@@ -1475,16 +1484,17 @@ function highlightSegment(name) {
   if (!mapReady) return;
   Object.keys(GPX_ROUTES).forEach(n => {
     if (mbMap.getLayer('l-'+n)) {
-      mbMap.setPaintProperty('l-'+n, 'line-opacity', n===name ? 1 : 0.1);
-      mbMap.setPaintProperty('l-'+n, 'line-width', n===name ? 6 : 2);
-      mbMap.setPaintProperty('g-'+n, 'line-opacity', n===name ? 0.4 : 0.02);
+      // Dim others but keep them visible — don't hide them
+      mbMap.setPaintProperty('l-'+n, 'line-opacity', n===name ? 1 : 0.15);
+      mbMap.setPaintProperty('l-'+n, 'line-width', n===name ? 6 : 1.5);
+      mbMap.setPaintProperty('g-'+n, 'line-opacity', n===name ? 0.5 : 0.03);
     }
   });
   const pts = GPX_ROUTES[name];
   if (pts) {
     const lngs = pts.map(p=>p[1]), lats = pts.map(p=>p[0]);
     mbMap.fitBounds([[Math.min(...lngs),Math.min(...lats)],[Math.max(...lngs),Math.max(...lats)]],
-      { padding: 80, pitch: 55, bearing: -10, duration: 900 });
+      { padding: 80, pitch: is3D ? 55 : 0, bearing: is3D ? -10 : 0, duration: 900 });
   }
 }
 
@@ -1498,6 +1508,40 @@ function resetSegmentStyles() {
     }
   });
   updateRouteVisibility(activeTab);
+}
+
+// 2D/3D toggle
+let is3D = true;
+function setMapDimension(mode) {
+  is3D = mode === '3d';
+  document.getElementById('btn3d').style.background = is3D ? 'var(--accent)' : 'var(--surface3)';
+  document.getElementById('btn3d').style.color = is3D ? 'var(--black)' : 'var(--text-muted)';
+  document.getElementById('btn2d').style.background = !is3D ? 'var(--accent)' : 'var(--surface3)';
+  document.getElementById('btn2d').style.color = !is3D ? 'var(--black)' : 'var(--text-muted)';
+  if (is3D) {
+    mbMap.setTerrain({ source: 'dem', exaggeration: 1.5 });
+    mbMap.easeTo({ pitch: 50, bearing: -15, duration: 800 });
+  } else {
+    mbMap.setTerrain(null);
+    mbMap.easeTo({ pitch: 0, bearing: 0, duration: 800 });
+  }
+}
+
+// Cinematic fly-in from I-90 west toward course
+function flyIn() {
+  if (!mapReady) return;
+  // Start far west on I-90, fly east toward the mountains
+  mbMap.jumpTo({ center: [-122.35, 47.54], zoom: 10, pitch: 45, bearing: 80 });
+  setTimeout(() => {
+    mbMap.flyTo({
+      center: [-122.005, 47.518],
+      zoom: 13,
+      pitch: 50,
+      bearing: -15,
+      duration: 4500,
+      easing: t => t < 0.5 ? 2*t*t : -1+(4-2*t)*t
+    });
+  }, 300);
 }
 
 // ============================================================
@@ -1573,10 +1617,141 @@ function updateRunnerPositions() {
 
 function drawMap() { updateRunnerPositions(); }
 
-
-
 // ============================================================
-// TABLE RENDERING
+// ROUTE HELPERS — interpolation + grade-adjusted pace
+// ============================================================
+function haversineM(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const p1 = lat1*Math.PI/180, p2 = lat2*Math.PI/180;
+  const dp = (lat2-lat1)*Math.PI/180, dl = (lon2-lon1)*Math.PI/180;
+  const a = Math.sin(dp/2)**2 + Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+function interpolateAlongRoute(route, fraction) {
+  if (!route || !route.length) return { lat: 47.52, lng: -122.0 };
+  if (fraction <= 0) return { lat: route[0][0], lng: route[0][1] };
+  if (fraction >= 1) return { lat: route[route.length-1][0], lng: route[route.length-1][1] };
+  const dists = [0];
+  for (let i = 1; i < route.length; i++)
+    dists.push(dists[i-1] + haversineM(route[i-1][0], route[i-1][1], route[i][0], route[i][1]));
+  const target = fraction * dists[dists.length-1];
+  for (let i = 1; i < route.length; i++) {
+    if (dists[i] >= target) {
+      const f = (target - dists[i-1]) / (dists[i] - dists[i-1]);
+      return { lat: route[i-1][0] + f*(route[i][0]-route[i-1][0]), lng: route[i-1][1] + f*(route[i][1]-route[i-1][1]) };
+    }
+  }
+  return { lat: route[route.length-1][0], lng: route[route.length-1][1] };
+}
+
+function gradeAdjustedPace(basePace, routeName, progress) {
+  const elevs = ELEVATION_DATA[routeName];
+  const pts = GPX_ROUTES[routeName];
+  if (!elevs || !pts || elevs.length < 2) return basePace;
+  const idx = Math.min(Math.floor(progress * (elevs.length-1)), elevs.length-2);
+  const rise = elevs[idx+1] - elevs[idx];
+  const run = haversineM(pts[idx][0], pts[idx][1], pts[idx+1][0], pts[idx+1][1]);
+  if (run < 1) return basePace;
+  const grade = rise / run;
+  if (grade > 0.25) return basePace * 3.5;
+  if (grade > 0.15) return basePace * 2.5;
+  if (grade > 0.08) return basePace * 1.8;
+  if (grade > 0.03) return basePace * 1.3;
+  if (grade > -0.03) return basePace;
+  if (grade > -0.08) return basePace * 0.85;
+  if (grade > -0.15) return basePace * 0.9;
+  return basePace * 1.1;
+}
+
+function getRunnerRouteAndProgress(r, type) {
+  const parseTime = s => s ? new Date(s).getTime() : null;
+  const now = Date.now();
+
+  if (type === '50k') {
+    const s = (r.Status||'').toUpperCase();
+    if (s === 'DNS') return null;
+    if (r['FINISH TIME (Scan)'] || s === 'FINISHED') return { fixed: true, lat: 47.527708, lng: -122.034216, segment: 'Finished' };
+    if (r['Red Checkpoint In']) {
+      const elapsed = (now - parseTime(r['Red Checkpoint In'])) / 1000;
+      return { route: GPX_ROUTES.red_finish, progress: Math.min(elapsed / (GPX_DISTANCES.red_finish / 1000 * gradeAdjustedPace(360,'red_finish',0.5)), 0.99), segment: 'Red → Finish' };
+    }
+    if (r['Third Loop Top']) {
+      const elapsed = (now - parseTime(r['Third Loop Top'])) / 1000;
+      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsed / (GPX_DISTANCES.blue_descent / 1000 * 300), 0.99), segment: 'Blue Descent' };
+    }
+    if (r['Third Loop Bottom']) {
+      const color = (r['Third Loop']||'').toLowerCase();
+      const rk = color || 'pink';
+      const elapsed = (now - parseTime(r['Third Loop Bottom'])) / 1000;
+      return { route: GPX_ROUTES[rk]||GPX_ROUTES.pink, progress: Math.min(elapsed / (GPX_DISTANCES[rk] / 1000 * gradeAdjustedPace(480,rk,0.5)), 0.99), segment: 'Loop 3 ('+color+')' };
+    }
+    if (r['Second Loop Top']) {
+      const elapsed = (now - parseTime(r['Second Loop Top'])) / 1000;
+      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsed / (GPX_DISTANCES.blue_descent / 1000 * 300), 0.99), segment: 'Blue Descent' };
+    }
+    if (r['Second Loop Bottom']) {
+      const color = (r['Second Loop']||'').toLowerCase();
+      const rk = color || 'pink';
+      const elapsed = (now - parseTime(r['Second Loop Bottom'])) / 1000;
+      return { route: GPX_ROUTES[rk]||GPX_ROUTES.pink, progress: Math.min(elapsed / (GPX_DISTANCES[rk] / 1000 * gradeAdjustedPace(480,rk,0.5)), 0.99), segment: 'Loop 2 ('+color+')' };
+    }
+    if (r['First Loop Top']) {
+      const elapsed = (now - parseTime(r['First Loop Top'])) / 1000;
+      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsed / (GPX_DISTANCES.blue_descent / 1000 * 300), 0.99), segment: 'Blue Descent' };
+    }
+    if (r['First Loop Bottom']) {
+      const color = (r['First Loop Color']||'').toLowerCase();
+      const rk = color || 'pink';
+      const elapsed = (now - parseTime(r['First Loop Bottom'])) / 1000;
+      return { route: GPX_ROUTES[rk]||GPX_ROUTES.pink, progress: Math.min(elapsed / (GPX_DISTANCES[rk] / 1000 * gradeAdjustedPace(480,rk,0.5)), 0.99), segment: 'Loop 1 ('+color+')' };
+    }
+    if (r['Green Checkpoint']) {
+      const elapsed = (now - parseTime(r['Green Checkpoint'])) / 1000;
+      return { route: GPX_ROUTES.green_start, progress: Math.min(0.95 + elapsed / (1500 * gradeAdjustedPace(420,'green_start',0.9)) * 0.05, 0.99), segment: 'Approaching Loop' };
+    }
+    const raceStart = new Date('2026-05-09T07:00:00-07:00').getTime();
+    const elapsed = (now - raceStart) / 1000;
+    return { route: GPX_ROUTES.green_start, progress: Math.min(elapsed / (GPX_DISTANCES.green_start / 1000 * gradeAdjustedPace(360,'green_start',0.3)), 0.99), segment: 'Start → Green' };
+  }
+
+  if (type === 'ascent') {
+    const s = (r.STATUS||'').toUpperCase();
+    if (s === 'DNS') return null;
+    if (r['FINISH TIME (SCAN)'] || s === 'FINISHED') return { fixed: true, lat: 47.508742, lng: -121.985226, segment: 'Finished' };
+    const raceStart = new Date('2026-05-08T18:00:00-07:00').getTime();
+    const elapsed = (now - raceStart) / 1000;
+    return { route: GPX_ROUTES.ascent, progress: Math.min(elapsed / (GPX_DISTANCES.ascent / 1000 * gradeAdjustedPace(480,'ascent',0.5)), 0.99), segment: 'Ascent' };
+  }
+
+  if (type === 'ambush') {
+    const s = (r.Status||'').toUpperCase();
+    if (s === 'DNS') return null;
+    if (r['FINISH TIME (Scan)']) return { fixed: true, lat: 47.527708, lng: -122.034216, segment: 'Finished' };
+    if (r['Red Checkpoint In']) {
+      const elapsed = (now - parseTime(r['Red Checkpoint In'])) / 1000;
+      return { route: GPX_ROUTES.red_finish, progress: Math.min(elapsed / (GPX_DISTANCES.red_finish / 1000 * 360), 0.99), segment: 'Red → Finish' };
+    }
+    if (r['Loop Top']) {
+      const elapsed = (now - parseTime(r['Loop Top'])) / 1000;
+      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsed / (GPX_DISTANCES.blue_descent / 1000 * 300), 0.99), segment: 'Blue Descent' };
+    }
+    if (r['Loop Bottom']) {
+      const color = (r['Loop Color']||'').toLowerCase();
+      const rk = color || 'pink';
+      const elapsed = (now - parseTime(r['Loop Bottom'])) / 1000;
+      return { route: GPX_ROUTES[rk]||GPX_ROUTES.pink, progress: Math.min(elapsed / (GPX_DISTANCES[rk] / 1000 * gradeAdjustedPace(480,rk,0.5)), 0.99), segment: 'Loop ('+color+')' };
+    }
+    if (r['Green Checkpoint']) {
+      const elapsed = (now - parseTime(r['Green Checkpoint'])) / 1000;
+      return { route: GPX_ROUTES.green_start, progress: Math.min(0.95 + elapsed*0.001, 0.99), segment: 'Approaching Loop' };
+    }
+    const raceStart = new Date('2026-05-09T10:00:00-07:00').getTime();
+    const elapsed = (now - raceStart) / 1000;
+    return { route: GPX_ROUTES.green_start, progress: Math.min(elapsed / (GPX_DISTANCES.green_start / 1000 * 360), 0.99), segment: 'Start → Green' };
+  }
+  return null;
+}
 // ============================================================
 function getGender(row, tab) {
   // Try every possible key — column name varies by tab and sheet export
