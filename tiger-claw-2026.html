@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tiger Claw 2026 — Live Results</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root {
@@ -638,15 +640,16 @@ td.team-name {
 <div class="map-section">
   <div class="map-title">Course Map — Live Positions</div>
   <div class="map-container">
-    <canvas id="courseMap"></canvas>
+    <div id="courseMap" style="width:100%;height:100%;"></div>
   </div>
   <div class="map-legend">
     <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div>Start / Finish</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div>Ascent Start</div>
     <div class="legend-item"><div class="legend-dot" style="background:#4ade80;opacity:0.6"></div>Green CP</div>
     <div class="legend-item"><div class="legend-dot" style="background:#f472b6"></div>Pink Loop</div>
     <div class="legend-item"><div class="legend-dot" style="background:#e2e8f0"></div>White Loop</div>
     <div class="legend-item"><div class="legend-dot" style="background:#fbbf24"></div>Yellow Loop</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#60a5fa"></div>Blue Summit</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#60a5fa"></div>Blue Summit / Ascent Finish</div>
     <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div>Red CP</div>
     <div class="legend-item"><div class="legend-dot" style="background:#e8c14a;width:8px;height:8px;border-radius:2px"></div>Runner</div>
   </div>
@@ -705,13 +708,14 @@ const RACE_STARTS = {
 };
 
 const CHECKPOINTS = [
-  { id: 'start',  label: 'Start / Finish', lat: 47.527708, lng: -122.034216, color: '#4ade80', r: 8 },
-  { id: 'green',  label: 'Green CP',        lat: 47.529832, lng: -121.996694, color: '#4ade80', r: 6 },
-  { id: 'pink',   label: 'Pink Loop',       lat: 47.526687, lng: -121.997090, color: '#f472b6', r: 6 },
-  { id: 'white',  label: 'White Loop',      lat: 47.527259, lng: -121.998629, color: '#e2e8f0', r: 6 },
-  { id: 'yellow', label: 'Yellow Loop',     lat: 47.527324, lng: -121.998865, color: '#fbbf24', r: 6 },
-  { id: 'blue',   label: 'Blue Summit',     lat: 47.508742, lng: -121.985226, color: '#60a5fa', r: 7 },
-  { id: 'red',    label: 'Red CP',          lat: 47.529776, lng: -121.996875, color: '#f87171', r: 6 },
+  { id: 'start',       label: 'Start / Finish',      lat: 47.527708, lng: -122.034216, color: '#4ade80', r: 8 },
+  { id: 'ascent_start',label: 'Ascent Start',         lat: 47.529744, lng: -121.995642, color: '#a78bfa', r: 6 },
+  { id: 'green',       label: 'Green CP',             lat: 47.529832, lng: -121.996694, color: '#4ade80', r: 6 },
+  { id: 'pink',        label: 'Pink Loop Bottom',     lat: 47.526687, lng: -121.997090, color: '#f472b6', r: 6 },
+  { id: 'white',       label: 'White Loop Bottom',    lat: 47.527259, lng: -121.998629, color: '#e2e8f0', r: 6 },
+  { id: 'yellow',      label: 'Yellow Loop Bottom',   lat: 47.527324, lng: -121.998865, color: '#fbbf24', r: 6 },
+  { id: 'blue',        label: 'Blue Summit / Ascent Finish', lat: 47.508742, lng: -121.985226, color: '#60a5fa', r: 7 },
+  { id: 'red',         label: 'Red CP',               lat: 47.529776, lng: -121.996875, color: '#f87171', r: 6 },
 ];
 
 // ============================================================
@@ -975,143 +979,199 @@ function updateSegChart() {
 }
 
 // ============================================================
-// COURSE MAP
+// COURSE MAP — Leaflet + Esri Satellite
 // ============================================================
+let leafletMap = null;
+let runnerMarkers = [];
+let cpMarkers = [];
+
 function initMap() {
-  mapCanvas = document.getElementById('courseMap');
-  mapCtx = mapCanvas.getContext('2d');
-  resizeMap();
-  window.addEventListener('resize', () => { resizeMap(); drawMap(); });
-}
+  leafletMap = L.map('courseMap', {
+    center: [47.52, -122.00],
+    zoom: 13,
+    zoomControl: true,
+    attributionControl: true
+  });
 
-function resizeMap() {
-  const container = mapCanvas.parentElement;
-  mapCanvas.width = container.clientWidth;
-  mapCanvas.height = container.clientHeight;
-}
+  // Esri World Imagery (free satellite, no key needed)
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles © Esri — Source: Esri, Maxar, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, and the GIS User Community',
+    maxZoom: 18
+  }).addTo(leafletMap);
 
-function latLngToXY(lat, lng, bounds, w, h) {
-  const pad = 0.1;
-  const latRange = bounds.maxLat - bounds.minLat;
-  const lngRange = bounds.maxLng - bounds.minLng;
-  const x = ((lng - bounds.minLng) / lngRange) * (w * (1 - 2*pad)) + w * pad;
-  const y = ((bounds.maxLat - lat) / latRange) * (h * (1 - 2*pad)) + h * pad;
-  return { x, y };
+  // Labels overlay so place names show over satellite
+  L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+    opacity: 0.6,
+    maxZoom: 18
+  }).addTo(leafletMap);
+
+  // Draw checkpoint markers
+  CHECKPOINTS.forEach(cp => {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="
+        width:${cp.r*2+4}px;height:${cp.r*2+4}px;
+        background:${cp.color};
+        border:2px solid #0a0a0a;
+        border-radius:50%;
+        box-shadow:0 0 8px ${cp.color}88;
+      "></div>`,
+      iconSize: [cp.r*2+4, cp.r*2+4],
+      iconAnchor: [cp.r+2, cp.r+2]
+    });
+
+    const marker = L.marker([cp.lat, cp.lng], { icon })
+      .addTo(leafletMap)
+      .bindTooltip(`<b style="color:${cp.color}">${cp.label}</b>`, {
+        permanent: false,
+        direction: 'top',
+        className: 'tc-tooltip'
+      });
+    cpMarkers.push(marker);
+  });
+
+  // Draw course route lines
+  const courseLines = [
+    // Start → Green
+    [[47.527708, -122.034216],[47.529832, -121.996694]],
+    // Green → Pink
+    [[47.529832, -121.996694],[47.526687, -121.997090]],
+    // Green → White
+    [[47.529832, -121.996694],[47.527259, -121.998629]],
+    // Green → Yellow
+    [[47.529832, -121.996694],[47.527324, -121.998865]],
+    // Pink → Blue Summit
+    [[47.526687, -121.997090],[47.508742, -121.985226]],
+    // White → Blue Summit
+    [[47.527259, -121.998629],[47.508742, -121.985226]],
+    // Yellow → Blue Summit
+    [[47.527324, -121.998865],[47.508742, -121.985226]],
+    // Blue → Red CP
+    [[47.508742, -121.985226],[47.529776, -121.996875]],
+    // Red → Finish
+    [[47.529776, -121.996875],[47.527708, -122.034216]],
+  ];
+
+  const lineColors = [
+    '#4ade80','#f472b6','#e2e8f0','#fbbf24',
+    '#f472b6','#e2e8f0','#fbbf24','#60a5fa','#4ade80'
+  ];
+
+  courseLines.forEach((line, i) => {
+    L.polyline(line, {
+      color: lineColors[i],
+      weight: 2,
+      opacity: 0.7,
+      dashArray: '6 4'
+    }).addTo(leafletMap);
+  });
+
+  // Fit map to all checkpoints
+  const allLatLngs = CHECKPOINTS.map(cp => [cp.lat, cp.lng]);
+  leafletMap.fitBounds(allLatLngs, { padding: [30, 30] });
+
+  // Add tooltip style
+  const style = document.createElement('style');
+  style.textContent = `.tc-tooltip { background:#111; border:1px solid #333; color:#f0f0f0; font-family:'DM Mono',monospace; font-size:11px; padding:4px 8px; border-radius:4px; box-shadow:none; }
+  .tc-tooltip::before { border-top-color:#333 !important; }
+  .leaflet-control-attribution { font-size:9px !important; background:rgba(0,0,0,0.6) !important; color:#555 !important; }
+  .leaflet-control-attribution a { color:#666 !important; }`;
+  document.head.appendChild(style);
 }
 
 function drawMap() {
-  if (!mapCtx) return;
-  const w = mapCanvas.width, h = mapCanvas.height;
-  mapCtx.clearRect(0, 0, w, h);
+  if (!leafletMap) return;
 
-  // Background
-  mapCtx.fillStyle = '#0d1117';
-  mapCtx.fillRect(0, 0, w, h);
+  // Remove old runner markers
+  runnerMarkers.forEach(m => leafletMap.removeLayer(m));
+  runnerMarkers = [];
 
-  // Grid
-  mapCtx.strokeStyle = '#1a2030';
-  mapCtx.lineWidth = 1;
-  for (let i = 0; i < w; i += 40) { mapCtx.beginPath(); mapCtx.moveTo(i,0); mapCtx.lineTo(i,h); mapCtx.stroke(); }
-  for (let i = 0; i < h; i += 40) { mapCtx.beginPath(); mapCtx.moveTo(0,i); mapCtx.lineTo(w,i); mapCtx.stroke(); }
+  const positions = getRunnerPositions();
 
-  const lats = CHECKPOINTS.map(c => c.lat);
-  const lngs = CHECKPOINTS.map(c => c.lng);
-  const bounds = {
-    minLat: Math.min(...lats) - 0.005,
-    maxLat: Math.max(...lats) + 0.005,
-    minLng: Math.min(...lngs) - 0.005,
-    maxLng: Math.max(...lngs) + 0.005,
-  };
-
-  const pos = {};
-  CHECKPOINTS.forEach(cp => {
-    pos[cp.id] = latLngToXY(cp.lat, cp.lng, bounds, w, h);
+  // Group runners by checkpoint to offset overlapping
+  const grouped = {};
+  positions.forEach(rp => {
+    if (!grouped[rp.cp]) grouped[rp.cp] = [];
+    grouped[rp.cp].push(rp);
   });
 
-  // Draw course lines
-  const courseLines = [
-    ['start','green'],['green','pink'],['green','white'],['green','yellow'],
-    ['pink','blue'],['white','blue'],['yellow','blue'],
-    ['blue','red'],['red','start']
-  ];
+  Object.entries(grouped).forEach(([cpId, runners]) => {
+    const cp = CHECKPOINTS.find(c => c.id === cpId);
+    if (!cp) return;
 
-  mapCtx.lineWidth = 1.5;
-  courseLines.forEach(([a, b]) => {
-    const pa = pos[a], pb = pos[b];
-    if (!pa || !pb) return;
-    mapCtx.strokeStyle = '#2a3a4a';
-    mapCtx.setLineDash([4, 4]);
-    mapCtx.beginPath();
-    mapCtx.moveTo(pa.x, pa.y);
-    mapCtx.lineTo(pb.x, pb.y);
-    mapCtx.stroke();
-  });
-  mapCtx.setLineDash([]);
+    runners.forEach((rp, i) => {
+      // Spiral offset so runners don't stack exactly
+      const angle = (i / Math.max(runners.length, 1)) * 2 * Math.PI;
+      const radius = runners.length > 1 ? 0.0003 + (Math.floor(i/8) * 0.0002) : 0;
+      const lat = cp.lat + Math.sin(angle) * radius;
+      const lng = cp.lng + Math.cos(angle) * radius;
 
-  // Draw runner positions based on last known checkpoint
-  const runnerPositions = getRunnerPositions();
-  runnerPositions.forEach(rp => {
-    const p = pos[rp.cp];
-    if (!p) return;
-    // Offset slightly so runners don't all stack
-    const offsetX = (Math.random() - 0.5) * 12;
-    const offsetY = (Math.random() - 0.5) * 12;
-    mapCtx.beginPath();
-    mapCtx.arc(p.x + offsetX, p.y + offsetY, 4, 0, Math.PI*2);
-    mapCtx.fillStyle = '#e8c14a';
-    mapCtx.fill();
-    mapCtx.strokeStyle = '#0d1117';
-    mapCtx.lineWidth = 1;
-    mapCtx.stroke();
-  });
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="
+          width:10px;height:10px;
+          background:#e8c14a;
+          border:1.5px solid #0a0a0a;
+          border-radius:50%;
+          box-shadow:0 0 4px #e8c14a88;
+        "></div>`,
+        iconSize: [10, 10],
+        iconAnchor: [5, 5]
+      });
 
-  // Draw checkpoints
-  CHECKPOINTS.forEach(cp => {
-    const p = pos[cp.id];
-    if (!p) return;
+      const marker = L.marker([lat, lng], { icon })
+        .addTo(leafletMap)
+        .bindTooltip(`<b>#${rp.bib}</b> ${rp.name}<br><span style="color:#888">${cp.label}</span>`, {
+          direction: 'top',
+          className: 'tc-tooltip'
+        });
 
-    // Outer ring
-    mapCtx.beginPath();
-    mapCtx.arc(p.x, p.y, cp.r + 3, 0, Math.PI*2);
-    mapCtx.fillStyle = cp.color + '22';
-    mapCtx.fill();
-
-    // Main dot
-    mapCtx.beginPath();
-    mapCtx.arc(p.x, p.y, cp.r, 0, Math.PI*2);
-    mapCtx.fillStyle = cp.color;
-    mapCtx.fill();
-    mapCtx.strokeStyle = '#0d1117';
-    mapCtx.lineWidth = 2;
-    mapCtx.stroke();
-
-    // Label
-    mapCtx.fillStyle = cp.color;
-    mapCtx.font = `500 10px "DM Mono"`;
-    mapCtx.textAlign = 'center';
-    mapCtx.fillText(cp.label, p.x, p.y - cp.r - 5);
+      runnerMarkers.push(marker);
+    });
   });
 }
 
 function getRunnerPositions() {
   const positions = [];
+
+  // 50k runners
   data.fiftyk.forEach(r => {
     if (!r.Bib || (r.Status||'').toUpperCase() === 'DNS') return;
+    const name = r.Name || '';
     const s = (r.Status||'').toUpperCase();
-    if (s === 'FINISHED') { positions.push({ cp: 'start', bib: r.Bib }); return; }
-
-    // Determine last known checkpoint
-    if (r['FINISH TIME (Scan)']) { positions.push({ cp: 'start', bib: r.Bib }); return; }
-    if (r['Red Checkpoint In']) { positions.push({ cp: 'red', bib: r.Bib }); return; }
-    if (r['Third Loop Top']) { positions.push({ cp: 'blue', bib: r.Bib }); return; }
-    if (r['Third Loop Bottom']) { positions.push({ cp: r['Third Loop'] ? r['Third Loop'].toLowerCase() : 'green', bib: r.Bib }); return; }
-    if (r['Second Loop Top']) { positions.push({ cp: 'blue', bib: r.Bib }); return; }
-    if (r['Second Loop Bottom']) { positions.push({ cp: r['Second Loop'] ? r['Second Loop'].toLowerCase() : 'green', bib: r.Bib }); return; }
-    if (r['First Loop Top']) { positions.push({ cp: 'blue', bib: r.Bib }); return; }
-    if (r['First Loop Bottom']) { positions.push({ cp: r['First Loop'] ? r['First Loop'].toLowerCase() : 'green', bib: r.Bib }); return; }
-    if (r['Green Checkpoint']) { positions.push({ cp: 'green', bib: r.Bib }); return; }
-    positions.push({ cp: 'start', bib: r.Bib });
+    if (s === 'FINISHED' || r['FINISH TIME (Scan)']) { positions.push({ cp: 'start', bib: r.Bib, name }); return; }
+    if (r['Red Checkpoint In']) { positions.push({ cp: 'red', bib: r.Bib, name }); return; }
+    if (r['Third Loop Top']) { positions.push({ cp: 'blue', bib: r.Bib, name }); return; }
+    if (r['Third Loop Bottom']) { positions.push({ cp: (r['Third Loop']||'').toLowerCase() || 'green', bib: r.Bib, name }); return; }
+    if (r['Second Loop Top']) { positions.push({ cp: 'blue', bib: r.Bib, name }); return; }
+    if (r['Second Loop Bottom']) { positions.push({ cp: (r['Second Loop']||'').toLowerCase() || 'green', bib: r.Bib, name }); return; }
+    if (r['First Loop Top']) { positions.push({ cp: 'blue', bib: r.Bib, name }); return; }
+    if (r['First Loop Bottom']) { positions.push({ cp: (r['First Loop']||'').toLowerCase() || 'green', bib: r.Bib, name }); return; }
+    if (r['Green Checkpoint']) { positions.push({ cp: 'green', bib: r.Bib, name }); return; }
+    positions.push({ cp: 'start', bib: r.Bib, name });
   });
+
+  // Ascent runners
+  data.ascent.forEach(r => {
+    if (!r.BIB || (r.STATUS||'').toUpperCase() === 'DNS') return;
+    const name = r.NAME || '';
+    const s = (r.STATUS||'').toUpperCase();
+    if (s === 'FINISHED' || r['FINISH TIME (SCAN)']) { positions.push({ cp: 'blue', bib: r.BIB, name }); return; }
+    positions.push({ cp: 'ascent_start', bib: r.BIB, name });
+  });
+
+  // Ambush runners
+  data.ambush.forEach(r => {
+    if (!r.Bib || (r.Status||'').toUpperCase() === 'DNS') return;
+    const name = r.Name || '';
+    if (r['FINISH TIME (Scan)']) { positions.push({ cp: 'start', bib: r.Bib, name }); return; }
+    if (r['Red Checkpoint In']) { positions.push({ cp: 'red', bib: r.Bib, name }); return; }
+    if (r['Loop Top']) { positions.push({ cp: 'blue', bib: r.Bib, name }); return; }
+    if (r['Loop Bottom']) { positions.push({ cp: (r['Loop Color']||'').toLowerCase() || 'green', bib: r.Bib, name }); return; }
+    if (r['Green Checkpoint']) { positions.push({ cp: 'green', bib: r.Bib, name }); return; }
+    positions.push({ cp: 'start', bib: r.Bib, name });
+  });
+
   return positions;
 }
 
