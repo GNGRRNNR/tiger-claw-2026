@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tiger Claw 2026 — Live Results</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root {
@@ -27,6 +27,7 @@
   --blue: #60a5fa;
   --green: #4ade80;
   --red: #f87171;
+  --orange: #fb923c;
   --orange: #fb923c;
   --finished: #4ade80;
   --dnf: #f87171;
@@ -447,7 +448,15 @@ td.team-name {
   to { left: 100%; }
 }
 
-.row-count {
+.mapboxgl-popup-content {
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+.mapboxgl-popup-tip { display: none !important; }
+.mapboxgl-ctrl-bottom-left { font-size: 9px !important; }
+.mapboxgl-ctrl-attrib { background: rgba(0,0,0,0.6) !important; color: #555 !important; font-size: 9px !important; }
   padding: 0.5rem 1rem;
   font-size: 0.65rem;
   color: var(--text-dim);
@@ -1339,11 +1348,7 @@ function openSegmentFocus(routeName) {
   // Highlight selected, dim others
   highlightSegment(routeName);
 
-  // Zoom map to segment bounds
-  const pts = GPX_ROUTES[routeName];
-  if (pts && leafletMap) {
-    leafletMap.fitBounds(pts, { padding: [60, 60], maxZoom: 15 });
-  }
+  // Zoom handled inside highlightSegment via Mapbox fitBounds
 
   // Find runners on this segment
   const runnersOnSeg = [];
@@ -1399,367 +1404,213 @@ document.getElementById('segFocusClose').addEventListener('click', () => {
   activeSegment = null;
   if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
   resetSegmentStyles();
-  if (leafletMap) {
-    leafletMap.fitBounds(Object.values(GPX_ROUTES).flat(), { padding: [30, 30] });
-  }
 });
-let leafletMap = null;
-let runnerMarkers = [];
-let cpMarkers = [];
-let routePolylines = {}; // routeName -> L.polyline instance
+let mbMap = null;
+let runnerMarkers = {};   // bib_key -> mapbox Marker
 let animationFrame = null;
-let lastDataTime = null;
-let runnerAnimState = {};
+let smoothPositions = {};
+
+// Route visibility by tab
+const ROUTE_TABS = {
+  ascent:  ['ascent'],
+  '50k':   ['green_start','pink','white','yellow','blue_descent','red_finish'],
+  ambush:  ['green_start','pink','white','yellow','blue_descent','red_finish'],
+  bigcat:  ['ascent','green_start','pink','white','yellow','blue_descent','red_finish'],
+};
+
+mapboxgl.accessToken = 'pk.eyJ1IjoiZ25ncnJubnIiLCJhIjoiY21vaGdsaWtqMDFuNTJwcHQ0em83bWltaCJ9.DdC1VfJKIjSpNo3uLDLNLw';
 
 function initMap() {
-  leafletMap = L.map('courseMap', {
-    center: [47.52, -122.00],
-    zoom: 13,
-    zoomControl: true,
-    attributionControl: true
+  mbMap = new mapboxgl.Map({
+    container: 'courseMap',
+    style: 'mapbox://styles/mapbox/satellite-streets-v12',
+    center: [-121.998, 47.518],
+    zoom: 12.5,
+    pitch: 55,
+    bearing: -20,
+    antialias: true,
   });
 
-  // Esri World Imagery (free satellite, no key needed)
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    attribution: 'Tiles © Esri — Source: Esri, Maxar, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, and the GIS User Community',
-    maxZoom: 18
-  }).addTo(leafletMap);
+  mbMap.addControl(new mapboxgl.NavigationControl(), 'top-right');
+  mbMap.addControl(new mapboxgl.ScaleControl({ unit: 'imperial' }), 'bottom-left');
 
-  // Labels overlay so place names show over satellite
-  L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
-    opacity: 0.6,
-    maxZoom: 18
-  }).addTo(leafletMap);
+  mbMap.on('load', () => {
+    // Add 3D terrain
+    mbMap.addSource('mapbox-dem', {
+      type: 'raster-dem',
+      url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+      tileSize: 512,
+      maxzoom: 14
+    });
+    mbMap.setTerrain({ source: 'mapbox-dem', exaggeration: 1.8 });
 
-  // Draw checkpoint markers
-  CHECKPOINTS.forEach(cp => {
-    const icon = L.divIcon({
-      className: '',
-      html: `<div style="
+    // Sky layer for realism
+    mbMap.addLayer({
+      id: 'sky',
+      type: 'sky',
+      paint: {
+        'sky-type': 'atmosphere',
+        'sky-atmosphere-sun': [0.0, 90.0],
+        'sky-atmosphere-sun-intensity': 15
+      }
+    });
+
+    // Add each route as a GeoJSON source + layer
+    const routeColors = {
+      green_start:  '#4ade80',
+      ascent:       '#a78bfa',
+      pink:         '#f472b6',
+      white:        '#e2e8f0',
+      yellow:       '#fbbf24',
+      blue_descent: '#60a5fa',
+      red_finish:   '#f87171',
+    };
+
+    Object.entries(GPX_ROUTES).forEach(([name, pts]) => {
+      const geojson = {
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: pts.map(([lat,lon]) => [lon, lat]) }
+      };
+      mbMap.addSource(`route-${name}`, { type: 'geojson', data: geojson });
+
+      // Glow/shadow layer
+      mbMap.addLayer({
+        id: `route-${name}-glow`,
+        type: 'line',
+        source: `route-${name}`,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': routeColors[name] || '#fff',
+          'line-width': 10,
+          'line-opacity': 0.25,
+          'line-blur': 4
+        }
+      });
+
+      // Main route line
+      mbMap.addLayer({
+        id: `route-${name}`,
+        type: 'line',
+        source: `route-${name}`,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': routeColors[name] || '#fff',
+          'line-width': 3.5,
+          'line-opacity': 0.95
+        }
+      });
+
+      // Click handler
+      mbMap.on('click', `route-${name}`, () => openSegmentFocus(name));
+      mbMap.on('mouseenter', `route-${name}`, () => { mbMap.getCanvas().style.cursor = 'pointer'; });
+      mbMap.on('mouseleave', `route-${name}`, () => { mbMap.getCanvas().style.cursor = ''; });
+    });
+
+    // Add checkpoint markers
+    CHECKPOINTS.forEach(cp => {
+      const el = document.createElement('div');
+      el.style.cssText = `
         width:${cp.r*2+4}px;height:${cp.r*2+4}px;
         background:${cp.color};
         border:2px solid #0a0a0a;
         border-radius:50%;
-        box-shadow:0 0 8px ${cp.color}88;
-      "></div>`,
-      iconSize: [cp.r*2+4, cp.r*2+4],
-      iconAnchor: [cp.r+2, cp.r+2]
+        box-shadow:0 0 10px ${cp.color}99;
+        cursor:pointer;
+      `;
+      const popup = new mapboxgl.Popup({ offset: 15, closeButton: false })
+        .setHTML(`<div style="font-family:'DM Mono',monospace;font-size:11px;color:#f0f0f0;background:#111;padding:4px 8px;border-radius:4px"><b style="color:${cp.color}">${cp.label}</b></div>`);
+      new mapboxgl.Marker(el)
+        .setLngLat([cp.lng, cp.lat])
+        .setPopup(popup)
+        .addTo(mbMap);
     });
 
-    const marker = L.marker([cp.lat, cp.lng], { icon })
-      .addTo(leafletMap)
-      .bindTooltip(`<b style="color:${cp.color}">${cp.label}</b>`, {
-        permanent: false,
-        direction: 'top',
-        className: 'tc-tooltip'
-      });
-    cpMarkers.push(marker);
+    // Initial route visibility
+    updateRouteVisibility(activeTab);
+    startAnimation();
   });
 
-  // Draw actual GPX route polylines — clickable for segment focus
-  const routeStyles = {
-    green_start: { color: '#4ade80', weight: 2.5, opacity: 0.8 },
-    ascent:      { color: '#a78bfa', weight: 2.5, opacity: 0.8 },
-    pink:        { color: '#f472b6', weight: 2.5, opacity: 0.8 },
-    white:       { color: '#e2e8f0', weight: 2.5, opacity: 0.8 },
-    yellow:      { color: '#fbbf24', weight: 2.5, opacity: 0.8 },
-    blue_descent:{ color: '#60a5fa', weight: 2.5, opacity: 0.8 },
-    red_finish:  { color: '#f87171', weight: 2.5, opacity: 0.8 },
-  };
+  // Resize observer
+  const resizeObs = new ResizeObserver(() => mbMap.resize());
+  resizeObs.observe(document.getElementById('courseMap'));
+}
 
-  Object.entries(GPX_ROUTES).forEach(([name, pts]) => {
-    const style = routeStyles[name] || { color: '#888', weight: 2, opacity: 0.6 };
-    const line = L.polyline(pts, { ...style, dashArray: '5 4', weight: 4 }).addTo(leafletMap);
-    routePolylines[name] = line; // store reference for dimming
-
-    // Invisible thick overlay for easier clicking
-    const hitLine = L.polyline(pts, { color: 'transparent', weight: 20, opacity: 0 }).addTo(leafletMap);
-
-    const info = SEGMENT_INFO[name];
-    if (info) {
-      hitLine.bindTooltip(`<b style="color:${style.color};font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:0.1em">${info.label}</b><br><span style="color:#aaa;font-size:10px">Click to focus segment</span>`, {
-        className: 'tc-tooltip', sticky: true
-      });
-      hitLine.on('click', () => openSegmentFocus(name));
-      line.on('click', () => openSegmentFocus(name));
+function updateRouteVisibility(tab) {
+  if (!mbMap || !mbMap.isStyleLoaded()) return;
+  const visible = ROUTE_TABS[tab] || ROUTE_TABS['50k'];
+  Object.keys(GPX_ROUTES).forEach(name => {
+    const vis = visible.includes(name) ? 'visible' : 'none';
+    if (mbMap.getLayer(`route-${name}`)) {
+      mbMap.setLayoutProperty(`route-${name}`, 'visibility', vis);
+      mbMap.setLayoutProperty(`route-${name}-glow`, 'visibility', vis);
     }
   });
 
-  // Fit map to GPX bounds
-  const allPts = Object.values(GPX_ROUTES).flat();
-  leafletMap.fitBounds(allPts, { padding: [30, 30] });
+  // Fly to appropriate bounds
+  const pts = visible.flatMap(n => (GPX_ROUTES[n]||[]).map(([lat,lon]) => [lon,lat]));
+  if (pts.length > 0) {
+    const lngs = pts.map(p => p[0]), lats = pts.map(p => p[1]);
+    mbMap.fitBounds([[Math.min(...lngs), Math.min(...lats)],[Math.max(...lngs), Math.max(...lats)]], {
+      padding: 60, pitch: 55, bearing: -20, duration: 800
+    });
+  }
+}
 
-  // Invalidate map size when container is resized (drag handle)
-  const resizeObs = new ResizeObserver(() => { leafletMap.invalidateSize(); });
-  resizeObs.observe(document.getElementById('courseMap').parentElement);
+function highlightSegment(routeName) {
+  if (!mbMap || !mbMap.isStyleLoaded()) return;
+  Object.keys(GPX_ROUTES).forEach(name => {
+    if (mbMap.getLayer(`route-${name}`)) {
+      if (name === routeName) {
+        mbMap.setPaintProperty(`route-${name}`, 'line-width', 6);
+        mbMap.setPaintProperty(`route-${name}`, 'line-opacity', 1);
+        mbMap.setPaintProperty(`route-${name}-glow`, 'line-opacity', 0.5);
+      } else {
+        mbMap.setPaintProperty(`route-${name}`, 'line-opacity', 0.1);
+        mbMap.setPaintProperty(`route-${name}-glow`, 'line-opacity', 0.05);
+      }
+    }
+  });
 
-  // Tooltip style
-  const style = document.createElement('style');
-  style.textContent = `
-    .tc-tooltip { background:#111; border:1px solid #444; color:#f0f0f0; font-family:'DM Mono',monospace; font-size:11px; padding:4px 8px; border-radius:4px; box-shadow:none; }
-    .tc-tooltip::before { border-top-color:#444 !important; }
-    .leaflet-control-attribution { font-size:9px !important; background:rgba(0,0,0,0.6) !important; color:#555 !important; }
-    .leaflet-control-attribution a { color:#666 !important; }
-    .runner-label { background:transparent; border:none; box-shadow:none; }
-  `;
-  document.head.appendChild(style);
+  // Fly to segment
+  const pts = (GPX_ROUTES[routeName]||[]).map(([lat,lon]) => [lon,lat]);
+  if (pts.length > 0) {
+    const lngs = pts.map(p => p[0]), lats = pts.map(p => p[1]);
+    mbMap.fitBounds([[Math.min(...lngs), Math.min(...lats)],[Math.max(...lngs), Math.max(...lats)]], {
+      padding: 80, pitch: 60, bearing: -15, duration: 1000
+    });
+  }
+}
 
-  // Start smooth animation loop
-  startAnimation();
+function resetSegmentStyles() {
+  if (!mbMap || !mbMap.isStyleLoaded()) return;
+  Object.keys(GPX_ROUTES).forEach(name => {
+    if (mbMap.getLayer(`route-${name}`)) {
+      mbMap.setPaintProperty(`route-${name}`, 'line-width', 3.5);
+      mbMap.setPaintProperty(`route-${name}`, 'line-opacity', 0.95);
+      mbMap.setPaintProperty(`route-${name}-glow`, 'line-opacity', 0.25);
+    }
+  });
+  updateRouteVisibility(activeTab);
 }
 
 // ============================================================
-// ROUTE INTERPOLATION HELPERS
+// SMOOTH ANIMATION LOOP
 // ============================================================
-function haversineM(lat1, lon1, lat2, lon2) {
-  const R = 6371000;
-  const phi1 = lat1 * Math.PI/180, phi2 = lat2 * Math.PI/180;
-  const dphi = (lat2-lat1) * Math.PI/180;
-  const dlambda = (lon2-lon1) * Math.PI/180;
-  const a = Math.sin(dphi/2)**2 + Math.cos(phi1)*Math.cos(phi2)*Math.sin(dlambda/2)**2;
-  return 2*R*Math.asin(Math.sqrt(a));
-}
-
-function interpolateAlongRoute(route, fraction) {
-  // Returns {lat, lng} at given fraction (0-1) along route
-  if (fraction <= 0) return { lat: route[0][0], lng: route[0][1] };
-  if (fraction >= 1) return { lat: route[route.length-1][0], lng: route[route.length-1][1] };
-
-  // Calculate cumulative distances
-  const dists = [0];
-  for (let i = 1; i < route.length; i++) {
-    dists.push(dists[i-1] + haversineM(route[i-1][0], route[i-1][1], route[i][0], route[i][1]));
-  }
-  const totalDist = dists[dists.length-1];
-  const targetDist = fraction * totalDist;
-
-  for (let i = 1; i < route.length; i++) {
-    if (dists[i] >= targetDist) {
-      const segFrac = (targetDist - dists[i-1]) / (dists[i] - dists[i-1]);
-      return {
-        lat: route[i-1][0] + segFrac * (route[i][0] - route[i-1][0]),
-        lng: route[i-1][1] + segFrac * (route[i][1] - route[i-1][1])
-      };
-    }
-  }
-  return { lat: route[route.length-1][0], lng: route[route.length-1][1] };
-}
-
-function getRunnerRouteAndProgress(r, type) {
-  // Returns { route, progress (0-1), segmentName } based on last known scans
-  const parseTime = (str) => str ? new Date(str).getTime() : null;
-  const now = Date.now();
-
-  if (type === '50k') {
-    const s = (r.Status||'').toUpperCase();
-    if (s === 'DNS') return null;
-    if (r['FINISH TIME (Scan)'] || s === 'FINISHED') {
-      return { lat: 47.527708, lng: -122.034216, fixed: true, segment: 'Finished' };
-    }
-
-    // Red → Finish
-    if (r['Red Checkpoint In'] && !r['FINISH TIME (Scan)']) {
-      const fromT = parseTime(r['Red Checkpoint In']);
-      const elapsed = (now - fromT) / 1000;
-      const pace = gradeAdjustedPace(360, 'red_finish', 0.5);
-      const progress = Math.min(elapsed / (GPX_DISTANCES.red_finish / 1000 * pace), 0.99);
-      return { route: GPX_ROUTES.red_finish, progress, segment: 'Red → Finish' };
-    }
-
-    // Loop 3 top → Red (Blue descent 3)
-    if (r['Third Loop Top'] && !r['Red Checkpoint In']) {
-      const fromT = parseTime(r['Third Loop Top']);
-      const elapsed = (now - fromT) / 1000;
-      const pace = 300;
-      const progress = Math.min(elapsed / (GPX_DISTANCES.blue_descent / 1000 * pace), 0.99);
-      return { route: GPX_ROUTES.blue_descent, progress, segment: 'Blue Descent' };
-    }
-
-    // Loop 3 bottom → top
-    if (r['Third Loop Bottom'] && !r['Third Loop Top']) {
-      const color = (r['Third Loop']||'').toLowerCase();
-      const routeKey = color || 'pink';
-      const route = GPX_ROUTES[routeKey] || GPX_ROUTES.pink;
-      const fromT = parseTime(r['Third Loop Bottom']);
-      const elapsed = (now - fromT) / 1000;
-      const pace = 480;
-      const progress = Math.min(elapsed / (GPX_DISTANCES[routeKey] / 1000 * pace), 0.99);
-      return { route, progress, segment: `Loop 3 (${color})` };
-    }
-
-    // Loop 2 top → Loop 3 bottom (Blue descent 2)
-    if (r['Second Loop Top'] && !r['Third Loop Bottom']) {
-      const fromT = parseTime(r['Second Loop Top']);
-      const elapsed = (now - fromT) / 1000;
-      const pace = 300;
-      const progress = Math.min(elapsed / (GPX_DISTANCES.blue_descent / 1000 * pace), 0.99);
-      return { route: GPX_ROUTES.blue_descent, progress, segment: 'Blue Descent' };
-    }
-
-    // Loop 2 bottom → top
-    if (r['Second Loop Bottom'] && !r['Second Loop Top']) {
-      const color = (r['Second Loop']||'').toLowerCase();
-      const routeKey = color || 'pink';
-      const route = GPX_ROUTES[routeKey] || GPX_ROUTES.pink;
-      const fromT = parseTime(r['Second Loop Bottom']);
-      const elapsed = (now - fromT) / 1000;
-      const pace = 480;
-      const progress = Math.min(elapsed / (GPX_DISTANCES[routeKey] / 1000 * pace), 0.99);
-      return { route, progress, segment: `Loop 2 (${color})` };
-    }
-
-    // Loop 1 top → Loop 2 bottom (Blue descent 1)
-    if (r['First Loop Top'] && !r['Second Loop Bottom']) {
-      const fromT = parseTime(r['First Loop Top']);
-      const elapsed = (now - fromT) / 1000;
-      const pace = 300;
-      const progress = Math.min(elapsed / (GPX_DISTANCES.blue_descent / 1000 * pace), 0.99);
-      return { route: GPX_ROUTES.blue_descent, progress, segment: 'Blue Descent' };
-    }
-
-    // Loop 1 bottom → top
-    if (r['First Loop Bottom'] && !r['First Loop Top']) {
-      const color = (r['First Loop Color']||'').toLowerCase();
-      const routeKey = color || 'pink';
-      const route = GPX_ROUTES[routeKey] || GPX_ROUTES.pink;
-      const fromT = parseTime(r['First Loop Bottom']);
-      const elapsed = (now - fromT) / 1000;
-      const pace = 480;
-      const progress = Math.min(elapsed / (GPX_DISTANCES[routeKey] / 1000 * pace), 0.99);
-      return { route, progress, segment: `Loop 1 (${color})` };
-    }
-
-    // Green → First loop bottom
-    if (r['Green Checkpoint'] && !r['First Loop Bottom']) {
-      const fromT = parseTime(r['Green Checkpoint']);
-      const elapsed = (now - fromT) / 1000;
-      const pace = 420;
-      // Estimate short distance from green to loop bottom
-      const progress = Math.min(elapsed / (1500 / 1000 * pace), 0.99);
-      return { route: GPX_ROUTES.green_start, progress: 0.95 + progress * 0.05, segment: 'Approaching Loop' };
-    }
-
-    // Start → Green
-    if (!r['Green Checkpoint']) {
-      const raceStart = new Date('2026-05-09T07:00:00-07:00').getTime();
-      const elapsed = (now - raceStart) / 1000;
-      const pace = 360;
-      const progress = Math.min(elapsed / (GPX_DISTANCES.green_start / 1000 * pace), 0.99);
-      return { route: GPX_ROUTES.green_start, progress, segment: 'Start → Green' };
-    }
-  }
-
-  if (type === 'ascent') {
-    const s = (r.STATUS||'').toUpperCase();
-    if (s === 'DNS') return null;
-    if (r['FINISH TIME (SCAN)'] || s === 'FINISHED') {
-      return { lat: 47.508742, lng: -121.985226, fixed: true, segment: 'Finished' };
-    }
-    const raceStart = new Date('2026-05-08T18:00:00-07:00').getTime();
-    const elapsed = (now - raceStart) / 1000;
-    const pace = 480;
-    const progress = Math.min(elapsed / (GPX_DISTANCES.ascent / 1000 * pace), 0.99);
-    return { route: GPX_ROUTES.ascent, progress, segment: 'Ascent' };
-  }
-
-  if (type === 'ambush') {
-    const s = (r.Status||'').toUpperCase();
-    if (s === 'DNS') return null;
-    if (r['FINISH TIME (Scan)']) {
-      return { lat: 47.527708, lng: -122.034216, fixed: true, segment: 'Finished' };
-    }
-    if (r['Red Checkpoint In'] && !r['FINISH TIME (Scan)']) {
-      const fromT = parseTime(r['Red Checkpoint In']);
-      const elapsed = (now - fromT) / 1000;
-      const pace = 360;
-      const progress = Math.min(elapsed / (GPX_DISTANCES.red_finish / 1000 * pace), 0.99);
-      return { route: GPX_ROUTES.red_finish, progress, segment: 'Red → Finish' };
-    }
-    if (r['Loop Top'] && !r['Red Checkpoint In']) {
-      const fromT = parseTime(r['Loop Top']);
-      const elapsed = (now - fromT) / 1000;
-      const pace = 300;
-      const progress = Math.min(elapsed / (GPX_DISTANCES.blue_descent / 1000 * pace), 0.99);
-      return { route: GPX_ROUTES.blue_descent, progress, segment: 'Blue Descent' };
-    }
-    if (r['Loop Bottom'] && !r['Loop Top']) {
-      const color = (r['Loop Color']||'').toLowerCase();
-      const routeKey = color || 'pink';
-      const route = GPX_ROUTES[routeKey] || GPX_ROUTES.pink;
-      const fromT = parseTime(r['Loop Bottom']);
-      const elapsed = (now - fromT) / 1000;
-      const pace = 480;
-      const progress = Math.min(elapsed / (GPX_DISTANCES[routeKey] / 1000 * pace), 0.99);
-      return { route, progress, segment: `Loop (${color})` };
-    }
-    if (r['Green Checkpoint'] && !r['Loop Bottom']) {
-      const fromT = parseTime(r['Green Checkpoint']);
-      const elapsed = (now - fromT) / 1000;
-      const pace = 420;
-      const progress = Math.min(elapsed / (1500 / 1000 * pace), 0.99);
-      return { route: GPX_ROUTES.green_start, progress: 0.95 + progress * 0.05, segment: 'Approaching Loop' };
-    }
-    const raceStart = new Date('2026-05-09T10:00:00-07:00').getTime();
-    const elapsed = (now - raceStart) / 1000;
-    const pace = 360;
-    const progress = Math.min(elapsed / (GPX_DISTANCES.green_start / 1000 * pace), 0.99);
-    return { route: GPX_ROUTES.green_start, progress, segment: 'Start → Green' };
-  }
-
-  return null;
-}
-
-// Grade-adjusted pace using Minetti curve approximation
-// Returns seconds per km adjusted for gradient
-function gradeAdjustedPace(basePaceSec, routeName, progress) {
-  const elevs = ELEVATION_DATA[routeName];
-  if (!elevs || elevs.length < 2) return basePaceSec;
-  const pts = GPX_ROUTES[routeName];
-  if (!pts) return basePaceSec;
-
-  // Find gradient at current position
-  const idx = Math.min(Math.floor(progress * (elevs.length - 1)), elevs.length - 2);
-  const rise = elevs[idx + 1] - elevs[idx]; // meters
-  const segDist = haversineM(pts[idx][0], pts[idx][1], pts[idx+1][0], pts[idx+1][1]);
-  if (segDist < 1) return basePaceSec;
-  const grade = rise / segDist; // rise/run ratio
-
-  // Minetti curve: energy cost multiplier based on grade
-  // Flat=1.0, +10% grade ≈ 1.6x, +20% grade ≈ 2.5x, -10% grade ≈ 0.85x
-  let multiplier;
-  if (grade > 0.25) multiplier = 3.5;        // very steep up
-  else if (grade > 0.15) multiplier = 2.5;   // steep up
-  else if (grade > 0.08) multiplier = 1.8;   // moderate up
-  else if (grade > 0.03) multiplier = 1.3;   // gentle up
-  else if (grade > -0.03) multiplier = 1.0;  // flat
-  else if (grade > -0.08) multiplier = 0.85; // gentle down
-  else if (grade > -0.15) multiplier = 0.9;  // moderate down (starting to brake)
-  else multiplier = 1.1;                      // very steep down (slow)
-
-  return basePaceSec * multiplier;
-}
-let smoothPositions = {}; // bib -> { lat, lng }
-
 function startAnimation() {
-  if (animationFrame) cancelAnimationFrame(animationFrame);
+  if (animationFrame) clearTimeout(animationFrame);
   animateStep();
 }
 
 function animateStep() {
   updateRunnerPositions();
-  animationFrame = setTimeout(animateStep, 10000); // Update every 10s — smooth enough since data refreshes every 45s
+  animationFrame = setTimeout(animateStep, 10000);
 }
 
 function updateRunnerPositions() {
-  if (!leafletMap) return;
-
-  // Remove old markers
-  runnerMarkers.forEach(m => leafletMap.removeLayer(m));
-  runnerMarkers = [];
+  if (!mbMap || !mbMap.isStyleLoaded()) return;
 
   const allRunners = [];
 
-  // 50k
   data.fiftyk.forEach(r => {
     if (!r.Bib) return;
     const pos = getRunnerRouteAndProgress(r, '50k');
@@ -1767,17 +1618,15 @@ function updateRunnerPositions() {
     let lat, lng, segment;
     if (pos.fixed) { lat = pos.lat; lng = pos.lng; segment = pos.segment; }
     else { const p = interpolateAlongRoute(pos.route, pos.progress); lat = p.lat; lng = p.lng; segment = pos.segment; }
-    // Smooth interpolation
     const key = `50k_${r.Bib}`;
     if (smoothPositions[key]) {
       lat = smoothPositions[key].lat * 0.7 + lat * 0.3;
       lng = smoothPositions[key].lng * 0.7 + lng * 0.3;
     }
     smoothPositions[key] = { lat, lng };
-    allRunners.push({ lat, lng, bib: r.Bib, name: r.Name||'', segment, color: '#e8c14a', type: '50k' });
+    allRunners.push({ lat, lng, bib: r.Bib, name: r.Name||'', segment, color: '#e8c14a', key });
   });
 
-  // Ascent
   data.ascent.forEach(r => {
     if (!r.BIB) return;
     const pos = getRunnerRouteAndProgress(r, 'ascent');
@@ -1791,10 +1640,9 @@ function updateRunnerPositions() {
       lng = smoothPositions[key].lng * 0.7 + lng * 0.3;
     }
     smoothPositions[key] = { lat, lng };
-    allRunners.push({ lat, lng, bib: r.BIB, name: r.NAME||'', segment, color: '#a78bfa', type: 'ascent' });
+    allRunners.push({ lat, lng, bib: r.BIB, name: r.NAME||'', segment, color: '#a78bfa', key });
   });
 
-  // Ambush
   data.ambush.forEach(r => {
     if (!r.Bib) return;
     const pos = getRunnerRouteAndProgress(r, 'ambush');
@@ -1808,36 +1656,42 @@ function updateRunnerPositions() {
       lng = smoothPositions[key].lng * 0.7 + lng * 0.3;
     }
     smoothPositions[key] = { lat, lng };
-    allRunners.push({ lat, lng, bib: r.Bib, name: r.Name||'', segment, color: '#fb923c', type: 'ambush' });
+    allRunners.push({ lat, lng, bib: r.Bib, name: r.Name||'', segment, color: '#fb923c', key });
   });
 
-  // Add bib label + dot for each runner
+  // Update or create Mapbox markers
+  const seenKeys = new Set();
   allRunners.forEach(rp => {
-    // Runner dot with bib label
-    const icon = L.divIcon({
-      className: 'runner-label',
-      html: `<div style="position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer">
-        <div style="background:rgba(10,10,10,0.85);color:${rp.color};font-family:'DM Mono',monospace;font-size:9px;font-weight:700;padding:1px 3px;border-radius:2px;border:1px solid ${rp.color}44;line-height:1.2;white-space:nowrap;">#${rp.bib}</div>
-        <div style="width:8px;height:8px;background:${rp.color};border:1.5px solid #0a0a0a;border-radius:50%;box-shadow:0 0 5px ${rp.color}99;margin-top:1px;"></div>
-      </div>`,
-      iconSize: [32, 22],
-      iconAnchor: [16, 20]
-    });
+    seenKeys.add(rp.key);
+    if (runnerMarkers[rp.key]) {
+      // Move existing marker smoothly
+      runnerMarkers[rp.key].setLngLat([rp.lng, rp.lat]);
+    } else {
+      // Create new marker
+      const el = document.createElement('div');
+      el.style.cssText = `display:flex;flex-direction:column;align-items:center;cursor:pointer;`;
+      el.innerHTML = `
+        <div style="background:rgba(10,10,10,0.9);color:${rp.color};font-family:'DM Mono',monospace;font-size:9px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid ${rp.color}55;white-space:nowrap;">#${rp.bib}</div>
+        <div style="width:10px;height:10px;background:${rp.color};border:2px solid #0a0a0a;border-radius:50%;box-shadow:0 0 6px ${rp.color}cc;margin-top:1px;"></div>`;
+      const popup = new mapboxgl.Popup({ offset: 20, closeButton: false, maxWidth: '200px' })
+        .setHTML(`<div style="font-family:'DM Mono',monospace;font-size:11px;color:#f0f0f0;background:#111;padding:6px 8px;border-radius:4px;border-left:3px solid ${rp.color}">
+          <b style="color:${rp.color}">#${rp.bib}</b> ${rp.name}<br>
+          <span style="color:#888;font-size:10px">${rp.segment||''}</span>
+        </div>`);
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([rp.lng, rp.lat])
+        .setPopup(popup)
+        .addTo(mbMap);
+      runnerMarkers[rp.key] = marker;
+    }
+  });
 
-    const marker = L.marker([rp.lat, rp.lng], { icon, zIndexOffset: 100 })
-      .addTo(leafletMap)
-      .bindTooltip(`
-        <div style="line-height:1.5">
-          <b style="color:${rp.color};font-size:13px">#${rp.bib}</b><br>
-          <b>${rp.name}</b><br>
-          <span style="color:#aaa;font-size:10px">${rp.segment}</span>
-        </div>`, {
-        direction: 'top',
-        offset: [0, -18],
-        className: 'tc-tooltip'
-      });
-
-    runnerMarkers.push(marker);
+  // Remove markers for runners no longer active
+  Object.keys(runnerMarkers).forEach(key => {
+    if (!seenKeys.has(key)) {
+      runnerMarkers[key].remove();
+      delete runnerMarkers[key];
+    }
   });
 }
 
@@ -1875,8 +1729,38 @@ function renderPodium(allRows, tab) {
   const section = document.getElementById('podiumSection');
   const grid = document.getElementById('podiumGrid');
 
-  // No podium for ambush
-  if (tab === 'ambush') { section.style.display = 'none'; return; }
+  // Ambush — team-based podium
+  if (tab === 'ambush') {
+    // Group by team, find last member to finish per team
+    const teamTimes = {};
+    data.ambush.forEach(r => {
+      const team = r['Team Name'] || '';
+      if (!team) return;
+      const ms = elapsedMs(r['Team Elapsed Time']);
+      if (!ms || ms <= 0) return;
+      if (!teamTimes[team] || ms > teamTimes[team].ms) {
+        teamTimes[team] = { ms, teamName: team };
+      }
+    });
+    const sorted = Object.values(teamTimes).sort((a,b) => a.ms - b.ms);
+    if (!sorted.length) { section.style.display = 'none'; return; }
+
+    const medals = ['🥇','🥈','🥉'];
+    let html = `<div style="background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:1rem;border-top:2px solid var(--orange);grid-column:1/-1">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:0.1em;color:var(--orange);margin-bottom:0.75rem">Team Standings</div>`;
+    sorted.slice(0,3).forEach((t,i) => {
+      const timeStr = fmtElapsed(String(t.ms/86400000));
+      html += `<div style="display:flex;align-items:center;gap:0.6rem;padding:0.4rem 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:1.1rem;min-width:1.5rem">${medals[i]}</span>
+        <div style="flex:1"><div style="font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;color:var(--text)">${t.teamName}</div></div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--orange);letter-spacing:0.05em">${timeStr}</div>
+      </div>`;
+    });
+    html += `</div>`;
+    grid.innerHTML = html;
+    section.style.display = 'block';
+    return;
+  }
 
   const genders = [
     { key: 'M', label: 'Men', color: '#60a5fa' },
@@ -1885,21 +1769,19 @@ function renderPodium(allRows, tab) {
   ];
 
   const medals = ['🥇','🥈','🥉'];
-
   let html = '';
   let anyPodium = false;
 
   genders.forEach(g => {
-    // Get finished runners of this gender sorted by elapsed time
-    const finished = allRows
-      .filter(r => {
-        const gender = getGender(r, tab);
-        const status = (r.Status || r.STATUS || '').toUpperCase();
-        return gender === g.key && status === 'FINISHED';
-      })
-      .map(r => ({ ...r, _rankMs: getElapsedMsForRanking(r, tab) }))
-      .filter(r => r._rankMs && r._rankMs > 0)
-      .sort((a, b) => a._rankMs - b._rankMs);
+    const finished = allRows.filter(r => {
+      const gender = getGender(r, tab);
+      // Check all possible status field names
+      const status = (r.Status || r.STATUS || r.status || '').toUpperCase();
+      return gender === g.key && status === 'FINISHED';
+    })
+    .map(r => ({ ...r, _rankMs: getElapsedMsForRanking(r, tab) }))
+    .filter(r => r._rankMs && r._rankMs > 0)
+    .sort((a, b) => a._rankMs - b._rankMs);
 
     if (!finished.length) return;
     anyPodium = true;
@@ -1910,30 +1792,24 @@ function renderPodium(allRows, tab) {
     finished.slice(0, 3).forEach((r, i) => {
       const name = r.Name || r.NAME || '';
       const bib = r.Bib || r.BIB || r.ascentBib || '';
-      const time = fmtElapsed(
-        tab === 'ascent' ? r['ELAPSED TIME'] :
-        tab === '50k' ? r['Total Elapsed Time'] :
-        String(r._totalMs / 86400000)
-      );
+      let timeStr = '';
+      if (tab === 'ascent') timeStr = fmtElapsed(r['ELAPSED TIME']);
+      else if (tab === '50k') timeStr = fmtElapsed(r['Total Elapsed Time']);
+      else if (tab === 'bigcat') timeStr = r._totalMs ? fmtElapsed(String(r._totalMs/86400000)) : '';
       html += `<div style="display:flex;align-items:center;gap:0.6rem;padding:0.4rem 0;border-bottom:1px solid var(--border);margin-bottom:0.2rem">
         <span style="font-size:1.1rem;min-width:1.5rem">${medals[i]}</span>
         <div style="flex:1">
           <div style="font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;color:var(--text)">${name}</div>
           <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--text-dim)">#${bib}</div>
         </div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:${g.color};letter-spacing:0.05em">${time}</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:${g.color};letter-spacing:0.05em">${timeStr}</div>
       </div>`;
     });
-
     html += `</div>`;
   });
 
-  if (anyPodium) {
-    grid.innerHTML = html;
-    section.style.display = 'block';
-  } else {
-    section.style.display = 'none';
-  }
+  if (anyPodium) { grid.innerHTML = html; section.style.display = 'block'; }
+  else { section.style.display = 'none'; }
 }
 
 function getTableData() {
@@ -2268,6 +2144,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     sortCol = null;
     renderTable();
     drawMap();
+    updateRouteVisibility(activeTab);
   });
 });
 
