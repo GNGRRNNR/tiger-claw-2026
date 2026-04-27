@@ -662,6 +662,10 @@ td.team-name {
     <button class="tab-btn" data-tab="bigcat">🐅 Big Cat</button>
   </div>
   <div style="display:flex;gap:0.5rem;align-items:center;margin-left:auto;flex-wrap:wrap;">
+    <div style="display:flex;border:1px solid var(--border2);border-radius:4px;overflow:hidden;">
+      <button id="btn3d" onclick="setMapDimension('3d')" style="background:var(--accent);color:var(--black);border:none;padding:0.5rem 0.75rem;font-family:'DM Mono',monospace;font-size:0.75rem;font-weight:700;cursor:pointer;min-height:44px;">3D</button>
+      <button id="btn2d" onclick="setMapDimension('2d')" style="background:var(--surface3);color:var(--text-muted);border:none;padding:0.5rem 0.75rem;font-family:'DM Mono',monospace;font-size:0.75rem;cursor:pointer;min-height:44px;">2D</button>
+    </div>
     <select id="genderFilter" style="
       background:var(--surface3);border:1px solid var(--border2);border-radius:4px;
       color:var(--text);font-family:'DM Mono',monospace;font-size:0.8rem;
@@ -686,35 +690,27 @@ td.team-name {
   </div>
 </div>
 
-<!-- STATS BAR — below event tabs -->
+<!-- STATS BAR — shows stats for active event only -->
 <div class="stats-bar" id="statsBar">
-  <div class="stat-item">
-    <div class="stat-label">50k Runners</div>
-    <div class="stat-value" id="stat50kTotal">--</div>
+  <div class="stat-item" id="statCol1">
+    <div class="stat-label" id="statLabel1">Runners</div>
+    <div class="stat-value" id="statVal1">--</div>
   </div>
-  <div class="stat-item">
-    <div class="stat-label">50k Finished</div>
-    <div class="stat-value green" id="stat50kFinished">--</div>
+  <div class="stat-item" id="statCol2">
+    <div class="stat-label" id="statLabel2">Finished</div>
+    <div class="stat-value green" id="statVal2">--</div>
   </div>
-  <div class="stat-item">
-    <div class="stat-label">Ascent Runners</div>
-    <div class="stat-value" id="statAscentTotal">--</div>
+  <div class="stat-item" id="statCol3">
+    <div class="stat-label" id="statLabel3">On Course</div>
+    <div class="stat-value green" id="statVal3">--</div>
   </div>
-  <div class="stat-item">
-    <div class="stat-label">Ascent Finished</div>
-    <div class="stat-value green" id="statAscentFinished">--</div>
+  <div class="stat-item" id="statCol4">
+    <div class="stat-label" id="statLabel4">DNF</div>
+    <div class="stat-value red-col" id="statVal4">--</div>
   </div>
-  <div class="stat-item">
-    <div class="stat-label">Ambush Teams</div>
-    <div class="stat-value" id="statAmbushTeams">--</div>
-  </div>
-  <div class="stat-item">
-    <div class="stat-label">On Course</div>
-    <div class="stat-value green" id="statOnCourse">--</div>
-  </div>
-  <div class="stat-item">
-    <div class="stat-label">DNF</div>
-    <div class="stat-value red-col" id="statDNF">--</div>
+  <div class="stat-item" id="statCol5" style="display:none">
+    <div class="stat-label" id="statLabel5">DNS</div>
+    <div class="stat-value" id="statVal5">--</div>
   </div>
 </div>
 
@@ -729,10 +725,6 @@ td.team-name {
   <div class="map-title">
     Course Map — Live Positions
     <span class="map-resize-hint">↕ drag bottom edge to resize</span>
-    <div style="display:flex;border:1px solid var(--border2);border-radius:4px;overflow:hidden;margin-left:auto">
-      <button id="btn3d" onclick="setMapDimension('3d')" style="background:var(--accent);color:var(--black);border:none;padding:0.3rem 0.6rem;font-family:'DM Mono',monospace;font-size:0.7rem;font-weight:700;cursor:pointer">3D</button>
-      <button id="btn2d" onclick="setMapDimension('2d')" style="background:var(--surface3);color:var(--text-muted);border:none;padding:0.3rem 0.6rem;font-family:'DM Mono',monospace;font-size:0.7rem;cursor:pointer">2D</button>
-    </div>
   </div>
   <div class="map-container">
     <div id="courseMap" style="width:100%;height:100%;"></div>
@@ -866,14 +858,14 @@ const RACE_STARTS = {
 };
 
 const CHECKPOINTS = [
-  { id: 'start',       label: 'Start / Finish',      lat: 47.527708, lng: -122.034216, color: '#4ade80', r: 8 },
-  { id: 'ascent_start',label: 'Ascent Start',         lat: 47.529744, lng: -121.995642, color: '#a78bfa', r: 6 },
-  { id: 'green',       label: 'Green CP',             lat: 47.529832, lng: -121.996694, color: '#4ade80', r: 6 },
-  { id: 'pink',        label: 'Pink Loop Bottom',     lat: 47.526687, lng: -121.997090, color: '#f472b6', r: 6 },
-  { id: 'white',       label: 'White Loop Bottom',    lat: 47.527259, lng: -121.998629, color: '#e2e8f0', r: 6 },
-  { id: 'yellow',      label: 'Yellow Loop Bottom',   lat: 47.527324, lng: -121.998865, color: '#fbbf24', r: 6 },
-  { id: 'blue',        label: 'Blue Summit / Ascent Finish', lat: 47.508742, lng: -121.985226, color: '#60a5fa', r: 7 },
-  { id: 'red',         label: 'Red CP',               lat: 47.529776, lng: -121.996875, color: '#f87171', r: 6 },
+  { id: 'start',        label: 'Start / Finish',                lat: 47.527708, lng: -122.034216, color: '#4ade80', r: 9, symbol: '🏁' },
+  { id: 'ascent_start', label: 'Ascent Start',                  lat: 47.529744, lng: -121.995642, color: '#a78bfa', r: 6, symbol: '▶' },
+  { id: 'basecamp',     label: '⛺ Base Camp Aid Station',       lat: 47.529832, lng: -121.996694, color: '#fbbf24', r: 8, symbol: '⛺' },
+  { id: 'pink',         label: 'Pink Loop Checkpoint',          lat: 47.526687, lng: -121.997090, color: '#f472b6', r: 5, symbol: '●' },
+  { id: 'white',        label: 'White Loop Checkpoint',         lat: 47.527259, lng: -121.998629, color: '#e2e8f0', r: 5, symbol: '●' },
+  { id: 'yellow',       label: 'Yellow Loop Checkpoint',        lat: 47.527324, lng: -121.998865, color: '#fbbf24', r: 5, symbol: '●' },
+  { id: 'highcamp',     label: '🏔 High Camp Aid Station',      lat: 47.508742, lng: -121.985226, color: '#60a5fa', r: 8, symbol: '🏔' },
+  { id: 'red',          label: 'Red Checkpoint',                lat: 47.529776, lng: -121.996875, color: '#f87171', r: 5, symbol: '●' },
 ];
 
 // ============================================================
@@ -1082,30 +1074,50 @@ async function fetchAll() {
 }
 
 // ============================================================
-// STATS
+// STATS — shows stats for currently active tab only
 // ============================================================
 function updateStats() {
-  const f50 = data.fiftyk.filter(r => r.Bib && r.Bib !== '');
-  const fa = data.ascent.filter(r => r.BIB && r.BIB !== '');
-  const amb = data.ambush.filter(r => r.Bib && r.Bib !== '');
-  const teams = new Set(amb.map(r => r['Team Name']).filter(Boolean));
+  const tab = activeTab;
+  const set = (l1,v1,l2,v2,l3,v3,l4,v4,show5=false,l5='',v5='') => {
+    document.getElementById('statLabel1').textContent = l1; document.getElementById('statVal1').textContent = v1;
+    document.getElementById('statLabel2').textContent = l2; document.getElementById('statVal2').textContent = v2;
+    document.getElementById('statLabel3').textContent = l3; document.getElementById('statVal3').textContent = v3;
+    document.getElementById('statLabel4').textContent = l4; document.getElementById('statVal4').textContent = v4;
+    document.getElementById('statCol5').style.display = show5 ? '' : 'none';
+    if (show5) { document.getElementById('statLabel5').textContent = l5; document.getElementById('statVal5').textContent = v5; }
+  };
 
-  document.getElementById('stat50kTotal').textContent = f50.length || '--';
-  document.getElementById('stat50kFinished').textContent = f50.filter(r => (r.Status||'').toUpperCase()==='FINISHED').length;
-  document.getElementById('statAscentTotal').textContent = fa.length || '--';
-  document.getElementById('statAscentFinished').textContent = fa.filter(r => (r.STATUS||'').toUpperCase()==='FINISHED').length;
-  document.getElementById('statAmbushTeams').textContent = teams.size || '--';
-
-  const onCourse = f50.filter(r => {
-    const s = (r.Status||'').toUpperCase();
-    return s !== 'FINISHED' && s !== 'DNF' && s !== 'DNS' && r.Bib;
-  }).length;
-  document.getElementById('statOnCourse').textContent = onCourse;
-
-  const dnf = [...f50, ...fa].filter(r => {
-    return (r.Status||r.STATUS||'').toUpperCase() === 'DNF';
-  }).length;
-  document.getElementById('statDNF').textContent = dnf;
+  if (tab === 'ascent') {
+    const rows = data.ascent.filter(r => r.BIB);
+    const fin = rows.filter(r => (r.STATUS||'').toUpperCase()==='FINISHED').length;
+    const dnf = rows.filter(r => (r.STATUS||'').toUpperCase()==='DNF').length;
+    const dns = rows.filter(r => (r.STATUS||'').toUpperCase()==='DNS').length;
+    const onc = rows.length - fin - dnf - dns;
+    set('Ascent Runners', rows.length||'--', 'Finished', fin, 'On Course', onc, 'DNF', dnf, true, 'DNS', dns);
+  } else if (tab === '50k') {
+    const rows = data.fiftyk.filter(r => r.Bib);
+    const fin = rows.filter(r => (r.Status||'').toUpperCase()==='FINISHED').length;
+    const dnf = rows.filter(r => (r.Status||'').toUpperCase()==='DNF').length;
+    const dns = rows.filter(r => (r.Status||'').toUpperCase()==='DNS').length;
+    const onc = rows.length - fin - dnf - dns;
+    set('50k Runners', rows.length||'--', 'Finished', fin, 'On Course', onc, 'DNF', dnf, true, 'DNS', dns);
+  } else if (tab === 'ambush') {
+    const rows = data.ambush.filter(r => r.Bib);
+    const teams = new Set(rows.map(r => r['Team Name']).filter(Boolean));
+    const fin = rows.filter(r => (r.Status||'').toUpperCase()==='FINISHED').length;
+    const dnf = rows.filter(r => (r.Status||'').toUpperCase()==='DNF').length;
+    const onc = rows.length - fin - dnf;
+    set('Teams', teams.size||'--', 'Members', rows.length||'--', 'Finished Members', fin, 'DNF', dnf);
+  } else if (tab === 'bigcat') {
+    const ascentMap = new Map(data.ascent.filter(r=>r.NAME).map(r => [r.NAME.trim().toUpperCase(), r]));
+    const bcRows = data.fiftyk.filter(r => r.Name && ascentMap.has(r.Name.trim().toUpperCase()));
+    const finBoth = bcRows.filter(r => {
+      const ra = ascentMap.get(r.Name.trim().toUpperCase());
+      return (r.Status||'').toUpperCase()==='FINISHED' && (ra.STATUS||'').toUpperCase()==='FINISHED';
+    }).length;
+    const inProgress = bcRows.length - finBoth;
+    set('Big Cat Athletes', bcRows.length||'--', 'Completed Both', finBoth, 'In Progress', inProgress, 'DNF', 0);
+  }
 }
 
 // ============================================================
@@ -1490,15 +1502,6 @@ function openSegmentFocus(routeName) {
   document.getElementById('segFocusStats').textContent = statsText;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('segFocusClose').addEventListener('click', () => {
-    document.getElementById('segmentFocus').style.display = 'none';
-    activeSegment = null;
-    if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
-    resetSegmentStyles(); // restores routes for current tab and re-fits bounds
-  });
-});
-
 
 // ============================================================
 // MAP — Mapbox GL JS with satellite + GPX routes
@@ -1577,13 +1580,27 @@ function initMap() {
       });
     });
 
-    // Checkpoint markers
+    // Checkpoint markers with aid station labels
     CHECKPOINTS.forEach(cp => {
+      const isAidStation = cp.id === 'basecamp' || cp.id === 'highcamp';
+      const isStart = cp.id === 'start';
       const el = document.createElement('div');
-      el.style.cssText = 'width:14px;height:14px;background:' + cp.color + ';border:2px solid #0a0a0a;border-radius:50%;box-shadow:0 0 8px ' + cp.color + '99;cursor:pointer';
+      el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer';
+
+      if (isAidStation) {
+        // Aid stations get a label badge
+        el.innerHTML = `
+          <div style="background:rgba(10,10,10,0.92);color:${cp.color};font-family:'DM Mono',monospace;font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;border:1px solid ${cp.color}88;white-space:nowrap;margin-bottom:2px">${cp.symbol} ${cp.id === 'basecamp' ? 'BASE CAMP' : 'HIGH CAMP'}</div>
+          <div style="width:${cp.r*2+2}px;height:${cp.r*2+2}px;background:${cp.color};border:2px solid #0a0a0a;border-radius:50%;box-shadow:0 0 10px ${cp.color}cc"></div>`;
+      } else if (isStart) {
+        el.innerHTML = `<div style="width:${cp.r*2+4}px;height:${cp.r*2+4}px;background:${cp.color};border:3px solid #0a0a0a;border-radius:50%;box-shadow:0 0 12px ${cp.color}cc"></div>`;
+      } else {
+        el.innerHTML = `<div style="width:${cp.r*2}px;height:${cp.r*2}px;background:${cp.color};border:1.5px solid #0a0a0a;border-radius:50%;box-shadow:0 0 6px ${cp.color}88;opacity:0.9"></div>`;
+      }
+
       new mapboxgl.Marker(el).setLngLat([cp.lng, cp.lat])
         .setPopup(new mapboxgl.Popup({ offset: 12, closeButton: false })
-          .setHTML('<div style="background:#111;color:' + cp.color + ';font-family:DM Mono,monospace;font-size:11px;padding:4px 8px;border-radius:4px"><b>' + cp.label + '</b></div>'))
+          .setHTML(`<div style="background:#111;color:${cp.color};font-family:'DM Mono',monospace;font-size:11px;padding:5px 8px;border-radius:4px"><b>${cp.label}</b></div>`))
         .addTo(mbMap);
     });
 
@@ -1609,13 +1626,15 @@ function updateRouteVisibility(tab) {
   });
   if (coords.length) {
     const lngs = coords.map(c=>c[0]), lats = coords.map(c=>c[1]);
-    // Pad bounds generously so whole course is visible with pitch
-    const lngPad = (Math.max(...lngs) - Math.min(...lngs)) * 0.15;
-    const latPad = (Math.max(...lats) - Math.min(...lats)) * 0.15;
+    // Minimal padding so course fills the view
+    const lngSpan = Math.max(...lngs) - Math.min(...lngs);
+    const latSpan = Math.max(...lats) - Math.min(...lats);
+    const lngPad = lngSpan * 0.05;
+    const latPad = latSpan * 0.05;
     mbMap.fitBounds(
       [[Math.min(...lngs)-lngPad, Math.min(...lats)-latPad],
        [Math.max(...lngs)+lngPad, Math.max(...lats)+latPad]],
-      { pitch: is3D ? 40 : 0, bearing: is3D ? -10 : 0, duration: 800, padding: 30 }
+      { pitch: is3D ? 40 : 0, bearing: is3D ? -10 : 0, duration: 800, padding: 10 }
     );
   }
 }
@@ -1714,30 +1733,38 @@ function animateStep() {
 function updateRunnerTargets() {
   if (!mapReady) return;
   const all = [];
+  const tab = activeTab;
 
-  data.fiftyk.forEach(r => {
-    if (!r.Bib) return;
-    const pos = getRunnerRouteAndProgress(r, '50k');
-    if (!pos) return;
-    const p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
-    all.push({...p, bib:r.Bib, name:r.Name||'', seg:pos.segment||'', color:'#e8c14a', key:'f_'+r.Bib});
-  });
+  // Only show runners relevant to current tab
+  if (tab === '50k' || tab === 'bigcat') {
+    data.fiftyk.forEach(r => {
+      if (!r.Bib) return;
+      const pos = getRunnerRouteAndProgress(r, '50k');
+      if (!pos) return;
+      const p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
+      all.push({...p, bib:r.Bib, name:r.Name||'', seg:pos.segment||'', color:'#e8c14a', key:'f_'+r.Bib});
+    });
+  }
 
-  data.ascent.forEach(r => {
-    if (!r.BIB) return;
-    const pos = getRunnerRouteAndProgress(r, 'ascent');
-    if (!pos) return;
-    const p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
-    all.push({...p, bib:r.BIB, name:r.NAME||'', seg:pos.segment||'', color:'#a78bfa', key:'a_'+r.BIB});
-  });
+  if (tab === 'ascent' || tab === 'bigcat') {
+    data.ascent.forEach(r => {
+      if (!r.BIB) return;
+      const pos = getRunnerRouteAndProgress(r, 'ascent');
+      if (!pos) return;
+      const p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
+      all.push({...p, bib:r.BIB, name:r.NAME||'', seg:pos.segment||'', color:'#a78bfa', key:'a_'+r.BIB});
+    });
+  }
 
-  data.ambush.forEach(r => {
-    if (!r.Bib) return;
-    const pos = getRunnerRouteAndProgress(r, 'ambush');
-    if (!pos) return;
-    const p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
-    all.push({...p, bib:r.Bib, name:r.Name||'', seg:pos.segment||'', color:'#fb923c', key:'b_'+r.Bib});
-  });
+  if (tab === 'ambush') {
+    data.ambush.forEach(r => {
+      if (!r.Bib) return;
+      const pos = getRunnerRouteAndProgress(r, 'ambush');
+      if (!pos) return;
+      const p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
+      all.push({...p, bib:r.Bib, name:r.Name||'', seg:pos.segment||'', color:'#fb923c', key:'b_'+r.Bib});
+    });
+  }
 
   const seen = new Set();
   all.forEach(rp => {
@@ -2030,22 +2057,44 @@ function getTableData() {
   } else if (tab === 'ambush') {
     rows = data.ambush.filter(r => r.Bib && r.Bib !== '');
   } else if (tab === 'bigcat') {
-    // O(1) lookup using Map instead of repeated object searches
+    // Include runners registered in EITHER event — Big Cat is cross-event
     const ascentLookup = new Map();
     data.ascent.forEach(r => { if (r.NAME) ascentLookup.set(r.NAME.trim().toUpperCase(), r); });
-    rows = data.fiftyk.filter(r => r.Name && ascentLookup.has(r.Name.trim().toUpperCase()))
-    .map(r50 => {
-      const ra = ascentLookup.get(r50.Name.trim().toUpperCase());
-      const ascentMs = elapsedMs(ra['ELAPSED TIME']);
-      const fiftyMs = elapsedMs(r50['Total Elapsed Time']);
+    const fiftyLookup = new Map();
+    data.fiftyk.forEach(r => { if (r.Name) fiftyLookup.set(r.Name.trim().toUpperCase(), r); });
+
+    // Union of names appearing in both lists
+    const bcNames = new Set([
+      ...data.ascent.filter(r=>r.NAME).map(r=>r.NAME.trim().toUpperCase()),
+    ].filter(name => fiftyLookup.has(name)));
+
+    rows = [...bcNames].map(name => {
+      const ra = ascentLookup.get(name);
+      const r50 = fiftyLookup.get(name);
+      const ascentFinished = ra && (ra.STATUS||'').toUpperCase() === 'FINISHED';
+      const fiftyFinished = r50 && (r50.Status||'').toUpperCase() === 'FINISHED';
+      const ascentDNF = ra && (ra.STATUS||'').toUpperCase() === 'DNF';
+      const fiftyDNF = r50 && (r50.Status||'').toUpperCase() === 'DNF';
+      const ascentMs = ra ? elapsedMs(ra['ELAPSED TIME']) : null;
+      const fiftyMs = r50 ? elapsedMs(r50['Total Elapsed Time']) : null;
       const totalMs = (ascentMs && fiftyMs) ? ascentMs + fiftyMs : null;
-      const ascentFinished = (ra.STATUS||'').toUpperCase() === 'FINISHED';
-      const fiftyFinished = (r50.Status||'').toUpperCase() === 'FINISHED';
+
+      // Big Cat status: FINISHED only if both done; DNF if either DNF
+      let status = 'In Progress';
+      if (ascentFinished && fiftyFinished) status = 'FINISHED';
+      else if (ascentDNF || fiftyDNF) status = 'DNF';
+      else if (ascentFinished && !r50) status = 'Ascent Done';
+      else if (ascentFinished) status = 'Ascent Done · 50k In Progress';
+
       return {
-        Name: r50.Name, ascentBib: ra.BIB||'', fiftyBib: r50.Bib||'',
-        'Ascent Time': ra['ELAPSED TIME'], '50k Time': r50['Total Elapsed Time'],
-        ascentMs, fiftyMs, _totalMs: totalMs, gender: getGender(ra, 'ascent'),
-        Status: (ascentFinished && fiftyFinished) ? 'FINISHED' : (ascentFinished ? 'Ascent Done' : 'In Progress')
+        Name: ra ? ra.NAME : (r50 ? r50.Name : name),
+        ascentBib: ra ? ra.BIB||'' : '—',
+        fiftyBib: r50 ? r50.Bib||'' : '—',
+        'Ascent Time': ra ? ra['ELAPSED TIME'] : '',
+        '50k Time': r50 ? r50['Total Elapsed Time'] : '',
+        ascentMs, fiftyMs, _totalMs: totalMs,
+        gender: ra ? getGender(ra, 'ascent') : (r50 ? getGender(r50, '50k') : ''),
+        Status: status
       };
     }).sort((a, b) => (a._totalMs||Infinity) - (b._totalMs||Infinity));
   }
@@ -2351,6 +2400,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
     }
     renderTable();
+    updateStats();
     updateRouteVisibility(activeTab);
     drawMap();
   });
