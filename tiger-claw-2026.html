@@ -215,7 +215,7 @@ body {
 
 /* MAP */
 .map-section {
-  padding: 1.5rem;
+  padding: 1rem 1.5rem 0.75rem;
   border-bottom: 1px solid var(--border);
   background: var(--surface2);
 }
@@ -226,17 +226,30 @@ body {
   letter-spacing: 0.1em;
   color: var(--text-muted);
   text-transform: uppercase;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.map-resize-hint {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  margin-left: auto;
 }
 
 .map-container {
   position: relative;
   width: 100%;
-  height: 320px;
+  height: 540px;
   background: #0d1117;
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
+  resize: vertical;
+  min-height: 300px;
+  max-height: 85vh;
 }
 
 #courseMap {
@@ -567,8 +580,8 @@ td.team-name {
   .search-input { width: 160px; }
   .stat-item { padding: 0.6rem 1rem; min-width: 90px; }
   .stat-value { font-size: 1.3rem; }
-  .map-section { padding: 1rem; }
-  .map-container { height: 220px; }
+  .map-section { padding: 0.75rem 1rem; }
+  .map-container { height: 360px; min-height: 260px; }
   .charts-row { grid-template-columns: 1fr; }
   .chart-panel { border-right: none; border-bottom: 1px solid var(--border); }
 }
@@ -663,7 +676,7 @@ td.team-name {
 
 <!-- MAP -->
 <div class="map-section">
-  <div class="map-title">Course Map — Live Positions</div>
+  <div class="map-title">Course Map — Live Positions <span class="map-resize-hint">↕ drag bottom edge to resize</span></div>
   <div class="map-container">
     <div id="courseMap" style="width:100%;height:100%;"></div>
   </div>
@@ -822,6 +835,8 @@ function parseCSV(text) {
   const lines = text.trim().split('\n');
   if (lines.length < 2) return [];
   const headers = lines[0].split(',').map(h => h.trim());
+  // Log headers for debugging
+  console.log('CSV headers:', headers);
   return lines.slice(1).map(line => {
     const vals = line.split(',').map(v => v.trim());
     const obj = {};
@@ -1474,6 +1489,10 @@ function initMap() {
   const allPts = Object.values(GPX_ROUTES).flat();
   leafletMap.fitBounds(allPts, { padding: [30, 30] });
 
+  // Invalidate map size when container is resized (drag handle)
+  const resizeObs = new ResizeObserver(() => { leafletMap.invalidateSize(); });
+  resizeObs.observe(document.getElementById('courseMap').parentElement);
+
   // Tooltip style
   const style = document.createElement('style');
   style.textContent = `
@@ -1728,7 +1747,7 @@ function startAnimation() {
 
 function animateStep() {
   updateRunnerPositions();
-  animationFrame = setTimeout(animateStep, 3000); // Update every 3s for smooth movement
+  animationFrame = setTimeout(animateStep, 10000); // Update every 10s — smooth enough since data refreshes every 45s
 }
 
 function updateRunnerPositions() {
@@ -1948,7 +1967,7 @@ function getTableData() {
         ascentMs,
         fiftyMs,
         _totalMs: totalMs,
-        gender: (ra['GENDER'] || ra['Gender'] || '').toUpperCase(),
+        gender: getGender(ra, 'ascent'),
         Status: (ascentFinished && fiftyFinished) ? 'FINISHED' : (ascentFinished ? 'Ascent Done' : 'In Progress')
       };
     }).sort((a, b) => (a._totalMs||Infinity) - (b._totalMs||Infinity));
