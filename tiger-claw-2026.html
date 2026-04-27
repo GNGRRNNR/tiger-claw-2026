@@ -625,15 +625,32 @@ td.team-name {
 <!-- CONTROLS -->
 <div class="controls">
   <div class="tabs">
-    <button class="tab-btn active" data-tab="50k">50k</button>
-    <button class="tab-btn" data-tab="ascent">Ascent</button>
+    <button class="tab-btn active" data-tab="ascent">Ascent</button>
+    <button class="tab-btn" data-tab="50k">50k</button>
     <button class="tab-btn" data-tab="ambush">Ambush</button>
     <button class="tab-btn" data-tab="bigcat">🐅 Big Cat</button>
   </div>
-  <div class="search-wrap">
-    <span class="search-icon">⌕</span>
-    <input type="text" class="search-input" id="searchInput" placeholder="Search bib or name…">
+  <div style="display:flex;gap:0.5rem;align-items:center;margin-left:auto;flex-wrap:wrap;">
+    <select id="genderFilter" style="
+      background:var(--surface3);border:1px solid var(--border2);border-radius:4px;
+      color:var(--text);font-family:'DM Mono',monospace;font-size:0.8rem;
+      padding:0.5rem 0.75rem;outline:none;cursor:pointer;">
+      <option value="all">All Genders</option>
+      <option value="M">Men</option>
+      <option value="F">Women</option>
+      <option value="NB">Non-Binary</option>
+    </select>
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input type="text" class="search-input" id="searchInput" placeholder="Search bib or name…">
+    </div>
   </div>
+</div>
+
+<!-- PODIUM -->
+<div id="podiumSection" style="border-bottom:1px solid var(--border);background:var(--surface2);padding:1.25rem 1.5rem;display:none;">
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:0.9rem;letter-spacing:0.12em;color:var(--text-dim);margin-bottom:1rem;">Podium</div>
+  <div id="podiumGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;"></div>
 </div>
 
 <!-- MAP -->
@@ -722,9 +739,10 @@ const CHECKPOINTS = [
 // STATE
 // ============================================================
 let data = { ascent: [], fiftyk: [], ambush: [] };
-let activeTab = '50k';
+let activeTab = 'ascent';
 let sortCol = null, sortDir = 'asc';
 let filterText = '';
+let genderFilter = 'all';
 let loopChartInst = null, segChartInst = null;
 let mapCanvas, mapCtx;
 
@@ -878,7 +896,7 @@ function updateStats() {
 function updateLoopChart() {
   const orders = {};
   data.fiftyk.forEach(r => {
-    const l1 = r['First Loop'] || '';
+    const l1 = r['First Loop Color'] || '';
     const l2 = r['Second Loop'] || '';
     const l3 = r['Third Loop'] || '';
     if (l1 && l2 && l3) {
@@ -923,7 +941,7 @@ function updateSegChart() {
   const descents = { D1: [], D2: [], D3: [] };
 
   data.fiftyk.forEach(r => {
-    [['First Loop','First Loop Elapsed'],['Second Loop','Second Loop Elapsed'],['Third Loop','Third Loop Elapsed']].forEach(([colorCol, elapsedCol]) => {
+    [['First Loop Color','First Loop Elapsed'],['Second Loop','Second Loop Elapsed'],['Third Loop','Third Loop Elapsed']].forEach(([colorCol, elapsedCol]) => {
       const color = r[colorCol] || '';
       const ms = elapsedMs(r[elapsedCol]);
       if (color && ms && ms > 0 && loops[color]) loops[color].push(ms);
@@ -1146,7 +1164,7 @@ function getRunnerPositions() {
     if (r['Second Loop Top']) { positions.push({ cp: 'blue', bib: r.Bib, name }); return; }
     if (r['Second Loop Bottom']) { positions.push({ cp: (r['Second Loop']||'').toLowerCase() || 'green', bib: r.Bib, name }); return; }
     if (r['First Loop Top']) { positions.push({ cp: 'blue', bib: r.Bib, name }); return; }
-    if (r['First Loop Bottom']) { positions.push({ cp: (r['First Loop']||'').toLowerCase() || 'green', bib: r.Bib, name }); return; }
+    if (r['First Loop Bottom']) { positions.push({ cp: (r['First Loop Color']||'').toLowerCase() || 'green', bib: r.Bib, name }); return; }
     if (r['Green Checkpoint']) { positions.push({ cp: 'green', bib: r.Bib, name }); return; }
     positions.push({ cp: 'start', bib: r.Bib, name });
   });
@@ -1178,6 +1196,85 @@ function getRunnerPositions() {
 // ============================================================
 // TABLE RENDERING
 // ============================================================
+function getGender(row, tab) {
+  if (tab === '50k') return (row['Gender'] || row['GENDER'] || '').toUpperCase();
+  if (tab === 'ascent') return (row['GENDER'] || row['Gender'] || '').toUpperCase();
+  if (tab === 'bigcat') return (row.gender || '').toUpperCase();
+  return '';
+}
+
+function getElapsedMsForRanking(row, tab) {
+  if (tab === 'ascent') return elapsedMs(row['ELAPSED TIME']);
+  if (tab === '50k') return elapsedMs(row['Total Elapsed Time']);
+  if (tab === 'bigcat') return row._totalMs || null;
+  return null;
+}
+
+function renderPodium(allRows, tab) {
+  const section = document.getElementById('podiumSection');
+  const grid = document.getElementById('podiumGrid');
+
+  // No podium for ambush
+  if (tab === 'ambush') { section.style.display = 'none'; return; }
+
+  const genders = [
+    { key: 'M', label: 'Men', color: '#60a5fa' },
+    { key: 'F', label: 'Women', color: '#f472b6' },
+    { key: 'NB', label: 'Non-Binary', color: '#a78bfa' },
+  ];
+
+  const medals = ['🥇','🥈','🥉'];
+
+  let html = '';
+  let anyPodium = false;
+
+  genders.forEach(g => {
+    // Get finished runners of this gender sorted by elapsed time
+    const finished = allRows
+      .filter(r => {
+        const gender = getGender(r, tab);
+        const status = (r.Status || r.STATUS || '').toUpperCase();
+        return gender === g.key && status === 'FINISHED';
+      })
+      .map(r => ({ ...r, _rankMs: getElapsedMsForRanking(r, tab) }))
+      .filter(r => r._rankMs && r._rankMs > 0)
+      .sort((a, b) => a._rankMs - b._rankMs);
+
+    if (!finished.length) return;
+    anyPodium = true;
+
+    html += `<div style="background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:1rem;border-top:2px solid ${g.color}">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:0.1em;color:${g.color};margin-bottom:0.75rem">${g.label}</div>`;
+
+    finished.slice(0, 3).forEach((r, i) => {
+      const name = r.Name || r.NAME || '';
+      const bib = r.Bib || r.BIB || r.ascentBib || '';
+      const time = fmtElapsed(
+        tab === 'ascent' ? r['ELAPSED TIME'] :
+        tab === '50k' ? r['Total Elapsed Time'] :
+        String(r._totalMs / 86400000)
+      );
+      html += `<div style="display:flex;align-items:center;gap:0.6rem;padding:0.4rem 0;border-bottom:1px solid var(--border);margin-bottom:0.2rem">
+        <span style="font-size:1.1rem;min-width:1.5rem">${medals[i]}</span>
+        <div style="flex:1">
+          <div style="font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;color:var(--text)">${name}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--text-dim)">#${bib}</div>
+        </div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:${g.color};letter-spacing:0.05em">${time}</div>
+      </div>`;
+    });
+
+    html += `</div>`;
+  });
+
+  if (anyPodium) {
+    grid.innerHTML = html;
+    section.style.display = 'block';
+  } else {
+    section.style.display = 'none';
+  }
+}
+
 function getTableData() {
   const tab = activeTab;
   let rows = [];
@@ -1189,7 +1286,6 @@ function getTableData() {
   } else if (tab === 'ambush') {
     rows = data.ambush.filter(r => r.Bib && r.Bib !== '');
   } else if (tab === 'bigcat') {
-    // Big Cat: match ascent runners who also have 50k data by name
     const ascentMap = {};
     data.ascent.forEach(r => { if (r.NAME) ascentMap[r.NAME.trim().toUpperCase()] = r; });
     rows = data.fiftyk.filter(r => {
@@ -1197,24 +1293,39 @@ function getTableData() {
     }).map(r50 => {
       const ra = ascentMap[r50.Name.trim().toUpperCase()];
       const ascentMs = elapsedMs(ra['ELAPSED TIME']);
-      const fiftykMs = elapsedMs(r50['Total Elapsed Time']);
-      const totalMs = (ascentMs && fiftykMs) ? ascentMs + fiftykMs : null;
+      const fiftyMs = elapsedMs(r50['Total Elapsed Time']);
+      const totalMs = (ascentMs && fiftyMs) ? ascentMs + fiftyMs : null;
+      const ascentFinished = (ra.STATUS||'').toUpperCase() === 'FINISHED';
+      const fiftyFinished = (r50.Status||'').toUpperCase() === 'FINISHED';
       return {
         Name: r50.Name,
+        ascentBib: ra.BIB || '',
+        fiftyBib: r50.Bib || '',
         'Ascent Time': ra['ELAPSED TIME'],
         '50k Time': r50['Total Elapsed Time'],
+        ascentMs,
+        fiftyMs,
         _totalMs: totalMs,
-        Status: (ra.STATUS||'').toUpperCase() === 'FINISHED' && (r50.Status||'').toUpperCase() === 'FINISHED' ? 'FINISHED' : 'In Progress'
+        gender: (ra['GENDER'] || ra['Gender'] || '').toUpperCase(),
+        Status: (ascentFinished && fiftyFinished) ? 'FINISHED' : (ascentFinished ? 'Ascent Done' : 'In Progress')
       };
-    });
+    }).sort((a, b) => (a._totalMs||Infinity) - (b._totalMs||Infinity));
   }
 
-  // Filter
+  // Render podium from full unfiltered data (before gender/text filter)
+  renderPodium(rows, tab);
+
+  // Gender filter (skip for ambush)
+  if (genderFilter !== 'all' && tab !== 'ambush') {
+    rows = rows.filter(r => getGender(r, tab) === genderFilter);
+  }
+
+  // Text filter
   if (filterText) {
     const f = filterText.toLowerCase();
     rows = rows.filter(r => {
       const bib = (r.Bib || r.BIB || '').toLowerCase();
-      const name = (r.Name || r.NAME || r.name || '').toLowerCase();
+      const name = (r.Name || r.NAME || '').toLowerCase();
       const team = (r['Team Name'] || '').toLowerCase();
       return bib.includes(f) || name.includes(f) || team.includes(f);
     });
@@ -1237,7 +1348,7 @@ function renderTable() {
   let html = '<table><thead><tr>';
 
   if (tab === '50k') {
-    html += `<th data-col="Bib">Bib</th><th data-col="Name">Name</th><th data-col="Status">Status</th>
+    html += `<th data-col="Bib">Bib</th><th data-col="Name">Name</th><th data-col="Gender">Gender</th><th data-col="Status">Status</th>
       <th data-col="Green Checkpoint">Green CP</th>
       <th>Lp1</th><th>L1 Bot</th><th>L1 Top</th><th data-col="First Loop Elapsed">L1 Time</th>
       <th data-col="First Blue Descent Elapsed">D1</th>
@@ -1249,7 +1360,7 @@ function renderTable() {
       <th data-col="FINISH TIME (Scan)">Finish</th>
       <th data-col="Total Elapsed Time">Total Time</th>`;
   } else if (tab === 'ascent') {
-    html += `<th data-col="BIB">Bib</th><th data-col="NAME">Name</th><th data-col="STATUS">Status</th>
+    html += `<th data-col="BIB">Bib</th><th data-col="NAME">Name</th><th data-col="GENDER">Gender</th><th data-col="STATUS">Status</th>
       <th data-col="FINISH TIME (SCAN)">Finish Scan</th><th data-col="ELAPSED TIME">Elapsed</th>`;
   } else if (tab === 'ambush') {
     html += `<th data-col="Bib">Bib</th><th data-col="Team Name">Team</th><th data-col="Name">Name</th>
@@ -1263,7 +1374,15 @@ function renderTable() {
       <th data-col="FINISH TIME (Scan)">Finish</th>
       <th data-col="Team Elapsed Time">Team Time</th>`;
   } else if (tab === 'bigcat') {
-    html += `<th data-col="Name">Name</th><th>Ascent Time</th><th>50k Time</th><th data-col="_totalMs">Total Time</th><th>Status</th>`;
+    html += `
+      <th data-col="Name">Name 🐅</th>
+      <th data-col="gender">Gender</th>
+      <th>Ascent Bib</th>
+      <th data-col="ascentMs">Ascent Time<br><span style="font-weight:400;font-size:0.6rem;opacity:0.5">May 8 · 6pm</span></th>
+      <th>50k Bib</th>
+      <th data-col="fiftyMs">50k Time<br><span style="font-weight:400;font-size:0.6rem;opacity:0.5">May 9 · 7am</span></th>
+      <th data-col="_totalMs">⏱ Combined</th>
+      <th>Status</th>`;
   }
 
   html += '</tr></thead><tbody>';
@@ -1272,14 +1391,17 @@ function renderTable() {
   if (sortCol) {
     rows.sort((a, b) => {
       let va = a[sortCol] || '', vb = b[sortCol] || '';
-      if (sortCol === '_totalMs') { va = a._totalMs||Infinity; vb = b._totalMs||Infinity; return sortDir==='asc'?va-vb:vb-va; }
+      if (sortCol === '_totalMs' || sortCol === 'ascentMs' || sortCol === 'fiftyMs') {
+        va = a[sortCol]||Infinity; vb = b[sortCol]||Infinity;
+        return sortDir==='asc'?va-vb:vb-va;
+      }
       const na = parseFloat(va), nb = parseFloat(vb);
       if (!isNaN(na) && !isNaN(nb)) return sortDir==='asc'?na-nb:nb-na;
       return sortDir==='asc'?va.localeCompare(vb):vb.localeCompare(va);
     });
   }
 
-  rows.forEach(r => {
+  rows.forEach((r, idx) => {
     const isHighlight = filterText && (
       (r.Bib||r.BIB||'').toLowerCase().includes(filterText.toLowerCase()) ||
       (r.Name||r.NAME||'').toLowerCase().includes(filterText.toLowerCase())
@@ -1291,9 +1413,10 @@ function renderTable() {
       const isBigCat = data.ascent.some(a => (a.NAME||'').trim().toUpperCase() === (r.Name||'').trim().toUpperCase());
       html += `<td class="bib">${r.Bib||''}</td>
         <td class="name">${r.Name||''}${isBigCat?' <span class="bigcat-icon">🐅</span>':''}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--text-muted)">${r.Gender||r.GENDER||''}</td>
         <td>${statusBadge(r.Status)}</td>
         <td class="time-val">${fmtTime(r['Green Checkpoint'])}</td>
-        <td>${loopTag(r['First Loop'])}</td>
+        <td>${loopTag(r['First Loop Color'])}</td>
         <td class="time-val">${fmtTime(r['First Loop Bottom'])}</td>
         <td class="time-val">${fmtTime(r['First Loop Top'])}</td>
         <td class="elapsed-val">${fmtElapsed(r['First Loop Elapsed'])}</td>
@@ -1312,8 +1435,10 @@ function renderTable() {
         <td class="time-val">${fmtTime(r['FINISH TIME (Scan)'])}</td>
         <td class="elapsed-val">${fmtElapsed(r['Total Elapsed Time'])}</td>`;
     } else if (tab === 'ascent') {
+      const isBigCat = data.fiftyk.some(f => (f.Name||'').trim().toUpperCase() === (r.NAME||'').trim().toUpperCase());
       html += `<td class="bib">${r.BIB||''}</td>
-        <td class="name">${r.NAME||''}</td>
+        <td class="name">${r.NAME||''}${isBigCat?' <span class="bigcat-icon">🐅</span>':''}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--text-muted)">${r.GENDER||r.Gender||''}</td>
         <td>${statusBadge(r.STATUS)}</td>
         <td class="time-val">${fmtTime(r['FINISH TIME (SCAN)'])}</td>
         <td class="elapsed-val">${fmtElapsed(r['ELAPSED TIME'])}</td>`;
@@ -1333,10 +1458,29 @@ function renderTable() {
         <td class="time-val">${fmtTime(r['FINISH TIME (Scan)'])}</td>
         <td class="elapsed-val">${fmtElapsed(r['Team Elapsed Time'])}</td>`;
     } else if (tab === 'bigcat') {
-      html += `<td class="name">${r.Name||''} 🐅</td>
-        <td class="elapsed-val">${fmtElapsed(r['Ascent Time'])}</td>
-        <td class="elapsed-val">${fmtElapsed(r['50k Time'])}</td>
-        <td class="elapsed-val">${r._totalMs ? fmtElapsed(String(r._totalMs/86400000)) : ''}</td>
+      const rank = idx + 1;
+      const rankDisplay = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+      const ascentDone = (r.Status||'').includes('Fin') || r.ascentMs;
+      const fiftyDone = (r.Status||'').includes('FINISHED') || r.fiftyMs;
+      html += `
+        <td class="name" style="display:flex;align-items:center;gap:0.5rem">
+          <span style="font-family:'Bebas Neue';font-size:1rem;color:var(--accent);min-width:2rem">${rankDisplay}</span>
+          ${r.Name||''} 🐅
+        </td>
+        <td style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--text-muted)">${r.gender||''}</td>
+        <td class="bib" style="color:var(--text-dim);font-size:0.8rem">${r.ascentBib||'—'}</td>
+        <td>
+          <span class="elapsed-val">${r.ascentMs ? fmtElapsed(String(r.ascentMs/86400000)) : ''}</span>
+          ${!ascentDone ? '<span style="color:var(--text-dim);font-size:0.7rem"> On Ascent…</span>' : ''}
+        </td>
+        <td class="bib" style="color:var(--text-dim);font-size:0.8rem">${r.fiftyBib||'—'}</td>
+        <td>
+          <span class="elapsed-val">${r.fiftyMs ? fmtElapsed(String(r.fiftyMs/86400000)) : ''}</span>
+          ${ascentDone && !fiftyDone ? '<span style="color:var(--text-dim);font-size:0.7rem"> On 50k…</span>' : ''}
+        </td>
+        <td style="font-family:'Bebas Neue';font-size:1.3rem;color:${r._totalMs?'var(--accent)':'var(--text-dim)'}">
+          ${r._totalMs ? fmtElapsed(String(r._totalMs/86400000)) : '—'}
+        </td>
         <td>${statusBadge(r.Status)}</td>`;
     }
 
@@ -1395,7 +1539,7 @@ function openModal(bib, tab) {
     const checkpoints = [
       { label: 'Start', time: null, always: true },
       { label: 'Green Checkpoint', time: runner['Green Checkpoint'] },
-      { label: `Loop 1 (${runner['First Loop']||'?'}) — Bottom`, time: runner['First Loop Bottom'] },
+      { label: `Loop 1 (${runner['First Loop Color']||'?'}) — Bottom`, time: runner['First Loop Bottom'] },
       { label: `Loop 1 Top (Blue)`, time: runner['First Loop Top'] },
       { label: `Loop 2 (${runner['Second Loop']||'?'}) — Bottom`, time: runner['Second Loop Bottom'] },
       { label: `Loop 2 Top (Blue)`, time: runner['Second Loop Top'] },
@@ -1468,6 +1612,11 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 
 document.getElementById('searchInput').addEventListener('input', e => {
   filterText = e.target.value.trim();
+  renderTable();
+});
+
+document.getElementById('genderFilter').addEventListener('change', e => {
+  genderFilter = e.target.value;
   renderTable();
 });
 
