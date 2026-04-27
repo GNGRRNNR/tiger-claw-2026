@@ -669,6 +669,36 @@ td.team-name {
     <div class="legend-item"><div class="legend-dot" style="background:#60a5fa"></div>Blue Summit / Ascent Finish</div>
     <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div>Red CP</div>
     <div class="legend-item"><div class="legend-dot" style="background:#e8c14a;width:8px;height:8px;border-radius:2px"></div>Runner</div>
+    <div class="legend-item" style="margin-left:auto;color:var(--text-dim);font-size:0.65rem">Click a route line to focus segment</div>
+  </div>
+</div>
+
+<!-- SEGMENT FOCUS PANEL -->
+<div id="segmentFocus" style="display:none;border-bottom:1px solid var(--border);background:var(--surface2);">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem 0.5rem;">
+    <div>
+      <span id="segFocusTitle" style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:0.08em;color:var(--accent)"></span>
+      <span id="segFocusStats" style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--text-dim);margin-left:1rem"></span>
+    </div>
+    <button id="segFocusClose" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:4px;padding:0.3rem 0.6rem;cursor:pointer;font-size:0.8rem;">✕ Close</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--border);margin-top:0.5rem;">
+    <!-- Runners on segment -->
+    <div style="padding:1rem 1.5rem;border-right:1px solid var(--border);">
+      <div style="font-family:'DM Mono',monospace;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);margin-bottom:0.75rem;">Runners on Segment</div>
+      <div id="segRunnerList" style="display:flex;flex-direction:column;gap:0.4rem;max-height:160px;overflow-y:auto;"></div>
+    </div>
+    <!-- Elevation profile -->
+    <div style="padding:1rem 1.5rem;">
+      <div style="font-family:'DM Mono',monospace;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);margin-bottom:0.75rem;">
+        Elevation Profile
+        <span id="elevLoadingMsg" style="color:var(--accent);margin-left:0.5rem;"></span>
+      </div>
+      <div style="position:relative;height:160px;">
+        <canvas id="elevChart"></canvas>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -997,11 +1027,291 @@ function updateSegChart() {
 }
 
 // ============================================================
-// COURSE MAP — Leaflet + Esri Satellite
+// GPX ROUTE DATA (embedded from CalTopo exports)
 // ============================================================
+const GPX_ROUTES = {"green_start":[[47.5276048095183,-122.03408360481262],[47.52727,-122.03379000000001],[47.52648,-122.03358000000003],[47.52494190406192,-122.03274138377276],[47.52357008441423,-122.03227941797434],[47.5195835499094,-122.03037313559776],[47.51946,-122.02998000000002],[47.51967,-122.02749],[47.52071,-122.02627000000001],[47.5212661911484,-122.02611571186912],[47.52192,-122.02537999999998],[47.52275,-122.02494000000002],[47.52363,-122.02503999999999],[47.52386,-122.02501000000001],[47.52419,-122.02386999999999],[47.52478,-122.02305999999999],[47.52498,-122.02206999999999],[47.526149264794256,-122.02183668482598],[47.52568,-122.02161999999998],[47.52424287421683,-122.02078426343542],[47.52278,-122.02106000000003],[47.52119,-122.02103999999997],[47.52055237202265,-122.02140780283582],[47.52113,-122.02391],[47.51988,-122.02114],[47.519980054774294,-122.02003183019968],[47.51973,-122.01785000000001],[47.51986,-122.01611000000003],[47.5207,-122.01474000000002],[47.5207,-122.01474000000002],[47.52302,-122.01524],[47.52445,-122.01574],[47.52672,-122.01755000000003],[47.52760294868675,-122.01803941737131],[47.52855,-122.01859000000002],[47.52924,-122.01877999999999],[47.53069,-122.01814000000002],[47.53147,-122.01715999999999],[47.53204,-122.01556],[47.53232,-122.01485000000002],[47.53292,-122.01411999999999],[47.53377,-122.01336000000003],[47.53489,-122.01287000000002],[47.53458,-122.01029],[47.53473,-122.00752],[47.53363,-122.00772999999998],[47.53267,-122.00603000000001],[47.53215,-122.00477999999998],[47.53174268255701,-122.00306799133375],[47.53138,-121.99865999999997],[47.529769286202956,-121.99666642890975]],"pink":[[47.52974913314984,-121.9966506958008],[47.52843,-121.99694],[47.52728,-121.99672],[47.52774,-121.9951],[47.52741,-121.99457],[47.52732,-121.99341],[47.5279,-121.99207],[47.52802,-121.9904],[47.52814,-121.98855],[47.52793,-121.98775],[47.52711,-121.98728],[47.52666,-121.98599],[47.52685,-121.98425],[47.52645,-121.98456],[47.526077251356696,-121.9844884103135],[47.52555,-121.98494],[47.52497,-121.98489],[47.52432,-121.98456],[47.52392,-121.9834],[47.52392,-121.98239],[47.52231,-121.98127],[47.52099,-121.9811],[47.51987,-121.9813],[47.51882,-121.98156],[47.51823,-121.98121],[47.51839,-121.98063],[47.51886,-121.98036],[47.520247236898605,-121.9779653414714],[47.51946,-121.97618],[47.51911,-121.97433],[47.51945,-121.97291],[47.51912,-121.97203],[47.51609,-121.97021],[47.51463,-121.97036],[47.51337,-121.97305],[47.51274,-121.97227],[47.51138,-121.9718],[47.50987,-121.97499],[47.50995,-121.97688],[47.50974,-121.97705],[47.50868,-121.97915],[47.50886,-121.98044],[47.51084,-121.98083],[47.51307,-121.98085],[47.51235,-121.98124],[47.51213,-121.98165],[47.51145,-121.98214],[47.51045,-121.9832],[47.50981,-121.98401],[47.50928,-121.98515],[47.50857922739789,-121.98535931324257]],"white":[[47.52976724361798,-121.99665606021883],[47.52919062713426,-121.99666484321642],[47.52784,-121.99709],[47.52742,-121.99847],[47.52738,-121.99862],[47.5265,-121.99887],[47.52515,-121.9996],[47.52403,-121.99909],[47.52335,-121.99865],[47.52251,-121.99883],[47.52205,-121.99824],[47.52108,-121.99863],[47.52081,-121.99839],[47.52016,-121.99735],[47.51958,-121.99736],[47.51885,-121.99794],[47.5185,-121.9978],[47.51777,-121.99996],[47.51786,-121.99948],[47.51755,-121.99807],[47.51743,-121.99846],[47.51707,-121.99917],[47.51645,-121.99926],[47.51581,-121.99892],[47.5154,-121.99805],[47.51504,-121.9975],[47.51482,-121.99619],[47.51455,-121.9954],[47.51419,-121.99488],[47.51323,-121.99554],[47.51208,-121.99523],[47.51128,-121.99494],[47.51024,-121.99466],[47.50971,-121.99394],[47.50978,-121.99324],[47.5096,-121.9925],[47.50956,-121.99219],[47.50938,-121.9918],[47.50965,-121.99108],[47.50971,-121.99014],[47.51017,-121.98919],[47.51002,-121.9889],[47.5094,-121.98872],[47.50945707426866,-121.9883590259397],[47.50957,-121.98751],[47.50911,-121.98761],[47.50925,-121.98688],[47.50877,-121.98628],[47.50839,-121.98569],[47.5084,-121.9852],[47.508751069171204,-121.98536288784534]],"yellow":[[47.529763621524864,-121.99662923812868],[47.52843,-121.99694],[47.52739,-121.99857],[47.52682,-122.00046],[47.52610987232616,-122.00394955314155],[47.52563,-122.00715],[47.524431413948534,-122.01036583010364],[47.52283,-122.01131],[47.52056,-122.01225],[47.51941709141196,-122.01126885933283],[47.5172,-122.01141],[47.51461,-122.00975],[47.51252,-122.00811],[47.51065,-122.00486],[47.50886,-122.00397],[47.5081,-122.00366],[47.50729,-122.00523],[47.5056,-122.00552],[47.50602,-122.00352],[47.50535,-122.00349],[47.50469,-122.00188],[47.50402,-122.0013],[47.50304,-122.00068],[47.50265,-121.99962],[47.50223,-121.99952],[47.50104,-121.99852],[47.50014,-121.99773],[47.49918,-121.99684],[47.49856,-121.99532],[47.49773,-121.99436],[47.49724,-121.99303],[47.49776,-121.99185],[47.4975,-121.98996],[47.49744,-121.98883],[47.4968,-121.98693],[47.49787,-121.98647],[47.49883,-121.98501],[47.49872,-121.98351],[47.49897,-121.98157],[47.49956,-121.98011],[47.50029,-121.97804],[47.50125,-121.97648],[47.50249,-121.97522],[47.50311,-121.97495],[47.50355,-121.97736],[47.50358,-121.97875],[47.50524,-121.98179],[47.50585,-121.98255],[47.50637,-121.98353],[47.50782,-121.98481],[47.50868685217657,-121.98531143082883]],"blue_descent":[[47.50868967279579,-121.9853049516678],[47.50858,-121.98536],[47.50821,-121.9851],[47.50839,-121.98569],[47.50929,-121.98616],[47.50884,-121.98752],[47.50941,-121.98751],[47.50958,-121.98828],[47.50953,-121.98881],[47.51017,-121.98909],[47.51027,-121.98951],[47.5107,-121.98995],[47.51141,-121.98994],[47.51176,-121.99066],[47.51191,-121.99015],[47.51261,-121.98974],[47.51344,-121.98914],[47.51389542194745,-121.98859869829984],[47.5145,-121.988],[47.51479,-121.98759],[47.5152,-121.98721],[47.51521,-121.98781],[47.5157,-121.98731],[47.51538,-121.98843],[47.51691,-121.98659],[47.5172,-121.98634],[47.51941,-121.98546],[47.51992,-121.98573],[47.51868,-121.9868],[47.51815,-121.98757],[47.5182,-121.98889],[47.51881,-121.98987],[47.51939,-121.9898],[47.52048,-121.98858],[47.52131,-121.98782],[47.52273,-121.98826],[47.52367,-121.98888],[47.52246,-121.98897],[47.52161,-121.9903],[47.52223,-121.99066],[47.52327,-121.99127],[47.52388,-121.99219],[47.52534,-121.99158],[47.52672,-121.9918],[47.52573,-121.9931],[47.52589,-121.99446],[47.526463246579404,-121.99670579348366],[47.52727,-121.99746],[47.52784,-121.99709],[47.52919062713426,-121.99666484321642],[47.52976729547362,-121.99660893168466]],"red_finish":[[47.52973464477083,-121.99662923812868],[47.52974,-121.99954],[47.52994387929472,-122.00052713976103],[47.53007,-122.00487],[47.529868853502414,-122.00823639061987],[47.52988,-122.00879],[47.529825867813784,-122.00906710728741],[47.52975,-122.00932],[47.52958,-122.00974],[47.52953265077937,-122.01075988818951],[47.52996,-122.01303],[47.53002,-122.01556],[47.52992,-122.01691],[47.52966410118832,-122.01846427767094],[47.52962,-122.01873],[47.52917,-122.01873],[47.528951566622126,-122.01885444631213],[47.52819,-122.01835],[47.5275,-122.01796],[47.52704,-122.01773],[47.52653,-122.01739],[47.52547,-122.01707],[47.52387,-122.01531],[47.52348,-122.01524],[47.52234,-122.01565],[47.5207,-122.01474],[47.52034,-122.01552],[47.51986,-122.01611],[47.5197,-122.01672],[47.51974,-122.01837],[47.51981,-122.019],[47.5199,-122.02028],[47.51957,-122.0212],[47.52006,-122.02329],[47.5206,-122.02558],[47.52079,-122.02578],[47.52069,-122.02597],[47.52052,-122.02635],[47.51967,-122.02749],[47.51937,-122.0297],[47.51946,-122.02998],[47.51948,-122.03024],[47.52044176503594,-122.03123875835331],[47.52252988890585,-122.03195077649488],[47.52411,-122.03245],[47.52442,-122.03251],[47.52645,-122.03341],[47.52716,-122.03382],[47.52734,-122.03376],[47.527510000231246,-122.03382000180567],[47.52761274194884,-122.0340914199378]],"ascent":[[47.52975637733785,-121.99551343917848],[47.52993,-121.99567],[47.53050238142769,-121.99461306780272],[47.53078744219244,-121.9925419728025],[47.53081,-121.99219],[47.53078,-121.98881],[47.53073969089206,-121.98769644911661],[47.53072,-121.98707],[47.53021,-121.98632],[47.53017,-121.98697],[47.52963605664423,-121.98752663994506],[47.5295,-121.98742],[47.52791,-121.98709],[47.52689,-121.98709],[47.52591,-121.98709],[47.52391,-121.98837],[47.5229,-121.98739],[47.52206,-121.98627],[47.52078,-121.98511],[47.51939,-121.98455],[47.51733,-121.98567],[47.516875278749595,-121.98596664144942],[47.51638,-121.98645],[47.51524,-121.98724],[47.515,-121.98735],[47.51479,-121.98759],[47.51462,-121.98789],[47.51414,-121.98837],[47.51388780195421,-121.98861317630637],[47.51359,-121.98899],[47.51317,-121.98945],[47.51253,-121.98982],[47.51191,-121.99015],[47.51168,-121.99035],[47.5115,-121.99021],[47.511294053822404,-121.9899480403668],[47.51095,-121.98978],[47.51075,-121.98979],[47.51027,-121.98951],[47.51018245254516,-121.98921452545153],[47.50999,-121.98884],[47.5094,-121.98872],[47.50945707426866,-121.9883590259397],[47.50963,-121.98756],[47.50934,-121.98755],[47.50889,-121.98729],[47.50929,-121.98616],[47.5086,-121.98616],[47.50821,-121.9851],[47.50858,-121.98536],[47.5087856722947,-121.98517953777994]]};
+
+const GPX_DISTANCES = {"green_start":7007,"pink":6175,"white":3799,"yellow":7918,"blue_descent":4806,"red_finish":5031,"ascent":3925};
+
+// ============================================================
+// ELEVATION DATA — fetched from USGS 3DEP on demand
+// ============================================================
+const elevationCache = {}; // routeName -> [elevation in meters per point]
+let elevChartInst = null;
+let activeSegment = null;
+
+// ============================================================
+// ELEVATION DATA — baked in (fetched once via elevation-fetcher.html)
+// Replace this constant with output from elevation-fetcher.html
+// ============================================================
+const ELEVATION_DATA = {"green_start":[32,32,39,46,46,46,46,45,42,64,64,112,68,68,91,91,137,151,151,174,142,142,103,112,103,123,141,159,159,159,192,192,166,177,177,134,155,104,157,157,155,137,137,156,144,144,155,155,154,140,174],"pink":[174,179,179,189,189,214,214,252,276,276,274,337,347,347,347,347,438,438,438,467,511,430,509,509,507,507,435,450,420,389,414,414,504,504,503,539,609,638,603,603,625,661,663,660,663,740,740,740,821,821,821],"white":[174,174,179,171,171,197,197,222,222,262,262,262,310,330,330,310,432,399,399,399,399,399,493,493,493,557,557,627,627,627,627,627,634,634,687,687,687,687,738,738,781,781,781,781,781,781,815,815,815,821,821],"yellow":[174,179,171,184,177,183,167,152,181,181,234,314,388,372,398,406,378,403,474,474,478,556,556,581,581,629,647,673,670,665,695,695,673,680,692,692,729,729,774,782,827,843,868,862,834,834,784,784,806,806,821],"blue_descent":[821,821,806,815,815,781,781,781,781,781,781,750,750,750,750,728,723,723,723,662,653,662,653,662,590,590,541,541,590,558,558,472,472,485,415,415,412,415,369,369,374,310,303,250,250,223,204,179,179,174,174],"red_finish":[174,169,163,164,168,159,159,159,159,152,155,161,155,155,155,155,164,177,177,166,166,166,192,192,192,159,159,159,141,141,123,123,103,68,42,42,42,42,45,46,46,46,46,42,46,46,39,32,32,32,32],"ascent":[173,173,173,182,182,172,172,165,165,165,172,165,274,337,337,412,490,490,582,582,590,590,653,653,653,662,662,723,723,723,723,728,750,750,750,750,750,750,781,781,781,781,781,781,781,815,815,815,806,821,821]};
+
+async function fetchRouteElevation(routeName) {
+  if (elevationCache[routeName]) return elevationCache[routeName];
+
+  // Use baked-in data if available
+  if (ELEVATION_DATA[routeName] && ELEVATION_DATA[routeName].length > 0) {
+    elevationCache[routeName] = ELEVATION_DATA[routeName];
+    return ELEVATION_DATA[routeName];
+  }
+
+  // Otherwise fetch live from Open-Elevation
+  const pts = GPX_ROUTES[routeName];
+  if (!pts) return null;
+
+  document.getElementById('elevLoadingMsg').textContent = 'Fetching elevation…';
+
+  try {
+    const locations = pts.map(([lat, lon]) => ({ latitude: lat, longitude: lon }));
+    const response = await fetch('https://api.open-elevation.com/api/v1/lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ locations })
+    });
+    if (!response.ok) throw new Error('API error');
+    const data = await response.json();
+    const elevations = data.results.map(r => r.elevation);
+    elevationCache[routeName] = elevations;
+    document.getElementById('elevLoadingMsg').textContent = '';
+    return elevations;
+  } catch(e) {
+    // Fallback: USGS one at a time
+    console.warn('Open-Elevation failed, trying USGS...', e);
+    document.getElementById('elevLoadingMsg').textContent = 'Fetching (slower)…';
+    const elevations = [];
+    for (const [lat, lon] of pts) {
+      try {
+        const url = `https://epqs.nationalmap.gov/v1/json?x=${lon}&y=${lat}&wkid=4326&units=Meters&includeDate=false`;
+        const r = await fetch(url);
+        const d2 = await r.json();
+        const v = parseFloat(d2.value);
+        elevations.push(isNaN(v) || v < -100 ? null : v);
+      } catch { elevations.push(null); }
+      await new Promise(r => setTimeout(r, 50));
+    }
+    for (let i = 0; i < elevations.length; i++) {
+      if (elevations[i] === null) {
+        const prev = elevations.slice(0,i).reverse().find(e => e !== null);
+        const next = elevations.slice(i+1).find(e => e !== null);
+        elevations[i] = prev ?? next ?? 0;
+      }
+    }
+    elevationCache[routeName] = elevations;
+    document.getElementById('elevLoadingMsg').textContent = '';
+    return elevations;
+  }
+}
+
+function calcRouteStats(routeName, elevations) {
+  const pts = GPX_ROUTES[routeName];
+  if (!pts || !elevations) return null;
+
+  let gain = 0, loss = 0;
+  for (let i = 1; i < elevations.length; i++) {
+    const diff = elevations[i] - elevations[i-1];
+    if (diff > 0) gain += diff;
+    else loss += Math.abs(diff);
+  }
+
+  const distKm = (GPX_DISTANCES[routeName] || 0) / 1000;
+  const minElev = Math.min(...elevations.filter(Boolean));
+  const maxElev = Math.max(...elevations.filter(Boolean));
+
+  return {
+    distKm: distKm.toFixed(1),
+    gainM: Math.round(gain),
+    gainFt: Math.round(gain * 3.281),
+    minM: Math.round(minElev),
+    maxM: Math.round(maxElev),
+  };
+}
+
+function showElevationProfile(routeName, elevations, runnerPositions, routeColor) {
+  const pts = GPX_ROUTES[routeName];
+  if (!pts || !elevations) return;
+
+  // Build distance axis
+  const distKm = [0];
+  for (let i = 1; i < pts.length; i++) {
+    const d = haversineM(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1]);
+    distKm.push(distKm[distKm.length-1] + d/1000);
+  }
+  const totalKm = distKm[distKm.length-1];
+
+  // Convert to feet for display
+  const elevFt = elevations.map(e => e ? Math.round(e * 3.281) : null);
+
+  // Runner position markers on the profile
+  const runnerAnnotations = runnerPositions.map(rp => ({
+    x: rp.progress * totalKm,
+    y: elevFt[Math.round(rp.progress * (elevFt.length-1))] || 0,
+    bib: rp.bib,
+    color: rp.color
+  }));
+
+  if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
+
+  const ctx = document.getElementById('elevChart').getContext('2d');
+  elevChartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: distKm.map(d => d.toFixed(2)),
+      datasets: [
+        {
+          label: 'Elevation (ft)',
+          data: elevFt,
+          borderColor: routeColor,
+          backgroundColor: routeColor + '22',
+          borderWidth: 2,
+          pointRadius: 0,
+          fill: true,
+          tension: 0.3,
+        },
+        // Runner position dots
+        {
+          label: 'Runners',
+          data: runnerAnnotations.map(ra => ({ x: ra.x.toFixed(2), y: ra.y })),
+          borderColor: '#e8c14a',
+          backgroundColor: '#e8c14a',
+          pointRadius: 6,
+          pointStyle: 'circle',
+          showLine: false,
+          pointBorderColor: '#0a0a0a',
+          pointBorderWidth: 1.5,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: ctx => `${ctx[0].label} km`,
+            label: ctx => {
+              if (ctx.datasetIndex === 1) {
+                const ra = runnerAnnotations[ctx.dataIndex];
+                return ra ? `#${ra.bib}` : '';
+              }
+              return `${ctx.parsed.y} ft`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'category',
+          ticks: {
+            color: '#666',
+            font: { family: 'DM Mono', size: 9 },
+            maxTicksLimit: 8,
+            callback: (val, i) => distKm[i] ? `${distKm[i].toFixed(1)}km` : ''
+          },
+          grid: { color: '#1a1a1a' }
+        },
+        y: {
+          ticks: { color: '#666', font: { family: 'DM Mono', size: 9 }, callback: v => `${v}ft` },
+          grid: { color: '#1a1a1a' }
+        }
+      }
+    }
+  });
+}
+
+// ============================================================
+// SEGMENT FOCUS
+// ============================================================
+const SEGMENT_INFO = {
+  green_start: { label: 'Start → Green Checkpoint', color: '#4ade80' },
+  ascent:      { label: 'Ascent Route', color: '#a78bfa' },
+  pink:        { label: 'Pink Loop', color: '#f472b6' },
+  white:       { label: 'White Loop', color: '#e2e8f0' },
+  yellow:      { label: 'Yellow Loop', color: '#fbbf24' },
+  blue_descent:{ label: 'Blue Summit Descent', color: '#60a5fa' },
+  red_finish:  { label: 'Red Checkpoint → Finish', color: '#f87171' },
+};
+
+async function openSegmentFocus(routeName) {
+  activeSegment = routeName;
+  const info = SEGMENT_INFO[routeName];
+  if (!info) return;
+
+  const panel = document.getElementById('segmentFocus');
+  panel.style.display = 'block';
+  document.getElementById('segFocusTitle').textContent = info.label;
+
+  // Zoom map to segment
+  const pts = GPX_ROUTES[routeName];
+  if (pts && leafletMap) {
+    leafletMap.fitBounds(pts, { padding: [40, 40], maxZoom: 15 });
+  }
+
+  // Find runners on this segment
+  const runnersOnSeg = [];
+  // Check all runner animation states
+  [...data.fiftyk, ...data.ascent, ...data.ambush].forEach(r => {
+    const bib = r.Bib || r.BIB;
+    const name = r.Name || r.NAME || '';
+    if (!bib) return;
+
+    // Check 50k
+    let pos = null;
+    if (r.Bib) pos = getRunnerRouteAndProgress(r, '50k');
+    else if (r.BIB) pos = getRunnerRouteAndProgress(r, 'ascent');
+    else pos = getRunnerRouteAndProgress(r, 'ambush');
+
+    if (pos && !pos.fixed && pos.route === GPX_ROUTES[routeName]) {
+      runnersOnSeg.push({ bib, name, progress: pos.progress, segment: pos.segment,
+        color: r.Bib ? '#e8c14a' : r.BIB ? '#a78bfa' : '#fb923c' });
+    }
+  });
+
+  // Runner list
+  const listEl = document.getElementById('segRunnerList');
+  if (runnersOnSeg.length === 0) {
+    listEl.innerHTML = `<div style="color:var(--text-dim);font-size:0.75rem;font-family:'DM Mono',monospace;">No runners currently on this segment</div>`;
+  } else {
+    listEl.innerHTML = runnersOnSeg.map(rp => `
+      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.3rem 0.5rem;background:var(--surface3);border-radius:3px;border-left:2px solid ${rp.color}">
+        <span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:${rp.color}">#${rp.bib}</span>
+        <span style="font-size:0.78rem;color:var(--text)">${rp.name}</span>
+        <span style="font-size:0.65rem;color:var(--text-dim);margin-left:auto">${Math.round(rp.progress*100)}%</span>
+      </div>`).join('');
+  }
+
+  // Stats
+  const distKm = ((GPX_DISTANCES[routeName] || 0) / 1000).toFixed(1);
+  document.getElementById('segFocusStats').textContent = `${distKm} km · ${runnersOnSeg.length} runner${runnersOnSeg.length !== 1 ? 's' : ''} on segment`;
+
+  // Fetch elevation and show profile
+  const elevations = await fetchRouteElevation(routeName);
+  if (elevations) {
+    const stats = calcRouteStats(routeName, elevations);
+    if (stats) {
+      document.getElementById('segFocusStats').textContent =
+        `${distKm} km · +${stats.gainFt}ft gain · ${stats.minM*3.281|0}–${stats.maxM*3.281|0}ft · ${runnersOnSeg.length} runner${runnersOnSeg.length !== 1 ? 's' : ''} on segment`;
+    }
+    showElevationProfile(routeName, elevations, runnersOnSeg, info.color);
+  }
+}
+
+document.getElementById('segFocusClose').addEventListener('click', () => {
+  document.getElementById('segmentFocus').style.display = 'none';
+  activeSegment = null;
+  if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
+  // Zoom back to full course
+  if (leafletMap) {
+    const allPts = Object.values(GPX_ROUTES).flat();
+    leafletMap.fitBounds(allPts, { padding: [30, 30] });
+  }
+});
 let leafletMap = null;
 let runnerMarkers = [];
 let cpMarkers = [];
+let animationFrame = null;
+let lastDataTime = null;
+let runnerAnimState = {}; // bib -> { lat, lng, targetLat, targetLng, route, progress }
 
 function initMap() {
   leafletMap = L.map('courseMap', {
@@ -1048,159 +1358,402 @@ function initMap() {
     cpMarkers.push(marker);
   });
 
-  // Draw course route lines
-  const courseLines = [
-    // Start → Green
-    [[47.527708, -122.034216],[47.529832, -121.996694]],
-    // Green → Pink
-    [[47.529832, -121.996694],[47.526687, -121.997090]],
-    // Green → White
-    [[47.529832, -121.996694],[47.527259, -121.998629]],
-    // Green → Yellow
-    [[47.529832, -121.996694],[47.527324, -121.998865]],
-    // Pink → Blue Summit
-    [[47.526687, -121.997090],[47.508742, -121.985226]],
-    // White → Blue Summit
-    [[47.527259, -121.998629],[47.508742, -121.985226]],
-    // Yellow → Blue Summit
-    [[47.527324, -121.998865],[47.508742, -121.985226]],
-    // Blue → Red CP
-    [[47.508742, -121.985226],[47.529776, -121.996875]],
-    // Red → Finish
-    [[47.529776, -121.996875],[47.527708, -122.034216]],
-  ];
+  // Draw actual GPX route polylines — clickable for segment focus
+  const routeStyles = {
+    green_start: { color: '#4ade80', weight: 2.5, opacity: 0.8 },
+    ascent:      { color: '#a78bfa', weight: 2.5, opacity: 0.8 },
+    pink:        { color: '#f472b6', weight: 2.5, opacity: 0.8 },
+    white:       { color: '#e2e8f0', weight: 2.5, opacity: 0.8 },
+    yellow:      { color: '#fbbf24', weight: 2.5, opacity: 0.8 },
+    blue_descent:{ color: '#60a5fa', weight: 2.5, opacity: 0.8 },
+    red_finish:  { color: '#f87171', weight: 2.5, opacity: 0.8 },
+  };
 
-  const lineColors = [
-    '#4ade80','#f472b6','#e2e8f0','#fbbf24',
-    '#f472b6','#e2e8f0','#fbbf24','#60a5fa','#4ade80'
-  ];
+  Object.entries(GPX_ROUTES).forEach(([name, pts]) => {
+    const style = routeStyles[name] || { color: '#888', weight: 2, opacity: 0.6 };
+    const line = L.polyline(pts, { ...style, dashArray: '5 4', weight: 4 }).addTo(leafletMap);
 
-  courseLines.forEach((line, i) => {
-    L.polyline(line, {
-      color: lineColors[i],
-      weight: 2,
-      opacity: 0.7,
-      dashArray: '6 4'
-    }).addTo(leafletMap);
+    // Invisible thick overlay for easier clicking
+    const hitLine = L.polyline(pts, { color: 'transparent', weight: 20, opacity: 0 }).addTo(leafletMap);
+
+    const info = SEGMENT_INFO[name];
+    if (info) {
+      hitLine.bindTooltip(`<b style="color:${style.color}">${info.label}</b><br><span style="color:#aaa;font-size:10px">Click to focus segment</span>`, {
+        className: 'tc-tooltip', sticky: true
+      });
+      hitLine.on('click', () => openSegmentFocus(name));
+      line.on('click', () => openSegmentFocus(name));
+    }
   });
 
-  // Fit map to all checkpoints
-  const allLatLngs = CHECKPOINTS.map(cp => [cp.lat, cp.lng]);
-  leafletMap.fitBounds(allLatLngs, { padding: [30, 30] });
+  // Fit map to GPX bounds
+  const allPts = Object.values(GPX_ROUTES).flat();
+  leafletMap.fitBounds(allPts, { padding: [30, 30] });
 
-  // Add tooltip style
+  // Tooltip style
   const style = document.createElement('style');
-  style.textContent = `.tc-tooltip { background:#111; border:1px solid #333; color:#f0f0f0; font-family:'DM Mono',monospace; font-size:11px; padding:4px 8px; border-radius:4px; box-shadow:none; }
-  .tc-tooltip::before { border-top-color:#333 !important; }
-  .leaflet-control-attribution { font-size:9px !important; background:rgba(0,0,0,0.6) !important; color:#555 !important; }
-  .leaflet-control-attribution a { color:#666 !important; }`;
+  style.textContent = `
+    .tc-tooltip { background:#111; border:1px solid #444; color:#f0f0f0; font-family:'DM Mono',monospace; font-size:11px; padding:4px 8px; border-radius:4px; box-shadow:none; }
+    .tc-tooltip::before { border-top-color:#444 !important; }
+    .leaflet-control-attribution { font-size:9px !important; background:rgba(0,0,0,0.6) !important; color:#555 !important; }
+    .leaflet-control-attribution a { color:#666 !important; }
+    .runner-label { background:transparent; border:none; box-shadow:none; }
+  `;
   document.head.appendChild(style);
+
+  // Start smooth animation loop
+  startAnimation();
 }
 
-function drawMap() {
+// ============================================================
+// ROUTE INTERPOLATION HELPERS
+// ============================================================
+function haversineM(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const phi1 = lat1 * Math.PI/180, phi2 = lat2 * Math.PI/180;
+  const dphi = (lat2-lat1) * Math.PI/180;
+  const dlambda = (lon2-lon1) * Math.PI/180;
+  const a = Math.sin(dphi/2)**2 + Math.cos(phi1)*Math.cos(phi2)*Math.sin(dlambda/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+function interpolateAlongRoute(route, fraction) {
+  // Returns {lat, lng} at given fraction (0-1) along route
+  if (fraction <= 0) return { lat: route[0][0], lng: route[0][1] };
+  if (fraction >= 1) return { lat: route[route.length-1][0], lng: route[route.length-1][1] };
+
+  // Calculate cumulative distances
+  const dists = [0];
+  for (let i = 1; i < route.length; i++) {
+    dists.push(dists[i-1] + haversineM(route[i-1][0], route[i-1][1], route[i][0], route[i][1]));
+  }
+  const totalDist = dists[dists.length-1];
+  const targetDist = fraction * totalDist;
+
+  for (let i = 1; i < route.length; i++) {
+    if (dists[i] >= targetDist) {
+      const segFrac = (targetDist - dists[i-1]) / (dists[i] - dists[i-1]);
+      return {
+        lat: route[i-1][0] + segFrac * (route[i][0] - route[i-1][0]),
+        lng: route[i-1][1] + segFrac * (route[i][1] - route[i-1][1])
+      };
+    }
+  }
+  return { lat: route[route.length-1][0], lng: route[route.length-1][1] };
+}
+
+function getRunnerRouteAndProgress(r, type) {
+  // Returns { route, progress (0-1), segmentName } based on last known scans
+  const parseTime = (str) => str ? new Date(str).getTime() : null;
+  const now = Date.now();
+
+  if (type === '50k') {
+    const s = (r.Status||'').toUpperCase();
+    if (s === 'DNS') return null;
+    if (r['FINISH TIME (Scan)'] || s === 'FINISHED') {
+      return { lat: 47.527708, lng: -122.034216, fixed: true, segment: 'Finished' };
+    }
+
+    // Red → Finish
+    if (r['Red Checkpoint In'] && !r['FINISH TIME (Scan)']) {
+      const fromT = parseTime(r['Red Checkpoint In']);
+      const elapsed = (now - fromT) / 1000;
+      const pace = gradeAdjustedPace(360, 'red_finish', 0.5);
+      const progress = Math.min(elapsed / (GPX_DISTANCES.red_finish / 1000 * pace), 0.99);
+      return { route: GPX_ROUTES.red_finish, progress, segment: 'Red → Finish' };
+    }
+
+    // Loop 3 top → Red (Blue descent 3)
+    if (r['Third Loop Top'] && !r['Red Checkpoint In']) {
+      const fromT = parseTime(r['Third Loop Top']);
+      const elapsed = (now - fromT) / 1000;
+      const pace = 300;
+      const progress = Math.min(elapsed / (GPX_DISTANCES.blue_descent / 1000 * pace), 0.99);
+      return { route: GPX_ROUTES.blue_descent, progress, segment: 'Blue Descent' };
+    }
+
+    // Loop 3 bottom → top
+    if (r['Third Loop Bottom'] && !r['Third Loop Top']) {
+      const color = (r['Third Loop']||'').toLowerCase();
+      const routeKey = color || 'pink';
+      const route = GPX_ROUTES[routeKey] || GPX_ROUTES.pink;
+      const fromT = parseTime(r['Third Loop Bottom']);
+      const elapsed = (now - fromT) / 1000;
+      const pace = 480;
+      const progress = Math.min(elapsed / (GPX_DISTANCES[routeKey] / 1000 * pace), 0.99);
+      return { route, progress, segment: `Loop 3 (${color})` };
+    }
+
+    // Loop 2 top → Loop 3 bottom (Blue descent 2)
+    if (r['Second Loop Top'] && !r['Third Loop Bottom']) {
+      const fromT = parseTime(r['Second Loop Top']);
+      const elapsed = (now - fromT) / 1000;
+      const pace = 300;
+      const progress = Math.min(elapsed / (GPX_DISTANCES.blue_descent / 1000 * pace), 0.99);
+      return { route: GPX_ROUTES.blue_descent, progress, segment: 'Blue Descent' };
+    }
+
+    // Loop 2 bottom → top
+    if (r['Second Loop Bottom'] && !r['Second Loop Top']) {
+      const color = (r['Second Loop']||'').toLowerCase();
+      const routeKey = color || 'pink';
+      const route = GPX_ROUTES[routeKey] || GPX_ROUTES.pink;
+      const fromT = parseTime(r['Second Loop Bottom']);
+      const elapsed = (now - fromT) / 1000;
+      const pace = 480;
+      const progress = Math.min(elapsed / (GPX_DISTANCES[routeKey] / 1000 * pace), 0.99);
+      return { route, progress, segment: `Loop 2 (${color})` };
+    }
+
+    // Loop 1 top → Loop 2 bottom (Blue descent 1)
+    if (r['First Loop Top'] && !r['Second Loop Bottom']) {
+      const fromT = parseTime(r['First Loop Top']);
+      const elapsed = (now - fromT) / 1000;
+      const pace = 300;
+      const progress = Math.min(elapsed / (GPX_DISTANCES.blue_descent / 1000 * pace), 0.99);
+      return { route: GPX_ROUTES.blue_descent, progress, segment: 'Blue Descent' };
+    }
+
+    // Loop 1 bottom → top
+    if (r['First Loop Bottom'] && !r['First Loop Top']) {
+      const color = (r['First Loop Color']||'').toLowerCase();
+      const routeKey = color || 'pink';
+      const route = GPX_ROUTES[routeKey] || GPX_ROUTES.pink;
+      const fromT = parseTime(r['First Loop Bottom']);
+      const elapsed = (now - fromT) / 1000;
+      const pace = 480;
+      const progress = Math.min(elapsed / (GPX_DISTANCES[routeKey] / 1000 * pace), 0.99);
+      return { route, progress, segment: `Loop 1 (${color})` };
+    }
+
+    // Green → First loop bottom
+    if (r['Green Checkpoint'] && !r['First Loop Bottom']) {
+      const fromT = parseTime(r['Green Checkpoint']);
+      const elapsed = (now - fromT) / 1000;
+      const pace = 420;
+      // Estimate short distance from green to loop bottom
+      const progress = Math.min(elapsed / (1500 / 1000 * pace), 0.99);
+      return { route: GPX_ROUTES.green_start, progress: 0.95 + progress * 0.05, segment: 'Approaching Loop' };
+    }
+
+    // Start → Green
+    if (!r['Green Checkpoint']) {
+      const raceStart = new Date('2026-05-09T07:00:00-07:00').getTime();
+      const elapsed = (now - raceStart) / 1000;
+      const pace = 360;
+      const progress = Math.min(elapsed / (GPX_DISTANCES.green_start / 1000 * pace), 0.99);
+      return { route: GPX_ROUTES.green_start, progress, segment: 'Start → Green' };
+    }
+  }
+
+  if (type === 'ascent') {
+    const s = (r.STATUS||'').toUpperCase();
+    if (s === 'DNS') return null;
+    if (r['FINISH TIME (SCAN)'] || s === 'FINISHED') {
+      return { lat: 47.508742, lng: -121.985226, fixed: true, segment: 'Finished' };
+    }
+    const raceStart = new Date('2026-05-08T18:00:00-07:00').getTime();
+    const elapsed = (now - raceStart) / 1000;
+    const pace = 480;
+    const progress = Math.min(elapsed / (GPX_DISTANCES.ascent / 1000 * pace), 0.99);
+    return { route: GPX_ROUTES.ascent, progress, segment: 'Ascent' };
+  }
+
+  if (type === 'ambush') {
+    const s = (r.Status||'').toUpperCase();
+    if (s === 'DNS') return null;
+    if (r['FINISH TIME (Scan)']) {
+      return { lat: 47.527708, lng: -122.034216, fixed: true, segment: 'Finished' };
+    }
+    if (r['Red Checkpoint In'] && !r['FINISH TIME (Scan)']) {
+      const fromT = parseTime(r['Red Checkpoint In']);
+      const elapsed = (now - fromT) / 1000;
+      const pace = 360;
+      const progress = Math.min(elapsed / (GPX_DISTANCES.red_finish / 1000 * pace), 0.99);
+      return { route: GPX_ROUTES.red_finish, progress, segment: 'Red → Finish' };
+    }
+    if (r['Loop Top'] && !r['Red Checkpoint In']) {
+      const fromT = parseTime(r['Loop Top']);
+      const elapsed = (now - fromT) / 1000;
+      const pace = 300;
+      const progress = Math.min(elapsed / (GPX_DISTANCES.blue_descent / 1000 * pace), 0.99);
+      return { route: GPX_ROUTES.blue_descent, progress, segment: 'Blue Descent' };
+    }
+    if (r['Loop Bottom'] && !r['Loop Top']) {
+      const color = (r['Loop Color']||'').toLowerCase();
+      const routeKey = color || 'pink';
+      const route = GPX_ROUTES[routeKey] || GPX_ROUTES.pink;
+      const fromT = parseTime(r['Loop Bottom']);
+      const elapsed = (now - fromT) / 1000;
+      const pace = 480;
+      const progress = Math.min(elapsed / (GPX_DISTANCES[routeKey] / 1000 * pace), 0.99);
+      return { route, progress, segment: `Loop (${color})` };
+    }
+    if (r['Green Checkpoint'] && !r['Loop Bottom']) {
+      const fromT = parseTime(r['Green Checkpoint']);
+      const elapsed = (now - fromT) / 1000;
+      const pace = 420;
+      const progress = Math.min(elapsed / (1500 / 1000 * pace), 0.99);
+      return { route: GPX_ROUTES.green_start, progress: 0.95 + progress * 0.05, segment: 'Approaching Loop' };
+    }
+    const raceStart = new Date('2026-05-09T10:00:00-07:00').getTime();
+    const elapsed = (now - raceStart) / 1000;
+    const pace = 360;
+    const progress = Math.min(elapsed / (GPX_DISTANCES.green_start / 1000 * pace), 0.99);
+    return { route: GPX_ROUTES.green_start, progress, segment: 'Start → Green' };
+  }
+
+  return null;
+}
+
+// Grade-adjusted pace using Minetti curve approximation
+// Returns seconds per km adjusted for gradient
+function gradeAdjustedPace(basePaceSec, routeName, progress) {
+  const elevs = ELEVATION_DATA[routeName];
+  if (!elevs || elevs.length < 2) return basePaceSec;
+  const pts = GPX_ROUTES[routeName];
+  if (!pts) return basePaceSec;
+
+  // Find gradient at current position
+  const idx = Math.min(Math.floor(progress * (elevs.length - 1)), elevs.length - 2);
+  const rise = elevs[idx + 1] - elevs[idx]; // meters
+  const segDist = haversineM(pts[idx][0], pts[idx][1], pts[idx+1][0], pts[idx+1][1]);
+  if (segDist < 1) return basePaceSec;
+  const grade = rise / segDist; // rise/run ratio
+
+  // Minetti curve: energy cost multiplier based on grade
+  // Flat=1.0, +10% grade ≈ 1.6x, +20% grade ≈ 2.5x, -10% grade ≈ 0.85x
+  let multiplier;
+  if (grade > 0.25) multiplier = 3.5;        // very steep up
+  else if (grade > 0.15) multiplier = 2.5;   // steep up
+  else if (grade > 0.08) multiplier = 1.8;   // moderate up
+  else if (grade > 0.03) multiplier = 1.3;   // gentle up
+  else if (grade > -0.03) multiplier = 1.0;  // flat
+  else if (grade > -0.08) multiplier = 0.85; // gentle down
+  else if (grade > -0.15) multiplier = 0.9;  // moderate down (starting to brake)
+  else multiplier = 1.1;                      // very steep down (slow)
+
+  return basePaceSec * multiplier;
+}
+let smoothPositions = {}; // bib -> { lat, lng }
+
+function startAnimation() {
+  if (animationFrame) cancelAnimationFrame(animationFrame);
+  animateStep();
+}
+
+function animateStep() {
+  updateRunnerPositions();
+  animationFrame = setTimeout(animateStep, 3000); // Update every 3s for smooth movement
+}
+
+function updateRunnerPositions() {
   if (!leafletMap) return;
 
-  // Remove old runner markers
+  // Remove old markers
   runnerMarkers.forEach(m => leafletMap.removeLayer(m));
   runnerMarkers = [];
 
-  const positions = getRunnerPositions();
+  const allRunners = [];
 
-  // Group runners by checkpoint to offset overlapping
-  const grouped = {};
-  positions.forEach(rp => {
-    if (!grouped[rp.cp]) grouped[rp.cp] = [];
-    grouped[rp.cp].push(rp);
+  // 50k
+  data.fiftyk.forEach(r => {
+    if (!r.Bib) return;
+    const pos = getRunnerRouteAndProgress(r, '50k');
+    if (!pos) return;
+    let lat, lng, segment;
+    if (pos.fixed) { lat = pos.lat; lng = pos.lng; segment = pos.segment; }
+    else { const p = interpolateAlongRoute(pos.route, pos.progress); lat = p.lat; lng = p.lng; segment = pos.segment; }
+    // Smooth interpolation
+    const key = `50k_${r.Bib}`;
+    if (smoothPositions[key]) {
+      lat = smoothPositions[key].lat * 0.7 + lat * 0.3;
+      lng = smoothPositions[key].lng * 0.7 + lng * 0.3;
+    }
+    smoothPositions[key] = { lat, lng };
+    allRunners.push({ lat, lng, bib: r.Bib, name: r.Name||'', segment, color: '#e8c14a', type: '50k' });
   });
 
-  Object.entries(grouped).forEach(([cpId, runners]) => {
-    const cp = CHECKPOINTS.find(c => c.id === cpId);
-    if (!cp) return;
+  // Ascent
+  data.ascent.forEach(r => {
+    if (!r.BIB) return;
+    const pos = getRunnerRouteAndProgress(r, 'ascent');
+    if (!pos) return;
+    let lat, lng, segment;
+    if (pos.fixed) { lat = pos.lat; lng = pos.lng; segment = pos.segment; }
+    else { const p = interpolateAlongRoute(pos.route, pos.progress); lat = p.lat; lng = p.lng; segment = pos.segment; }
+    const key = `asc_${r.BIB}`;
+    if (smoothPositions[key]) {
+      lat = smoothPositions[key].lat * 0.7 + lat * 0.3;
+      lng = smoothPositions[key].lng * 0.7 + lng * 0.3;
+    }
+    smoothPositions[key] = { lat, lng };
+    allRunners.push({ lat, lng, bib: r.BIB, name: r.NAME||'', segment, color: '#a78bfa', type: 'ascent' });
+  });
 
-    runners.forEach((rp, i) => {
-      // Spiral offset so runners don't stack exactly
-      const angle = (i / Math.max(runners.length, 1)) * 2 * Math.PI;
-      const radius = runners.length > 1 ? 0.0003 + (Math.floor(i/8) * 0.0002) : 0;
-      const lat = cp.lat + Math.sin(angle) * radius;
-      const lng = cp.lng + Math.cos(angle) * radius;
+  // Ambush
+  data.ambush.forEach(r => {
+    if (!r.Bib) return;
+    const pos = getRunnerRouteAndProgress(r, 'ambush');
+    if (!pos) return;
+    let lat, lng, segment;
+    if (pos.fixed) { lat = pos.lat; lng = pos.lng; segment = pos.segment; }
+    else { const p = interpolateAlongRoute(pos.route, pos.progress); lat = p.lat; lng = p.lng; segment = pos.segment; }
+    const key = `amb_${r.Bib}`;
+    if (smoothPositions[key]) {
+      lat = smoothPositions[key].lat * 0.7 + lat * 0.3;
+      lng = smoothPositions[key].lng * 0.7 + lng * 0.3;
+    }
+    smoothPositions[key] = { lat, lng };
+    allRunners.push({ lat, lng, bib: r.Bib, name: r.Name||'', segment, color: '#fb923c', type: 'ambush' });
+  });
 
-      const icon = L.divIcon({
-        className: '',
-        html: `<div style="
-          width:10px;height:10px;
-          background:#e8c14a;
-          border:1.5px solid #0a0a0a;
-          border-radius:50%;
-          box-shadow:0 0 4px #e8c14a88;
-        "></div>`,
-        iconSize: [10, 10],
-        iconAnchor: [5, 5]
+  // Add bib label + dot for each runner
+  allRunners.forEach(rp => {
+    // Runner dot with bib label
+    const icon = L.divIcon({
+      className: 'runner-label',
+      html: `<div style="position:relative;display:flex;flex-direction:column;align-items:center;cursor:pointer">
+        <div style="background:rgba(10,10,10,0.85);color:${rp.color};font-family:'DM Mono',monospace;font-size:9px;font-weight:700;padding:1px 3px;border-radius:2px;border:1px solid ${rp.color}44;line-height:1.2;white-space:nowrap;">#${rp.bib}</div>
+        <div style="width:8px;height:8px;background:${rp.color};border:1.5px solid #0a0a0a;border-radius:50%;box-shadow:0 0 5px ${rp.color}99;margin-top:1px;"></div>
+      </div>`,
+      iconSize: [32, 22],
+      iconAnchor: [16, 20]
+    });
+
+    const marker = L.marker([rp.lat, rp.lng], { icon, zIndexOffset: 100 })
+      .addTo(leafletMap)
+      .bindTooltip(`
+        <div style="line-height:1.5">
+          <b style="color:${rp.color};font-size:13px">#${rp.bib}</b><br>
+          <b>${rp.name}</b><br>
+          <span style="color:#aaa;font-size:10px">${rp.segment}</span>
+        </div>`, {
+        direction: 'top',
+        offset: [0, -18],
+        className: 'tc-tooltip'
       });
 
-      const marker = L.marker([lat, lng], { icon })
-        .addTo(leafletMap)
-        .bindTooltip(`<b>#${rp.bib}</b> ${rp.name}<br><span style="color:#888">${cp.label}</span>`, {
-          direction: 'top',
-          className: 'tc-tooltip'
-        });
-
-      runnerMarkers.push(marker);
-    });
+    runnerMarkers.push(marker);
   });
 }
 
-function getRunnerPositions() {
-  const positions = [];
-
-  // 50k runners
-  data.fiftyk.forEach(r => {
-    if (!r.Bib || (r.Status||'').toUpperCase() === 'DNS') return;
-    const name = r.Name || '';
-    const s = (r.Status||'').toUpperCase();
-    if (s === 'FINISHED' || r['FINISH TIME (Scan)']) { positions.push({ cp: 'start', bib: r.Bib, name }); return; }
-    if (r['Red Checkpoint In']) { positions.push({ cp: 'red', bib: r.Bib, name }); return; }
-    if (r['Third Loop Top']) { positions.push({ cp: 'blue', bib: r.Bib, name }); return; }
-    if (r['Third Loop Bottom']) { positions.push({ cp: (r['Third Loop']||'').toLowerCase() || 'green', bib: r.Bib, name }); return; }
-    if (r['Second Loop Top']) { positions.push({ cp: 'blue', bib: r.Bib, name }); return; }
-    if (r['Second Loop Bottom']) { positions.push({ cp: (r['Second Loop']||'').toLowerCase() || 'green', bib: r.Bib, name }); return; }
-    if (r['First Loop Top']) { positions.push({ cp: 'blue', bib: r.Bib, name }); return; }
-    if (r['First Loop Bottom']) { positions.push({ cp: (r['First Loop Color']||'').toLowerCase() || 'green', bib: r.Bib, name }); return; }
-    if (r['Green Checkpoint']) { positions.push({ cp: 'green', bib: r.Bib, name }); return; }
-    positions.push({ cp: 'start', bib: r.Bib, name });
-  });
-
-  // Ascent runners
-  data.ascent.forEach(r => {
-    if (!r.BIB || (r.STATUS||'').toUpperCase() === 'DNS') return;
-    const name = r.NAME || '';
-    const s = (r.STATUS||'').toUpperCase();
-    if (s === 'FINISHED' || r['FINISH TIME (SCAN)']) { positions.push({ cp: 'blue', bib: r.BIB, name }); return; }
-    positions.push({ cp: 'ascent_start', bib: r.BIB, name });
-  });
-
-  // Ambush runners
-  data.ambush.forEach(r => {
-    if (!r.Bib || (r.Status||'').toUpperCase() === 'DNS') return;
-    const name = r.Name || '';
-    if (r['FINISH TIME (Scan)']) { positions.push({ cp: 'start', bib: r.Bib, name }); return; }
-    if (r['Red Checkpoint In']) { positions.push({ cp: 'red', bib: r.Bib, name }); return; }
-    if (r['Loop Top']) { positions.push({ cp: 'blue', bib: r.Bib, name }); return; }
-    if (r['Loop Bottom']) { positions.push({ cp: (r['Loop Color']||'').toLowerCase() || 'green', bib: r.Bib, name }); return; }
-    if (r['Green Checkpoint']) { positions.push({ cp: 'green', bib: r.Bib, name }); return; }
-    positions.push({ cp: 'start', bib: r.Bib, name });
-  });
-
-  return positions;
+function drawMap() {
+  updateRunnerPositions();
 }
 
 // ============================================================
 // TABLE RENDERING
 // ============================================================
 function getGender(row, tab) {
-  if (tab === '50k') return (row['Gender'] || row['GENDER'] || '').toUpperCase();
-  if (tab === 'ascent') return (row['GENDER'] || row['Gender'] || '').toUpperCase();
-  if (tab === 'bigcat') return (row.gender || '').toUpperCase();
-  return '';
+  // Try all possible column name variations
+  const g = row['GENDER'] || row['Gender'] || row['gender'] || '';
+  return g.trim().toUpperCase();
+}
+
+// Fix BIB text/number mismatch in gender filter
+function bibMatch(rowBib, filterBib) {
+  return String(rowBib).trim() === String(filterBib).trim();
 }
 
 function getElapsedMsForRanking(row, tab) {
