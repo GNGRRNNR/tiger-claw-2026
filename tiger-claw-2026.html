@@ -108,6 +108,11 @@ body {
   50% { opacity: 0.5; transform: scale(0.8); }
 }
 
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
 .last-updated {
   font-family: 'DM Mono', monospace;
   font-size: 0.7rem;
@@ -226,12 +231,13 @@ body {
   font-family: 'Bebas Neue', sans-serif;
   font-size: 1rem;
   letter-spacing: 0.1em;
-  color: var(--text-muted);
+  color: var(--text);
   text-transform: uppercase;
   margin-bottom: 0.75rem;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .map-resize-hint {
@@ -496,15 +502,15 @@ td.team-name {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.85);
-  z-index: 100;
+  background: rgba(0,0,0,0.88);
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1rem;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s ease;
 }
 
 .modal-overlay.open {
@@ -515,11 +521,20 @@ td.team-name {
 .modal {
   background: var(--surface);
   border: 1px solid var(--border2);
-  border-radius: 8px;
+  border-radius: 10px;
   width: 100%;
-  max-width: 600px;
-  max-height: 90vh;
+  max-width: 580px;
+  max-height: 88vh;
   overflow-y: auto;
+  transform: translateY(24px) scale(0.97);
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  opacity: 0;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.8);
+}
+
+.modal-overlay.open .modal {
+  transform: translateY(0) scale(1);
+  opacity: 1;
 }
 
 .modal-header {
@@ -528,6 +543,10 @@ td.team-name {
   justify-content: space-between;
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 2;
 }
 
 .modal-runner-name {
@@ -540,20 +559,24 @@ td.team-name {
 .modal-bib {
   font-family: 'DM Mono', monospace;
   font-size: 0.8rem;
-  color: var(--text-dim);
+  color: var(--text-muted);
 }
 
 .modal-close {
-  background: none;
+  background: var(--surface3);
   border: 1px solid var(--border2);
-  color: var(--text-muted);
-  border-radius: 4px;
-  padding: 0.3rem 0.6rem;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.5rem 0.9rem;
   cursor: pointer;
   font-size: 1rem;
+  font-weight: 700;
+  transition: all 0.15s;
+  min-height: 44px;
+  min-width: 44px;
 }
 
-.modal-close:hover { color: var(--text); border-color: var(--text-muted); }
+.modal-close:hover { background: var(--border2); border-color: var(--accent); color: var(--accent); }
 
 .modal-body { padding: 1.5rem; }
 
@@ -662,10 +685,6 @@ td.team-name {
     <button class="tab-btn" data-tab="bigcat">🐅 Big Cat</button>
   </div>
   <div style="display:flex;gap:0.5rem;align-items:center;margin-left:auto;flex-wrap:wrap;">
-    <div style="display:flex;border:1px solid var(--border2);border-radius:4px;overflow:hidden;">
-      <button id="btn3d" onclick="setMapDimension('3d')" style="background:var(--accent);color:var(--black);border:none;padding:0.5rem 0.75rem;font-family:'DM Mono',monospace;font-size:0.75rem;font-weight:700;cursor:pointer;min-height:44px;">3D</button>
-      <button id="btn2d" onclick="setMapDimension('2d')" style="background:var(--surface3);color:var(--text-muted);border:none;padding:0.5rem 0.75rem;font-family:'DM Mono',monospace;font-size:0.75rem;cursor:pointer;min-height:44px;">2D</button>
-    </div>
     <select id="genderFilter" style="
       background:var(--surface3);border:1px solid var(--border2);border-radius:4px;
       color:var(--text);font-family:'DM Mono',monospace;font-size:0.8rem;
@@ -724,7 +743,11 @@ td.team-name {
 <div class="map-section">
   <div class="map-title">
     Course Map — Live Positions
-    <span class="map-resize-hint">↕ drag bottom edge to resize</span>
+    <div style="display:flex;border:1px solid var(--border2);border-radius:4px;overflow:hidden;margin-left:0.75rem;flex-shrink:0;">
+      <button id="btn3d" onclick="setMapDimension('3d')" style="background:var(--accent);color:var(--black);border:none;padding:0.3rem 0.6rem;font-family:'DM Mono',monospace;font-size:0.72rem;font-weight:700;cursor:pointer;">3D</button>
+      <button id="btn2d" onclick="setMapDimension('2d')" style="background:var(--surface3);color:var(--text-muted);border:none;padding:0.3rem 0.6rem;font-family:'DM Mono',monospace;font-size:0.72rem;cursor:pointer;">2D</button>
+    </div>
+    <span class="map-resize-hint" style="margin-left:auto;">↕ drag bottom edge to resize</span>
   </div>
   <div class="map-container">
     <div id="courseMap" style="width:100%;height:100%;"></div>
@@ -825,6 +848,9 @@ td.team-name {
   <div class="row-count" id="rowCount"></div>
 </div>
 
+<!-- TOAST NOTIFICATIONS -->
+<div id="toastContainer" style="position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;display:flex;flex-direction:column;gap:0.5rem;max-width:300px;"></div>
+
 <!-- RUNNER MODAL -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
@@ -869,11 +895,119 @@ const CHECKPOINTS = [
 ];
 
 // ============================================================
-// STATE
+// HISTORICAL PACE ENGINE
+// ============================================================
+// Baked-in pace estimates (seconds per km) per segment.
+// Source: typical Tiger Claw finishing times / course knowledge.
+// When we have real UltraSignup data we can refine these per-runner.
+// To add a runner's historical pace: add their bib to RUNNER_PACE_OVERRIDES.
+// Format: { bibNumber: paceSec } where paceSec = seconds per flat km.
+const RUNNER_PACE_OVERRIDES = {
+  // Example: 42: 360 means bib 42 runs ~10 min/mile flat pace
+  // Fill in from UltraSignup exports before race day
+};
+
+// Segment base paces in seconds/km (flat equivalent).
+// Grade-adjusted pace is applied on top of these using elevation data.
+const SEGMENT_BASE_PACE = {
+  green_start:  330,  // ~5:18/km — fresh legs, mostly flat
+  ascent:       480,  // ~7:44/km — steep sustained climb
+  pink:         480,  // ~7:44/km — technical loop
+  white:        420,  // ~6:46/km — slightly less steep
+  yellow:       450,  // ~7:15/km — long loop
+  blue_descent: 280,  // ~4:31/km — fast descent (grade-limited)
+  red_finish:   350,  // ~5:38/km — tired legs, rolling
+};
+
+// Average finishing times for each event (used for position estimation)
+// in seconds. From prior Tiger Claw editions / similar races.
+const AVG_FINISH_TIMES = {
+  ascent: 4 * 3600,         // ~4 hours
+  fiftyk: 10.5 * 3600,      // ~10.5 hours
+  ambush: 8 * 3600,         // ~8 hours
+};
+
+// Get pace for a specific runner on a specific segment
+// Eventually: look up runner's historical UltraSignup pace
+function getRunnerPace(bib, segmentName) {
+  const basePace = SEGMENT_BASE_PACE[segmentName] || 400;
+  // If we have a personal pace override for this runner, scale proportionally
+  const personalPace = RUNNER_PACE_OVERRIDES[String(bib)];
+  if (personalPace) {
+    // Scale segment pace by runner's personal pace ratio vs "average" 400 s/km
+    const ratio = personalPace / 400;
+    return basePace * ratio;
+  }
+  return basePace;
+}
+
+// ============================================================
+// HOW TO ADD ULTRASIGNUP DATA
+// ============================================================
+// 1. Go to ultrasignup.com → find Tiger Claw or any past race your runners did
+// 2. Export results CSV (usually available on race results page)
+// 3. Calculate each runner's pace: (finish_time_seconds / distance_km)
+// 4. Add to RUNNER_PACE_OVERRIDES above: { bib: pace_seconds_per_km }
+// Example from UltraSignup 50k result: finished in 9h 30min = 34200s / 50km = 684 s/km
+// That's their total pace — we use it as a scalar against segment base paces
 // ============================================================
 let data = { ascent: [], fiftyk: [], ambush: [] };
 let activeTab = 'ascent';
 let previousTab = 'ascent';
+let units = 'imperial';
+let genderFilter = 'all';
+let filterText = '';
+let sortCol = null;
+let sortDir = 'asc';
+let elevChartInst = null;
+const lastCheckpointSeen = {};
+let STATE_lastUpdate = null; // runner key -> last checkpoint field seen
+
+// ============================================================
+// TOAST NOTIFICATIONS — checkpoint arrivals
+// ============================================================
+function showToast(msg, color = '#4ade80', duration = 5000) {
+  let container = document.getElementById('toastContainer');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.style.cssText = `background:rgba(10,10,10,0.96);border:1px solid ${color};border-left:4px solid ${color};color:#f0f0f0;font-family:'DM Sans',sans-serif;font-size:0.82rem;padding:0.65rem 1rem;border-radius:6px;box-shadow:0 4px 20px rgba(0,0,0,0.7);cursor:pointer;line-height:1.4;`;
+  toast.innerHTML = msg;
+  toast.onclick = () => toast.remove();
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.cssText += 'opacity:0;transition:opacity 0.5s;'; setTimeout(() => toast.remove(), 500); }, duration);
+}
+
+function checkCheckpointArrivals() {
+  // 50k checkpoint toasts
+  data.fiftyk.forEach(r => {
+    if (!r.Bib) return;
+    const key = 'f_' + r.Bib;
+    const milestones = [
+      { field: 'FINISH TIME (Scan)', label: '🏁 Finished!', color: '#4ade80' },
+      { field: 'Red Checkpoint In',  label: '🔴 Red CP In', color: '#f87171' },
+      { field: 'Third Loop Top',     label: '🏔 High Camp (Loop 3)', color: '#60a5fa' },
+      { field: 'Second Loop Top',    label: '🏔 High Camp (Loop 2)', color: '#60a5fa' },
+      { field: 'First Loop Top',     label: '🏔 High Camp (Loop 1)', color: '#60a5fa' },
+      { field: 'Green Checkpoint',   label: '⛺ Base Camp', color: '#fbbf24' },
+    ];
+    for (const m of milestones) {
+      if (r[m.field] && lastCheckpointSeen[key] !== m.field) {
+        lastCheckpointSeen[key] = m.field;
+        showToast(`<b style="color:${m.color}">#${r.Bib}</b> ${r.Name||''}<br><span style="color:${m.color}">${m.label}</span>`, m.color);
+        break;
+      }
+    }
+  });
+  // Ascent checkpoint toasts
+  data.ascent.forEach(r => {
+    if (!r.BIB) return;
+    const key = 'a_' + r.BIB;
+    if (r['FINISH TIME (SCAN)'] && lastCheckpointSeen[key] !== 'finish') {
+      lastCheckpointSeen[key] = 'finish';
+      showToast(`<b style="color:#a78bfa">#${r.BIB}</b> ${r.NAME||''}<br><span style="color:#a78bfa">🏔 Ascent Finished!</span>`, '#a78bfa');
+    }
+  });
+}
 
 // ============================================================
 // EVENT STATUS — Live / Countdown / Ended
@@ -915,10 +1049,6 @@ function updateEventStatus() {
     text.textContent = 'Live';
   }
 }
-let sortCol = null, sortDir = 'asc';
-let filterText = '';
-let genderFilter = 'all';
-let units = 'imperial'; // 'imperial' or 'metric'
 
 function setUnits(u) {
   units = u;
@@ -949,21 +1079,39 @@ function fmtDistAxis(km) {
   if (units === 'imperial') return (km * 0.621371).toFixed(1) + 'mi';
   return km.toFixed(1) + 'km';
 }
-let loopChartInst = null, segChartInst = null;
 let mapCanvas, mapCtx;
 
 // ============================================================
-// CSV PARSING — optimized
+// CSV PARSING — robust quoted-field parser (handles commas in names)
 // ============================================================
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i+1] === '"') { current += '"'; i++; } // escaped quote
+      else inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current.trim()); current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
 function parseCSV(text) {
   const lines = text.trim().split('\n');
   if (lines.length < 2) return [];
-  const headers = lines[0].split(',').map(h => h.trim());
+  const headers = parseCSVLine(lines[0]);
   const headerLen = headers.length;
   return lines.slice(1).map(line => {
-    const vals = line.split(',');
+    const vals = parseCSVLine(line);
     const obj = {};
-    for (let i = 0; i < headerLen; i++) obj[headers[i]] = (vals[i] || '').trim();
+    for (let i = 0; i < headerLen; i++) obj[headers[i]] = vals[i] || '';
     return obj;
   });
 }
@@ -1067,6 +1215,8 @@ async function fetchAll() {
     document.getElementById('chartsRow').style.display = hasLoopData ? 'grid' : 'none';
     drawMap();
     document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+    STATE_lastUpdate = Date.now();
+    checkCheckpointArrivals();
   } catch(e) {
     console.error('Fetch error:', e);
   }
@@ -1237,7 +1387,6 @@ const GPX_DISTANCES = {"green_start":7007,"pink":6175,"white":3799,"yellow":7918
 // ELEVATION DATA — fetched from USGS 3DEP on demand
 // ============================================================
 const elevationCache = {}; // routeName -> [elevation in meters per point]
-let elevChartInst = null;
 let activeSegment = null;
 
 // ============================================================
@@ -1580,27 +1729,31 @@ function initMap() {
       });
     });
 
-    // Checkpoint markers with aid station labels
+    // Checkpoint markers — emoji for aid stations, dots for checkpoints
     CHECKPOINTS.forEach(cp => {
       const isAidStation = cp.id === 'basecamp' || cp.id === 'highcamp';
       const isStart = cp.id === 'start';
       const el = document.createElement('div');
-      el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer';
+      el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer;';
 
       if (isAidStation) {
-        // Aid stations get a label badge
+        // Big emoji + label badge
+        const emoji = cp.id === 'basecamp' ? '⛺' : '🏔';
+        const shortLabel = cp.id === 'basecamp' ? 'BASE CAMP' : 'HIGH CAMP';
         el.innerHTML = `
-          <div style="background:rgba(10,10,10,0.92);color:${cp.color};font-family:'DM Mono',monospace;font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;border:1px solid ${cp.color}88;white-space:nowrap;margin-bottom:2px">${cp.symbol} ${cp.id === 'basecamp' ? 'BASE CAMP' : 'HIGH CAMP'}</div>
-          <div style="width:${cp.r*2+2}px;height:${cp.r*2+2}px;background:${cp.color};border:2px solid #0a0a0a;border-radius:50%;box-shadow:0 0 10px ${cp.color}cc"></div>`;
+          <div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.8))">${emoji}</div>
+          <div style="background:rgba(10,10,10,0.9);color:${cp.color};font-family:'DM Mono',monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid ${cp.color}66;white-space:nowrap;margin-top:1px;">${shortLabel}</div>`;
       } else if (isStart) {
-        el.innerHTML = `<div style="width:${cp.r*2+4}px;height:${cp.r*2+4}px;background:${cp.color};border:3px solid #0a0a0a;border-radius:50%;box-shadow:0 0 12px ${cp.color}cc"></div>`;
+        el.innerHTML = `<div style="font-size:20px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.8))">🏁</div>`;
       } else {
-        el.innerHTML = `<div style="width:${cp.r*2}px;height:${cp.r*2}px;background:${cp.color};border:1.5px solid #0a0a0a;border-radius:50%;box-shadow:0 0 6px ${cp.color}88;opacity:0.9"></div>`;
+        // Small colored dot for regular checkpoints
+        el.innerHTML = `<div style="width:${cp.r*2}px;height:${cp.r*2}px;background:${cp.color};border:1.5px solid rgba(0,0,0,0.7);border-radius:50%;box-shadow:0 0 6px ${cp.color}88;"></div>`;
       }
 
-      new mapboxgl.Marker(el).setLngLat([cp.lng, cp.lat])
-        .setPopup(new mapboxgl.Popup({ offset: 12, closeButton: false })
-          .setHTML(`<div style="background:#111;color:${cp.color};font-family:'DM Mono',monospace;font-size:11px;padding:5px 8px;border-radius:4px"><b>${cp.label}</b></div>`))
+      new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([cp.lng, cp.lat])
+        .setPopup(new mapboxgl.Popup({ offset: 8, closeButton: false })
+          .setHTML(`<div style="background:#111;color:${cp.color};font-family:'DM Mono',monospace;font-size:11px;padding:5px 8px;border-radius:4px;border-left:3px solid ${cp.color}"><b>${cp.label}</b></div>`))
         .addTo(mbMap);
     });
 
@@ -1850,88 +2003,96 @@ function gradeAdjustedPace(basePace, routeName, progress) {
 function getRunnerRouteAndProgress(r, type) {
   const parseTime = s => s ? new Date(s).getTime() : null;
   const now = Date.now();
+  const segDuration = (segName, bib) => {
+    const distKm = GPX_DISTANCES[segName] / 1000;
+    const basePace = getRunnerPace(bib, segName);
+    return distKm * gradeAdjustedPace(basePace, segName, 0.5);
+  };
 
   if (type === '50k') {
     const s = (r.Status||'').toUpperCase();
+    const bib = r.Bib || '';
     if (s === 'DNS') return null;
     if (r['FINISH TIME (Scan)'] || s === 'FINISHED') return { fixed: true, lat: 47.527708, lng: -122.034216, segment: 'Finished' };
     if (r['Red Checkpoint In']) {
       const elapsed = (now - parseTime(r['Red Checkpoint In'])) / 1000;
-      return { route: GPX_ROUTES.red_finish, progress: Math.min(elapsed / (GPX_DISTANCES.red_finish / 1000 * gradeAdjustedPace(360,'red_finish',0.5)), 0.99), segment: 'Red → Finish' };
+      return { route: GPX_ROUTES.red_finish, progress: Math.min(elapsed / segDuration('red_finish', bib), 0.99), segment: 'Red → Finish' };
     }
     if (r['Third Loop Top']) {
       const elapsed = (now - parseTime(r['Third Loop Top'])) / 1000;
-      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsed / (GPX_DISTANCES.blue_descent / 1000 * 300), 0.99), segment: 'Blue Descent' };
+      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsed / segDuration('blue_descent', bib), 0.99), segment: 'Blue Descent (3rd)' };
     }
     if (r['Third Loop Bottom']) {
       const color = (r['Third Loop']||'').toLowerCase();
-      const rk = color || 'pink';
+      const rk = ['pink','white','yellow'].includes(color) ? color : 'pink';
       const elapsed = (now - parseTime(r['Third Loop Bottom'])) / 1000;
-      return { route: GPX_ROUTES[rk]||GPX_ROUTES.pink, progress: Math.min(elapsed / (GPX_DISTANCES[rk] / 1000 * gradeAdjustedPace(480,rk,0.5)), 0.99), segment: 'Loop 3 ('+color+')' };
+      return { route: GPX_ROUTES[rk], progress: Math.min(elapsed / segDuration(rk, bib), 0.99), segment: `Loop 3 (${color||'?'})` };
     }
     if (r['Second Loop Top']) {
       const elapsed = (now - parseTime(r['Second Loop Top'])) / 1000;
-      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsed / (GPX_DISTANCES.blue_descent / 1000 * 300), 0.99), segment: 'Blue Descent' };
+      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsed / segDuration('blue_descent', bib), 0.99), segment: 'Blue Descent (2nd)' };
     }
     if (r['Second Loop Bottom']) {
       const color = (r['Second Loop']||'').toLowerCase();
-      const rk = color || 'pink';
+      const rk = ['pink','white','yellow'].includes(color) ? color : 'pink';
       const elapsed = (now - parseTime(r['Second Loop Bottom'])) / 1000;
-      return { route: GPX_ROUTES[rk]||GPX_ROUTES.pink, progress: Math.min(elapsed / (GPX_DISTANCES[rk] / 1000 * gradeAdjustedPace(480,rk,0.5)), 0.99), segment: 'Loop 2 ('+color+')' };
+      return { route: GPX_ROUTES[rk], progress: Math.min(elapsed / segDuration(rk, bib), 0.99), segment: `Loop 2 (${color||'?'})` };
     }
     if (r['First Loop Top']) {
       const elapsed = (now - parseTime(r['First Loop Top'])) / 1000;
-      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsed / (GPX_DISTANCES.blue_descent / 1000 * 300), 0.99), segment: 'Blue Descent' };
+      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsed / segDuration('blue_descent', bib), 0.99), segment: 'Blue Descent (1st)' };
     }
     if (r['First Loop Bottom']) {
       const color = (r['First Loop Color']||'').toLowerCase();
-      const rk = color || 'pink';
+      const rk = ['pink','white','yellow'].includes(color) ? color : 'pink';
       const elapsed = (now - parseTime(r['First Loop Bottom'])) / 1000;
-      return { route: GPX_ROUTES[rk]||GPX_ROUTES.pink, progress: Math.min(elapsed / (GPX_DISTANCES[rk] / 1000 * gradeAdjustedPace(480,rk,0.5)), 0.99), segment: 'Loop 1 ('+color+')' };
+      return { route: GPX_ROUTES[rk], progress: Math.min(elapsed / segDuration(rk, bib), 0.99), segment: `Loop 1 (${color||'?'})` };
     }
     if (r['Green Checkpoint']) {
       const elapsed = (now - parseTime(r['Green Checkpoint'])) / 1000;
-      return { route: GPX_ROUTES.green_start, progress: Math.min(0.95 + elapsed / (1500 * gradeAdjustedPace(420,'green_start',0.9)) * 0.05, 0.99), segment: 'Approaching Loop' };
+      return { route: GPX_ROUTES.green_start, progress: Math.min(0.93 + (elapsed / segDuration('green_start', bib)) * 0.06, 0.99), segment: 'Green → Loop' };
     }
     const raceStart = new Date('2026-05-09T07:00:00-07:00').getTime();
     const elapsed = (now - raceStart) / 1000;
-    return { route: GPX_ROUTES.green_start, progress: Math.min(elapsed / (GPX_DISTANCES.green_start / 1000 * gradeAdjustedPace(360,'green_start',0.3)), 0.99), segment: 'Start → Green' };
+    return { route: GPX_ROUTES.green_start, progress: Math.min(Math.max(elapsed / segDuration('green_start', bib), 0), 0.99), segment: 'Start → Green CP' };
   }
 
   if (type === 'ascent') {
     const s = (r.STATUS||'').toUpperCase();
+    const bib = r.BIB || '';
     if (s === 'DNS') return null;
     if (r['FINISH TIME (SCAN)'] || s === 'FINISHED') return { fixed: true, lat: 47.508742, lng: -121.985226, segment: 'Finished' };
     const raceStart = new Date('2026-05-08T18:00:00-07:00').getTime();
     const elapsed = (now - raceStart) / 1000;
-    return { route: GPX_ROUTES.ascent, progress: Math.min(elapsed / (GPX_DISTANCES.ascent / 1000 * gradeAdjustedPace(480,'ascent',0.5)), 0.99), segment: 'Ascent' };
+    return { route: GPX_ROUTES.ascent, progress: Math.min(Math.max(elapsed / segDuration('ascent', bib), 0), 0.99), segment: 'Ascent Course' };
   }
 
   if (type === 'ambush') {
     const s = (r.Status||'').toUpperCase();
+    const bib = r.Bib || '';
     if (s === 'DNS') return null;
     if (r['FINISH TIME (Scan)']) return { fixed: true, lat: 47.527708, lng: -122.034216, segment: 'Finished' };
     if (r['Red Checkpoint In']) {
       const elapsed = (now - parseTime(r['Red Checkpoint In'])) / 1000;
-      return { route: GPX_ROUTES.red_finish, progress: Math.min(elapsed / (GPX_DISTANCES.red_finish / 1000 * 360), 0.99), segment: 'Red → Finish' };
+      return { route: GPX_ROUTES.red_finish, progress: Math.min(elapsed / segDuration('red_finish', bib), 0.99), segment: 'Red → Finish' };
     }
     if (r['Loop Top']) {
       const elapsed = (now - parseTime(r['Loop Top'])) / 1000;
-      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsed / (GPX_DISTANCES.blue_descent / 1000 * 300), 0.99), segment: 'Blue Descent' };
+      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsed / segDuration('blue_descent', bib), 0.99), segment: 'Blue Descent' };
     }
     if (r['Loop Bottom']) {
       const color = (r['Loop Color']||'').toLowerCase();
-      const rk = color || 'pink';
+      const rk = ['pink','white','yellow'].includes(color) ? color : 'pink';
       const elapsed = (now - parseTime(r['Loop Bottom'])) / 1000;
-      return { route: GPX_ROUTES[rk]||GPX_ROUTES.pink, progress: Math.min(elapsed / (GPX_DISTANCES[rk] / 1000 * gradeAdjustedPace(480,rk,0.5)), 0.99), segment: 'Loop ('+color+')' };
+      return { route: GPX_ROUTES[rk], progress: Math.min(elapsed / segDuration(rk, bib), 0.99), segment: `Loop (${color||'?'})` };
     }
     if (r['Green Checkpoint']) {
       const elapsed = (now - parseTime(r['Green Checkpoint'])) / 1000;
-      return { route: GPX_ROUTES.green_start, progress: Math.min(0.95 + elapsed*0.001, 0.99), segment: 'Approaching Loop' };
+      return { route: GPX_ROUTES.green_start, progress: Math.min(0.93 + (elapsed / segDuration('green_start', bib)) * 0.06, 0.99), segment: 'Green → Loop' };
     }
     const raceStart = new Date('2026-05-09T10:00:00-07:00').getTime();
     const elapsed = (now - raceStart) / 1000;
-    return { route: GPX_ROUTES.green_start, progress: Math.min(elapsed / (GPX_DISTANCES.green_start / 1000 * 360), 0.99), segment: 'Start → Green' };
+    return { route: GPX_ROUTES.green_start, progress: Math.min(Math.max(elapsed / segDuration('green_start', bib), 0), 0.99), segment: 'Start → Green CP' };
   }
   return null;
 }
