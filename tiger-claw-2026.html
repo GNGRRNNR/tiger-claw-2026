@@ -1121,6 +1121,25 @@ function parseCSV(text) {
 // ============================================================
 function parseTS(str) {
   if (!str || str === '') return null;
+
+  // Handle bare time strings like "10:00:00 AM" or "3:27:51 PM"
+  // Google Sheets exports scan times without dates during testing
+  const timeOnly = str.match(/^(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)?$/i);
+  if (timeOnly) {
+    const now = new Date();
+    let h = parseInt(timeOnly[1]);
+    const m = parseInt(timeOnly[2]);
+    const s = parseInt(timeOnly[3]);
+    const ampm = (timeOnly[4]||'').toUpperCase();
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    // Use race date context: if h >= 6 assume same day (May 9 for 50k/ambush, May 8 for ascent)
+    // For testing, just use today's date with the given time
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, s);
+    return isNaN(d) ? null : d;
+  }
+
+  // Handle Google Sheets datetime like "5/9/2026 10:00:00 AM" or ISO
   const d = new Date(str);
   return isNaN(d) ? null : d;
 }
@@ -2001,98 +2020,161 @@ function gradeAdjustedPace(basePace, routeName, progress) {
 }
 
 function getRunnerRouteAndProgress(r, type) {
-  const parseTime = s => s ? new Date(s).getTime() : null;
   const now = Date.now();
-  const segDuration = (segName, bib) => {
+
+  // Robust time parser — handles bare "10:00:00 AM" strings from sheets
+  const parseTime = s => {
+    if (!s || s === '') return null;
+    const d = parseTS(s);
+    return d ? d.getTime() : null;
+  };
+
+  // Calculate expected segment duration from actual scan-to-scan pace
+  // If we have two scan timestamps bracketing a segment, use observed pace
+  // Otherwise fall back to grade-adjusted pace estimate
+  const elapsedSince = t => t ? (now - t) / 1000 : null;
+
+  // Observed pace from two checkpoint times: how fast did they cover the prev segment?
+  // Returns seconds/km they ran, capped at reasonable min/max
+  const observedPace = (fromTime, toTime, segName) => {
+    if (!fromTime || !toTime) return null;
+    const secs = (toTime - fromTime) / 1000;
+    if (secs <= 0) return null;
     const distKm = GPX_DISTANCES[segName] / 1000;
+    const pace = secs / distKm;
+    // Sanity check: between 2 min/km (fastest descent) and 30 min/km (crawl)
+    return Math.min(Math.max(pace, 120), 1800);
+  };
+
+  // Best duration estimate for a segment: use observed if available, else grade-adjusted estimate
+  const bestDuration = (segName, bib, fromTime, toTime) => {
+    const obs = observedPace(fromTime, toTime, segName);
+    if (obs) return (GPX_DISTANCES[segName] / 1000) * obs;
     const basePace = getRunnerPace(bib, segName);
-    return distKm * gradeAdjustedPace(basePace, segName, 0.5);
+    return (GPX_DISTANCES[segName] / 1000) * gradeAdjustedPace(basePace, segName, 0.5);
   };
 
   if (type === '50k') {
     const s = (r.Status||'').toUpperCase();
     const bib = r.Bib || '';
     if (s === 'DNS') return null;
-    if (r['FINISH TIME (Scan)'] || s === 'FINISHED') return { fixed: true, lat: 47.527708, lng: -122.034216, segment: 'Finished' };
-    if (r['Red Checkpoint In']) {
-      const elapsed = (now - parseTime(r['Red Checkpoint In'])) / 1000;
-      return { route: GPX_ROUTES.red_finish, progress: Math.min(elapsed / segDuration('red_finish', bib), 0.99), segment: 'Red → Finish' };
+    if (r['FINISH TIME (Scan)'] || s === 'FINISHED')
+      return { fixed: true, lat: 47.527708, lng: -122.034216, segment: 'Finished' };
+
+    const t = {
+      raceStart: new Date('2026-05-09T07:00:00-07:00').getTime(),
+      green:    parseTime(r['Green Checkpoint']),
+      l1bot:    parseTime(r['First Loop Bottom']),
+      l1top:    parseTime(r['First Loop Top']),
+      l2bot:    parseTime(r['Second Loop Bottom']),
+      l2top:    parseTime(r['Second Loop Top']),
+      l3bot:    parseTime(r['Third Loop Bottom']),
+      l3top:    parseTime(r['Third Loop Top']),
+      red:      parseTime(r['Red Checkpoint In']),
+    };
+
+    const loop1 = (r['First Loop Color']||'pink').toLowerCase();
+    const loop2 = (r['Second Loop']||'pink').toLowerCase();
+    const loop3 = (r['Third Loop']||'pink').toLowerCase();
+    const rk1 = ['pink','white','yellow'].includes(loop1) ? loop1 : 'pink';
+    const rk2 = ['pink','white','yellow'].includes(loop2) ? loop2 : 'pink';
+    const rk3 = ['pink','white','yellow'].includes(loop3) ? loop3 : 'pink';
+
+    // Work backwards from most recent checkpoint
+    if (t.red) {
+      const dur = bestDuration('red_finish', bib, t.red, null);
+      return { route: GPX_ROUTES.red_finish, progress: Math.min(elapsedSince(t.red) / dur, 0.99), segment: 'Red → Finish' };
     }
-    if (r['Third Loop Top']) {
-      const elapsed = (now - parseTime(r['Third Loop Top'])) / 1000;
-      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsed / segDuration('blue_descent', bib), 0.99), segment: 'Blue Descent (3rd)' };
+    if (t.l3top) {
+      const dur = bestDuration('blue_descent', bib, t.l3top, t.red);
+      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsedSince(t.l3top) / dur, 0.99), segment: 'Blue Descent (3)' };
     }
-    if (r['Third Loop Bottom']) {
-      const color = (r['Third Loop']||'').toLowerCase();
-      const rk = ['pink','white','yellow'].includes(color) ? color : 'pink';
-      const elapsed = (now - parseTime(r['Third Loop Bottom'])) / 1000;
-      return { route: GPX_ROUTES[rk], progress: Math.min(elapsed / segDuration(rk, bib), 0.99), segment: `Loop 3 (${color||'?'})` };
+    if (t.l3bot) {
+      const dur = bestDuration(rk3, bib, t.l3bot, t.l3top);
+      return { route: GPX_ROUTES[rk3], progress: Math.min(elapsedSince(t.l3bot) / dur, 0.99), segment: `Loop 3 (${rk3})` };
     }
-    if (r['Second Loop Top']) {
-      const elapsed = (now - parseTime(r['Second Loop Top'])) / 1000;
-      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsed / segDuration('blue_descent', bib), 0.99), segment: 'Blue Descent (2nd)' };
+    if (t.l2top) {
+      const dur = bestDuration('blue_descent', bib, t.l2top, t.l3bot);
+      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsedSince(t.l2top) / dur, 0.99), segment: 'Blue Descent (2)' };
     }
-    if (r['Second Loop Bottom']) {
-      const color = (r['Second Loop']||'').toLowerCase();
-      const rk = ['pink','white','yellow'].includes(color) ? color : 'pink';
-      const elapsed = (now - parseTime(r['Second Loop Bottom'])) / 1000;
-      return { route: GPX_ROUTES[rk], progress: Math.min(elapsed / segDuration(rk, bib), 0.99), segment: `Loop 2 (${color||'?'})` };
+    if (t.l2bot) {
+      const dur = bestDuration(rk2, bib, t.l2bot, t.l2top);
+      return { route: GPX_ROUTES[rk2], progress: Math.min(elapsedSince(t.l2bot) / dur, 0.99), segment: `Loop 2 (${rk2})` };
     }
-    if (r['First Loop Top']) {
-      const elapsed = (now - parseTime(r['First Loop Top'])) / 1000;
-      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsed / segDuration('blue_descent', bib), 0.99), segment: 'Blue Descent (1st)' };
+    if (t.l1top) {
+      const dur = bestDuration('blue_descent', bib, t.l1top, t.l2bot);
+      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsedSince(t.l1top) / dur, 0.99), segment: 'Blue Descent (1)' };
     }
-    if (r['First Loop Bottom']) {
-      const color = (r['First Loop Color']||'').toLowerCase();
-      const rk = ['pink','white','yellow'].includes(color) ? color : 'pink';
-      const elapsed = (now - parseTime(r['First Loop Bottom'])) / 1000;
-      return { route: GPX_ROUTES[rk], progress: Math.min(elapsed / segDuration(rk, bib), 0.99), segment: `Loop 1 (${color||'?'})` };
+    if (t.l1bot) {
+      // Runner is on the loop — use green→loop1bottom pace to estimate loop speed
+      const dur = bestDuration(rk1, bib, t.l1bot, t.l1top);
+      return { route: GPX_ROUTES[rk1], progress: Math.min(elapsedSince(t.l1bot) / dur, 0.99), segment: `Loop 1 (${rk1})` };
     }
-    if (r['Green Checkpoint']) {
-      const elapsed = (now - parseTime(r['Green Checkpoint'])) / 1000;
-      return { route: GPX_ROUTES.green_start, progress: Math.min(0.93 + (elapsed / segDuration('green_start', bib)) * 0.06, 0.99), segment: 'Green → Loop' };
+    if (t.green) {
+      // Runner passed Green CP — heading to first loop bottom
+      // Use start→green elapsed to derive their actual pace
+      const greenDur = bestDuration('green_start', bib, t.raceStart, t.green);
+      const toLoopDur = bestDuration('green_start', bib, t.green, t.l1bot);
+      const elapsed = elapsedSince(t.green);
+      // Runner is in the small section between Green CP and Loop junction
+      // Green route is ~93% done when they scan green, then small remainder
+      const progress = Math.min(0.93 + (elapsed / (toLoopDur || greenDur * 0.07)) * 0.07, 0.99);
+      return { route: GPX_ROUTES.green_start, progress, segment: 'Green → Loop Junction' };
     }
-    const raceStart = new Date('2026-05-09T07:00:00-07:00').getTime();
-    const elapsed = (now - raceStart) / 1000;
-    return { route: GPX_ROUTES.green_start, progress: Math.min(Math.max(elapsed / segDuration('green_start', bib), 0), 0.99), segment: 'Start → Green CP' };
+    // No checkpoints yet — estimate from race start using personal pace
+    const dur = bestDuration('green_start', bib, t.raceStart, t.green);
+    const elapsed = elapsedSince(t.raceStart);
+    return { route: GPX_ROUTES.green_start, progress: Math.min(Math.max(elapsed / dur, 0), 0.99), segment: 'Start → Green CP' };
   }
 
   if (type === 'ascent') {
     const s = (r.STATUS||'').toUpperCase();
     const bib = r.BIB || '';
     if (s === 'DNS') return null;
-    if (r['FINISH TIME (SCAN)'] || s === 'FINISHED') return { fixed: true, lat: 47.508742, lng: -121.985226, segment: 'Finished' };
+    if (r['FINISH TIME (SCAN)'] || s === 'FINISHED')
+      return { fixed: true, lat: 47.508742, lng: -121.985226, segment: 'Finished' };
     const raceStart = new Date('2026-05-08T18:00:00-07:00').getTime();
-    const elapsed = (now - raceStart) / 1000;
-    return { route: GPX_ROUTES.ascent, progress: Math.min(Math.max(elapsed / segDuration('ascent', bib), 0), 0.99), segment: 'Ascent Course' };
+    const dur = bestDuration('ascent', bib, raceStart, null);
+    const elapsed = elapsedSince(raceStart);
+    return { route: GPX_ROUTES.ascent, progress: Math.min(Math.max(elapsed / dur, 0), 0.99), segment: 'Ascent Course' };
   }
 
   if (type === 'ambush') {
     const s = (r.Status||'').toUpperCase();
     const bib = r.Bib || '';
     if (s === 'DNS') return null;
-    if (r['FINISH TIME (Scan)']) return { fixed: true, lat: 47.527708, lng: -122.034216, segment: 'Finished' };
-    if (r['Red Checkpoint In']) {
-      const elapsed = (now - parseTime(r['Red Checkpoint In'])) / 1000;
-      return { route: GPX_ROUTES.red_finish, progress: Math.min(elapsed / segDuration('red_finish', bib), 0.99), segment: 'Red → Finish' };
+    if (r['FINISH TIME (Scan)'])
+      return { fixed: true, lat: 47.527708, lng: -122.034216, segment: 'Finished' };
+
+    const t = {
+      raceStart: new Date('2026-05-09T10:00:00-07:00').getTime(),
+      green:  parseTime(r['Green Checkpoint']),
+      lbot:   parseTime(r['Loop Bottom']),
+      ltop:   parseTime(r['Loop Top']),
+      red:    parseTime(r['Red Checkpoint In']),
+    };
+    const loopColor = (r['Loop Color']||'pink').toLowerCase();
+    const rk = ['pink','white','yellow'].includes(loopColor) ? loopColor : 'pink';
+
+    if (t.red) {
+      const dur = bestDuration('red_finish', bib, t.red, null);
+      return { route: GPX_ROUTES.red_finish, progress: Math.min(elapsedSince(t.red) / dur, 0.99), segment: 'Red → Finish' };
     }
-    if (r['Loop Top']) {
-      const elapsed = (now - parseTime(r['Loop Top'])) / 1000;
-      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsed / segDuration('blue_descent', bib), 0.99), segment: 'Blue Descent' };
+    if (t.ltop) {
+      const dur = bestDuration('blue_descent', bib, t.ltop, t.red);
+      return { route: GPX_ROUTES.blue_descent, progress: Math.min(elapsedSince(t.ltop) / dur, 0.99), segment: 'Blue Descent' };
     }
-    if (r['Loop Bottom']) {
-      const color = (r['Loop Color']||'').toLowerCase();
-      const rk = ['pink','white','yellow'].includes(color) ? color : 'pink';
-      const elapsed = (now - parseTime(r['Loop Bottom'])) / 1000;
-      return { route: GPX_ROUTES[rk], progress: Math.min(elapsed / segDuration(rk, bib), 0.99), segment: `Loop (${color||'?'})` };
+    if (t.lbot) {
+      const dur = bestDuration(rk, bib, t.lbot, t.ltop);
+      return { route: GPX_ROUTES[rk], progress: Math.min(elapsedSince(t.lbot) / dur, 0.99), segment: `Loop (${rk})` };
     }
-    if (r['Green Checkpoint']) {
-      const elapsed = (now - parseTime(r['Green Checkpoint'])) / 1000;
-      return { route: GPX_ROUTES.green_start, progress: Math.min(0.93 + (elapsed / segDuration('green_start', bib)) * 0.06, 0.99), segment: 'Green → Loop' };
+    if (t.green) {
+      const elapsed = elapsedSince(t.green);
+      const dur = bestDuration('green_start', bib, t.raceStart, t.green);
+      return { route: GPX_ROUTES.green_start, progress: Math.min(0.93 + (elapsed / (dur * 0.07)) * 0.07, 0.99), segment: 'Green → Loop' };
     }
-    const raceStart = new Date('2026-05-09T10:00:00-07:00').getTime();
-    const elapsed = (now - raceStart) / 1000;
-    return { route: GPX_ROUTES.green_start, progress: Math.min(Math.max(elapsed / segDuration('green_start', bib), 0), 0.99), segment: 'Start → Green CP' };
+    const dur = bestDuration('green_start', bib, t.raceStart, null);
+    return { route: GPX_ROUTES.green_start, progress: Math.min(Math.max(elapsedSince(t.raceStart) / dur, 0), 0.99), segment: 'Start → Green CP' };
   }
   return null;
 }
