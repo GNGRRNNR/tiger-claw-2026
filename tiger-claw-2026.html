@@ -1121,25 +1121,38 @@ function parseCSV(text) {
 // ============================================================
 function parseTS(str) {
   if (!str || str === '') return null;
+  str = String(str).trim();
 
-  // Handle bare time strings like "10:00:00 AM" or "3:27:51 PM"
-  // Google Sheets exports scan times without dates during testing
-  const timeOnly = str.match(/^(\d{1,2}):(\d{2}):(\d{2})\s*(AM|PM)?$/i);
+  // Google Sheets sometimes exports time-formatted cells as decimals (fraction of a day)
+  // e.g. "0.427777..." for 10:15 AM. Range 0-1 with no other format = serial time
+  if (/^0?\.\d+$/.test(str)) {
+    const frac = parseFloat(str);
+    if (frac >= 0 && frac < 1) {
+      const totalSec = Math.round(frac * 86400);
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      const now = new Date();
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, s);
+      return isNaN(d) ? null : d;
+    }
+  }
+
+  // Bare time strings like "10:15:00 AM" or "3:27:51 PM" or "14:30:00"
+  const timeOnly = str.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
   if (timeOnly) {
     const now = new Date();
     let h = parseInt(timeOnly[1]);
     const m = parseInt(timeOnly[2]);
-    const s = parseInt(timeOnly[3]);
+    const s = parseInt(timeOnly[3] || '0');
     const ampm = (timeOnly[4]||'').toUpperCase();
     if (ampm === 'PM' && h < 12) h += 12;
     if (ampm === 'AM' && h === 12) h = 0;
-    // Use race date context: if h >= 6 assume same day (May 9 for 50k/ambush, May 8 for ascent)
-    // For testing, just use today's date with the given time
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, s);
     return isNaN(d) ? null : d;
   }
 
-  // Handle Google Sheets datetime like "5/9/2026 10:00:00 AM" or ISO
+  // Full datetime strings like "5/9/2026 10:15:00 AM" or ISO
   const d = new Date(str);
   return isNaN(d) ? null : d;
 }
@@ -2019,49 +2032,70 @@ function gradeAdjustedPace(basePace, routeName, progress) {
   return basePace * 1.1;
 }
 
+// ============================================================
+// RUNNER POSITION ENGINE — direct, transparent, observable
+// ============================================================
+// Strategy:
+// 1. Find the runner's most recent timestamped checkpoint (the "from" point)
+// 2. Determine which segment they are currently traveling (the "current" segment)
+// 3. Calculate observed pace from a previous segment if possible (best signal)
+// 4. Estimate how long the current segment takes at that pace
+// 5. progress = (now - lastScanTime) / estimatedSegmentDuration
+//
+// Default fallback paces if no observed data: SEGMENT_BASE_PACE (sec/km, flat)
+// adjusted using grade from baked elevation data.
+// ============================================================
+
+// Distance helpers (treat GPX_DISTANCES as meters)
+function segDistKm(seg) { return (GPX_DISTANCES[seg] || 1000) / 1000; }
+
+// Get a runner's pace in seconds/km for a specific segment.
+// If we observed them on a PREVIOUS segment, scale that observed pace
+// to fit the CURRENT segment's relative difficulty.
+function getEstimatedSegmentPace(observedPaceSecPerKm, observedSegName, currentSegName) {
+  if (!observedPaceSecPerKm) {
+    // No observed pace — use base table with grade adjustment
+    const base = SEGMENT_BASE_PACE[currentSegName] || 480;
+    return gradeAdjustedPace(base, currentSegName, 0.5);
+  }
+  // Scale the observed pace by the ratio of base paces between segments
+  const obsBase = SEGMENT_BASE_PACE[observedSegName] || 480;
+  const curBase = SEGMENT_BASE_PACE[currentSegName] || 480;
+  const ratio = curBase / obsBase;
+  return observedPaceSecPerKm * ratio;
+}
+
+// Calculate observed pace from two scan timestamps over a known segment
+function calcObservedPace(fromMs, toMs, segName) {
+  if (!fromMs || !toMs || toMs <= fromMs) return null;
+  const elapsedSec = (toMs - fromMs) / 1000;
+  const distKm = segDistKm(segName);
+  if (distKm <= 0) return null;
+  return elapsedSec / distKm;
+}
+
 function getRunnerRouteAndProgress(r, type) {
   const now = Date.now();
-
   const parseTime = s => {
     if (!s || s === '') return null;
     const d = parseTS(s);
     return d ? d.getTime() : null;
   };
-
-  const elapsedSince = t => t ? (now - t) / 1000 : null;
-
-  // Compute progress safely: must be in [0, 0.99]
-  // If elapsed is negative (timestamp in future), return 0.
-  // If duration is invalid, return 0.
-  const safeProgress = (elapsed, dur) => {
-    if (!elapsed || elapsed <= 0 || !dur || dur <= 0) return 0;
-    return Math.min(Math.max(elapsed / dur, 0), 0.99);
-  };
-
-  // Observed pace from two scan times — only valid if both exist and to > from
-  const observedPace = (fromTime, toTime, segName) => {
-    if (!fromTime || !toTime || toTime <= fromTime) return null;
-    const secs = (toTime - fromTime) / 1000;
-    const distKm = (GPX_DISTANCES[segName] || 1000) / 1000;
-    if (distKm <= 0) return null;
-    const pace = secs / distKm;
-    return Math.min(Math.max(pace, 120), 1800); // 2 min/km to 30 min/km
-  };
-
-  // Best estimate for segment duration
-  const estimateDuration = (segName, bib, observedFromTime, observedToTime) => {
-    const obs = observedPace(observedFromTime, observedToTime, segName);
-    const distKm = (GPX_DISTANCES[segName] || 1000) / 1000;
-    if (obs) return distKm * obs;
-    const basePace = getRunnerPace(bib, segName);
-    return distKm * gradeAdjustedPace(basePace, segName, 0.5);
+  // Build a position result with observable progress in [0, 0.99]
+  const buildPos = (segName, lastScanMs, observedPace, observedSegName, segLabel) => {
+    const elapsedSec = (now - lastScanMs) / 1000;
+    if (elapsedSec <= 0) return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
+    const paceSecPerKm = getEstimatedSegmentPace(observedPace, observedSegName, segName);
+    const segDurSec = segDistKm(segName) * paceSecPerKm;
+    if (segDurSec <= 0) return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
+    const progress = Math.min(Math.max(elapsedSec / segDurSec, 0), 0.99);
+    return { route: GPX_ROUTES[segName], progress, segment: segLabel };
   };
 
   if (type === '50k') {
-    const s = (r.Status||'').toUpperCase();
-    const bib = r.Bib || '';
-    if (s === 'DNS') return null;
-    if (r['FINISH TIME (Scan)'] || s === 'FINISHED')
+    const status = (r.Status||'').toUpperCase();
+    if (status === 'DNS') return null;
+    if (r['FINISH TIME (Scan)'] || status === 'FINISHED')
       return { fixed: true, lat: 47.527708, lng: -122.034216, segment: 'Finished' };
 
     const t = {
@@ -2076,68 +2110,81 @@ function getRunnerRouteAndProgress(r, type) {
       red:      parseTime(r['Red Checkpoint In']),
     };
 
-    const loop1Color = (r['First Loop Color']||'pink').toLowerCase();
-    const loop2Color = (r['Second Loop']||'pink').toLowerCase();
-    const loop3Color = (r['Third Loop']||'pink').toLowerCase();
-    const rk1 = ['pink','white','yellow'].includes(loop1Color) ? loop1Color : 'pink';
-    const rk2 = ['pink','white','yellow'].includes(loop2Color) ? loop2Color : 'pink';
-    const rk3 = ['pink','white','yellow'].includes(loop3Color) ? loop3Color : 'pink';
+    // TESTING SUPPORT: if the earliest scan is on a different day than configured race start,
+    // shift race start to that day at 7:00 AM local. This lets you test with bare time strings.
+    const earliestScan = [t.green, t.l1bot, t.l1top, t.l2bot, t.l2top, t.l3bot, t.l3top, t.red]
+      .filter(x => x).sort((a,b) => a-b)[0];
+    if (earliestScan) {
+      const scanDate = new Date(earliestScan);
+      const configDate = new Date(t.raceStart);
+      if (scanDate.toDateString() !== configDate.toDateString()) {
+        // Use scan date with 7am start time
+        const adjusted = new Date(scanDate.getFullYear(), scanDate.getMonth(), scanDate.getDate(), 7, 0, 0);
+        t.raceStart = adjusted.getTime();
+      }
+    }
+    const validColor = c => ['pink','white','yellow'].includes((c||'').toLowerCase()) ? c.toLowerCase() : 'pink';
+    const rk1 = validColor(r['First Loop Color']);
+    const rk2 = validColor(r['Second Loop']);
+    const rk3 = validColor(r['Third Loop']);
 
-    // Walk backwards from latest checkpoint
+    // ---- Latest checkpoint determines current segment ----
+
     if (t.red) {
-      const dur = estimateDuration('red_finish', bib, t.red, null);
-      return { route: GPX_ROUTES.red_finish, progress: safeProgress(elapsedSince(t.red), dur), segment: 'Red → Finish' };
+      // On Red→Finish. Observed pace from blue descent (l3top → red)
+      const obs = calcObservedPace(t.l3top, t.red, 'blue_descent');
+      return buildPos('red_finish', t.red, obs, 'blue_descent', 'Red → Finish');
     }
     if (t.l3top) {
-      const dur = estimateDuration('blue_descent', bib, t.l3top, t.red);
-      return { route: GPX_ROUTES.blue_descent, progress: safeProgress(elapsedSince(t.l3top), dur), segment: 'Blue Descent (3)' };
+      // On 3rd blue descent. Observed pace from loop 3 (l3bot → l3top)
+      const obs = calcObservedPace(t.l3bot, t.l3top, rk3);
+      return buildPos('blue_descent', t.l3top, obs, rk3, 'Blue Descent (3)');
     }
     if (t.l3bot) {
-      const dur = estimateDuration(rk3, bib, t.l3bot, t.l3top);
-      return { route: GPX_ROUTES[rk3], progress: safeProgress(elapsedSince(t.l3bot), dur), segment: `Loop 3 (${rk3})` };
+      // On loop 3. Observed pace from descent 2 if available
+      const obs = calcObservedPace(t.l2top, t.l3bot, 'blue_descent');
+      return buildPos(rk3, t.l3bot, obs, 'blue_descent', `Loop 3 (${rk3})`);
     }
     if (t.l2top) {
-      const dur = estimateDuration('blue_descent', bib, t.l2top, t.l3bot);
-      return { route: GPX_ROUTES.blue_descent, progress: safeProgress(elapsedSince(t.l2top), dur), segment: 'Blue Descent (2)' };
+      const obs = calcObservedPace(t.l2bot, t.l2top, rk2);
+      return buildPos('blue_descent', t.l2top, obs, rk2, 'Blue Descent (2)');
     }
     if (t.l2bot) {
-      const dur = estimateDuration(rk2, bib, t.l2bot, t.l2top);
-      return { route: GPX_ROUTES[rk2], progress: safeProgress(elapsedSince(t.l2bot), dur), segment: `Loop 2 (${rk2})` };
+      const obs = calcObservedPace(t.l1top, t.l2bot, 'blue_descent');
+      return buildPos(rk2, t.l2bot, obs, 'blue_descent', `Loop 2 (${rk2})`);
     }
     if (t.l1top) {
-      const dur = estimateDuration('blue_descent', bib, t.l1top, t.l2bot);
-      return { route: GPX_ROUTES.blue_descent, progress: safeProgress(elapsedSince(t.l1top), dur), segment: 'Blue Descent (1)' };
+      const obs = calcObservedPace(t.l1bot, t.l1top, rk1);
+      return buildPos('blue_descent', t.l1top, obs, rk1, 'Blue Descent (1)');
     }
     if (t.l1bot) {
-      // On the first loop — use scan-to-scan pace if available, else estimate
-      const dur = estimateDuration(rk1, bib, t.l1bot, t.l1top);
-      return { route: GPX_ROUTES[rk1], progress: safeProgress(elapsedSince(t.l1bot), dur), segment: `Loop 1 (${rk1})` };
+      // On Loop 1 (e.g. pink). Observed pace from green→l1bot
+      // The connector from green to l1bot is short (~5% of green_start route)
+      // Better: use start→green pace as the runner's general pace
+      const obs = calcObservedPace(t.raceStart, t.green, 'green_start');
+      return buildPos(rk1, t.l1bot, obs, 'green_start', `Loop 1 (${rk1})`);
     }
     if (t.green) {
-      // Between Green CP and Loop bottom — short connector section
-      // Stay on green_start route at ~95%
-      return { route: GPX_ROUTES.green_start, progress: 0.95, segment: 'Green → Loop Junction' };
+      // Between Green CP and Loop bottom — short connector
+      // Stay near end of green_start route
+      return { route: GPX_ROUTES.green_start, progress: 0.95, segment: 'Green → Loop' };
     }
-    // Before Green CP — on Start→Green section
-    const dur = estimateDuration('green_start', bib, t.raceStart, t.green);
-    return { route: GPX_ROUTES.green_start, progress: safeProgress(elapsedSince(t.raceStart), dur), segment: 'Start → Green CP' };
+    // No checkpoints yet — Start → Green CP
+    return buildPos('green_start', t.raceStart, null, null, 'Start → Green CP');
   }
 
   if (type === 'ascent') {
-    const s = (r.STATUS||'').toUpperCase();
-    const bib = r.BIB || '';
-    if (s === 'DNS') return null;
-    if (r['FINISH TIME (SCAN)'] || s === 'FINISHED')
+    const status = (r.STATUS||'').toUpperCase();
+    if (status === 'DNS') return null;
+    if (r['FINISH TIME (SCAN)'] || status === 'FINISHED')
       return { fixed: true, lat: 47.508742, lng: -121.985226, segment: 'Finished' };
     const raceStart = new Date('2026-05-08T18:00:00-07:00').getTime();
-    const dur = estimateDuration('ascent', bib, raceStart, null);
-    return { route: GPX_ROUTES.ascent, progress: safeProgress(elapsedSince(raceStart), dur), segment: 'Ascent Course' };
+    return buildPos('ascent', raceStart, null, null, 'Ascent Course');
   }
 
   if (type === 'ambush') {
-    const s = (r.Status||'').toUpperCase();
-    const bib = r.Bib || '';
-    if (s === 'DNS') return null;
+    const status = (r.Status||'').toUpperCase();
+    if (status === 'DNS') return null;
     if (r['FINISH TIME (Scan)'])
       return { fixed: true, lat: 47.527708, lng: -122.034216, segment: 'Finished' };
 
@@ -2148,26 +2195,35 @@ function getRunnerRouteAndProgress(r, type) {
       ltop:   parseTime(r['Loop Top']),
       red:    parseTime(r['Red Checkpoint In']),
     };
-    const loopColor = (r['Loop Color']||'pink').toLowerCase();
-    const rk = ['pink','white','yellow'].includes(loopColor) ? loopColor : 'pink';
+
+    const earliestScan = [t.green, t.lbot, t.ltop, t.red].filter(x => x).sort((a,b) => a-b)[0];
+    if (earliestScan) {
+      const scanDate = new Date(earliestScan);
+      const configDate = new Date(t.raceStart);
+      if (scanDate.toDateString() !== configDate.toDateString()) {
+        const adjusted = new Date(scanDate.getFullYear(), scanDate.getMonth(), scanDate.getDate(), 10, 0, 0);
+        t.raceStart = adjusted.getTime();
+      }
+    }
+    const validColor = c => ['pink','white','yellow'].includes((c||'').toLowerCase()) ? c.toLowerCase() : 'pink';
+    const rk = validColor(r['Loop Color']);
 
     if (t.red) {
-      const dur = estimateDuration('red_finish', bib, t.red, null);
-      return { route: GPX_ROUTES.red_finish, progress: safeProgress(elapsedSince(t.red), dur), segment: 'Red → Finish' };
+      const obs = calcObservedPace(t.ltop, t.red, 'blue_descent');
+      return buildPos('red_finish', t.red, obs, 'blue_descent', 'Red → Finish');
     }
     if (t.ltop) {
-      const dur = estimateDuration('blue_descent', bib, t.ltop, t.red);
-      return { route: GPX_ROUTES.blue_descent, progress: safeProgress(elapsedSince(t.ltop), dur), segment: 'Blue Descent' };
+      const obs = calcObservedPace(t.lbot, t.ltop, rk);
+      return buildPos('blue_descent', t.ltop, obs, rk, 'Blue Descent');
     }
     if (t.lbot) {
-      const dur = estimateDuration(rk, bib, t.lbot, t.ltop);
-      return { route: GPX_ROUTES[rk], progress: safeProgress(elapsedSince(t.lbot), dur), segment: `Loop (${rk})` };
+      const obs = calcObservedPace(t.raceStart, t.green, 'green_start');
+      return buildPos(rk, t.lbot, obs, 'green_start', `Loop (${rk})`);
     }
     if (t.green) {
       return { route: GPX_ROUTES.green_start, progress: 0.95, segment: 'Green → Loop' };
     }
-    const dur = estimateDuration('green_start', bib, t.raceStart, null);
-    return { route: GPX_ROUTES.green_start, progress: safeProgress(elapsedSince(t.raceStart), dur), segment: 'Start → Green CP' };
+    return buildPos('green_start', t.raceStart, null, null, 'Start → Green CP');
   }
   return null;
 }
