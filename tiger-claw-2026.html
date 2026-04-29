@@ -2081,15 +2081,34 @@ function getRunnerRouteAndProgress(r, type) {
     const d = parseTS(s);
     return d ? d.getTime() : null;
   };
-  // Build a position result with observable progress in [0, 0.99]
-  const buildPos = (segName, lastScanMs, observedPace, observedSegName, segLabel) => {
+
+  // Build position result with progress in [0, 0.99]
+  const buildPos = (segName, lastScanMs, observedPaceSecPerKm, observedSegName, segLabel) => {
+    if (!lastScanMs) return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
     const elapsedSec = (now - lastScanMs) / 1000;
     if (elapsedSec <= 0) return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
-    const paceSecPerKm = getEstimatedSegmentPace(observedPace, observedSegName, segName);
+    const paceSecPerKm = getEstimatedSegmentPace(observedPaceSecPerKm, observedSegName, segName);
     const segDurSec = segDistKm(segName) * paceSecPerKm;
     if (segDurSec <= 0) return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
     const progress = Math.min(Math.max(elapsedSec / segDurSec, 0), 0.99);
     return { route: GPX_ROUTES[segName], progress, segment: segLabel };
+  };
+
+  // Validate sequential timestamps — each scan must be after the previous one
+  // Returns the timestamps in proper order, dropping any that violate sequence
+  const validateSequence = (times) => {
+    const result = {...times};
+    let prev = result.raceStart;
+    for (const key of Object.keys(result)) {
+      if (key === 'raceStart') continue;
+      if (result[key] && result[key] < prev) {
+        // Out of sequence — drop this and all subsequent
+        result[key] = null;
+      } else if (result[key]) {
+        prev = result[key];
+      }
+    }
+    return result;
   };
 
   if (type === '50k') {
@@ -2098,7 +2117,7 @@ function getRunnerRouteAndProgress(r, type) {
     if (r['FINISH TIME (Scan)'] || status === 'FINISHED')
       return { fixed: true, lat: 47.527708, lng: -122.034216, segment: 'Finished' };
 
-    const t = {
+    let t = {
       raceStart: new Date('2026-05-09T07:00:00-07:00').getTime(),
       green:    parseTime(r['Green Checkpoint']),
       l1bot:    parseTime(r['First Loop Bottom']),
@@ -2110,66 +2129,55 @@ function getRunnerRouteAndProgress(r, type) {
       red:      parseTime(r['Red Checkpoint In']),
     };
 
-    // TESTING SUPPORT: if the earliest scan is on a different day than configured race start,
-    // shift race start to that day at 7:00 AM local. This lets you test with bare time strings.
-    const earliestScan = [t.green, t.l1bot, t.l1top, t.l2bot, t.l2top, t.l3bot, t.l3top, t.red]
-      .filter(x => x).sort((a,b) => a-b)[0];
-    if (earliestScan) {
+    // TESTING SUPPORT: shift race start to match scan dates
+    const allScans = [t.green, t.l1bot, t.l1top, t.l2bot, t.l2top, t.l3bot, t.l3top, t.red].filter(x => x);
+    if (allScans.length > 0) {
+      const earliestScan = Math.min(...allScans);
       const scanDate = new Date(earliestScan);
       const configDate = new Date(t.raceStart);
       if (scanDate.toDateString() !== configDate.toDateString()) {
-        // Use scan date with 7am start time
         const adjusted = new Date(scanDate.getFullYear(), scanDate.getMonth(), scanDate.getDate(), 7, 0, 0);
         t.raceStart = adjusted.getTime();
       }
     }
+
+    // Validate sequence — drop any out-of-order scans
+    t = validateSequence(t);
+
     const validColor = c => ['pink','white','yellow'].includes((c||'').toLowerCase()) ? c.toLowerCase() : 'pink';
     const rk1 = validColor(r['First Loop Color']);
     const rk2 = validColor(r['Second Loop']);
     const rk3 = validColor(r['Third Loop']);
 
-    // ---- Latest checkpoint determines current segment ----
+    // Build a list of ALL completed segments with their observed pace
+    // Most recent segment's pace is the BEST predictor of current pace
+    const completedSegments = [];
+    if (t.green) completedSegments.push({ from: t.raceStart, to: t.green, segName: 'green_start' });
+    if (t.l1bot && t.green) completedSegments.push({ from: t.green, to: t.l1bot, segName: 'green_start', short: true });
+    if (t.l1top && t.l1bot) completedSegments.push({ from: t.l1bot, to: t.l1top, segName: rk1 });
+    if (t.l2bot && t.l1top) completedSegments.push({ from: t.l1top, to: t.l2bot, segName: 'blue_descent' });
+    if (t.l2top && t.l2bot) completedSegments.push({ from: t.l2bot, to: t.l2top, segName: rk2 });
+    if (t.l3bot && t.l2top) completedSegments.push({ from: t.l2top, to: t.l3bot, segName: 'blue_descent' });
+    if (t.l3top && t.l3bot) completedSegments.push({ from: t.l3bot, to: t.l3top, segName: rk3 });
+    if (t.red && t.l3top) completedSegments.push({ from: t.l3top, to: t.red, segName: 'blue_descent' });
 
-    if (t.red) {
-      // On Red→Finish. Observed pace from blue descent (l3top → red)
-      const obs = calcObservedPace(t.l3top, t.red, 'blue_descent');
-      return buildPos('red_finish', t.red, obs, 'blue_descent', 'Red → Finish');
-    }
-    if (t.l3top) {
-      // On 3rd blue descent. Observed pace from loop 3 (l3bot → l3top)
-      const obs = calcObservedPace(t.l3bot, t.l3top, rk3);
-      return buildPos('blue_descent', t.l3top, obs, rk3, 'Blue Descent (3)');
-    }
-    if (t.l3bot) {
-      // On loop 3. Observed pace from descent 2 if available
-      const obs = calcObservedPace(t.l2top, t.l3bot, 'blue_descent');
-      return buildPos(rk3, t.l3bot, obs, 'blue_descent', `Loop 3 (${rk3})`);
-    }
-    if (t.l2top) {
-      const obs = calcObservedPace(t.l2bot, t.l2top, rk2);
-      return buildPos('blue_descent', t.l2top, obs, rk2, 'Blue Descent (2)');
-    }
-    if (t.l2bot) {
-      const obs = calcObservedPace(t.l1top, t.l2bot, 'blue_descent');
-      return buildPos(rk2, t.l2bot, obs, 'blue_descent', `Loop 2 (${rk2})`);
-    }
-    if (t.l1top) {
-      const obs = calcObservedPace(t.l1bot, t.l1top, rk1);
-      return buildPos('blue_descent', t.l1top, obs, rk1, 'Blue Descent (1)');
-    }
-    if (t.l1bot) {
-      // On Loop 1 (e.g. pink). Observed pace from green→l1bot
-      // The connector from green to l1bot is short (~5% of green_start route)
-      // Better: use start→green pace as the runner's general pace
-      const obs = calcObservedPace(t.raceStart, t.green, 'green_start');
-      return buildPos(rk1, t.l1bot, obs, 'green_start', `Loop 1 (${rk1})`);
-    }
-    if (t.green) {
-      // Between Green CP and Loop bottom — short connector
-      // Stay near end of green_start route
-      return { route: GPX_ROUTES.green_start, progress: 0.95, segment: 'Green → Loop' };
-    }
-    // No checkpoints yet — Start → Green CP
+    // Most recent segment's observed pace — this is what we use for "current pace"
+    // Skip the short connector segments
+    const mostRecentRealSeg = [...completedSegments].reverse().find(s => !s.short);
+    const recentObservedPace = mostRecentRealSeg
+      ? calcObservedPace(mostRecentRealSeg.from, mostRecentRealSeg.to, mostRecentRealSeg.segName)
+      : null;
+    const recentObservedSeg = mostRecentRealSeg ? mostRecentRealSeg.segName : null;
+
+    // Determine current segment based on most recent checkpoint
+    if (t.red) return buildPos('red_finish', t.red, recentObservedPace, recentObservedSeg, 'Red → Finish');
+    if (t.l3top) return buildPos('blue_descent', t.l3top, recentObservedPace, recentObservedSeg, 'Blue Descent (3)');
+    if (t.l3bot) return buildPos(rk3, t.l3bot, recentObservedPace, recentObservedSeg, `Loop 3 (${rk3})`);
+    if (t.l2top) return buildPos('blue_descent', t.l2top, recentObservedPace, recentObservedSeg, 'Blue Descent (2)');
+    if (t.l2bot) return buildPos(rk2, t.l2bot, recentObservedPace, recentObservedSeg, `Loop 2 (${rk2})`);
+    if (t.l1top) return buildPos('blue_descent', t.l1top, recentObservedPace, recentObservedSeg, 'Blue Descent (1)');
+    if (t.l1bot) return buildPos(rk1, t.l1bot, recentObservedPace, recentObservedSeg, `Loop 1 (${rk1})`);
+    if (t.green) return { route: GPX_ROUTES.green_start, progress: 0.95, segment: 'Green → Loop' };
     return buildPos('green_start', t.raceStart, null, null, 'Start → Green CP');
   }
 
@@ -2188,7 +2196,7 @@ function getRunnerRouteAndProgress(r, type) {
     if (r['FINISH TIME (Scan)'])
       return { fixed: true, lat: 47.527708, lng: -122.034216, segment: 'Finished' };
 
-    const t = {
+    let t = {
       raceStart: new Date('2026-05-09T10:00:00-07:00').getTime(),
       green:  parseTime(r['Green Checkpoint']),
       lbot:   parseTime(r['Loop Bottom']),
@@ -2196,8 +2204,9 @@ function getRunnerRouteAndProgress(r, type) {
       red:    parseTime(r['Red Checkpoint In']),
     };
 
-    const earliestScan = [t.green, t.lbot, t.ltop, t.red].filter(x => x).sort((a,b) => a-b)[0];
-    if (earliestScan) {
+    const allScans = [t.green, t.lbot, t.ltop, t.red].filter(x => x);
+    if (allScans.length > 0) {
+      const earliestScan = Math.min(...allScans);
       const scanDate = new Date(earliestScan);
       const configDate = new Date(t.raceStart);
       if (scanDate.toDateString() !== configDate.toDateString()) {
@@ -2205,24 +2214,27 @@ function getRunnerRouteAndProgress(r, type) {
         t.raceStart = adjusted.getTime();
       }
     }
+    t = validateSequence(t);
+
     const validColor = c => ['pink','white','yellow'].includes((c||'').toLowerCase()) ? c.toLowerCase() : 'pink';
     const rk = validColor(r['Loop Color']);
 
-    if (t.red) {
-      const obs = calcObservedPace(t.ltop, t.red, 'blue_descent');
-      return buildPos('red_finish', t.red, obs, 'blue_descent', 'Red → Finish');
-    }
-    if (t.ltop) {
-      const obs = calcObservedPace(t.lbot, t.ltop, rk);
-      return buildPos('blue_descent', t.ltop, obs, rk, 'Blue Descent');
-    }
-    if (t.lbot) {
-      const obs = calcObservedPace(t.raceStart, t.green, 'green_start');
-      return buildPos(rk, t.lbot, obs, 'green_start', `Loop (${rk})`);
-    }
-    if (t.green) {
-      return { route: GPX_ROUTES.green_start, progress: 0.95, segment: 'Green → Loop' };
-    }
+    const completedSegments = [];
+    if (t.green) completedSegments.push({ from: t.raceStart, to: t.green, segName: 'green_start' });
+    if (t.lbot && t.green) completedSegments.push({ from: t.green, to: t.lbot, segName: 'green_start', short: true });
+    if (t.ltop && t.lbot) completedSegments.push({ from: t.lbot, to: t.ltop, segName: rk });
+    if (t.red && t.ltop) completedSegments.push({ from: t.ltop, to: t.red, segName: 'blue_descent' });
+
+    const mostRecentRealSeg = [...completedSegments].reverse().find(s => !s.short);
+    const recentObservedPace = mostRecentRealSeg
+      ? calcObservedPace(mostRecentRealSeg.from, mostRecentRealSeg.to, mostRecentRealSeg.segName)
+      : null;
+    const recentObservedSeg = mostRecentRealSeg ? mostRecentRealSeg.segName : null;
+
+    if (t.red) return buildPos('red_finish', t.red, recentObservedPace, recentObservedSeg, 'Red → Finish');
+    if (t.ltop) return buildPos('blue_descent', t.ltop, recentObservedPace, recentObservedSeg, 'Blue Descent');
+    if (t.lbot) return buildPos(rk, t.lbot, recentObservedPace, recentObservedSeg, `Loop (${rk})`);
+    if (t.green) return { route: GPX_ROUTES.green_start, progress: 0.95, segment: 'Green → Loop' };
     return buildPos('green_start', t.raceStart, null, null, 'Start → Green CP');
   }
   return null;
