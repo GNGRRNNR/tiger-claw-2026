@@ -2679,11 +2679,123 @@ function renderTable() {
 // RUNNER MODAL
 // ============================================================
 function openModal(bib, tab) {
+  // String compare to handle CSV number/string mismatch
+  const bibStr = String(bib).trim();
   let runner = null;
-  if (tab === '50k') runner = data.fiftyk.find(r => r.Bib === bib);
-  else if (tab === 'ascent') runner = data.ascent.find(r => r.BIB === bib);
-  else if (tab === 'ambush') runner = data.ambush.find(r => r.Bib === bib);
-  if (!runner) return;
+  if (tab === '50k') runner = data.fiftyk.find(r => String(r.Bib).trim() === bibStr);
+  else if (tab === 'ascent') runner = data.ascent.find(r => String(r.BIB).trim() === bibStr);
+  else if (tab === 'ambush') runner = data.ambush.find(r => String(r.Bib).trim() === bibStr);
+  else if (tab === 'bigcat') {
+    runner = data.fiftyk.find(r => String(r.Bib).trim() === bibStr || String(r.fiftyBib).trim() === bibStr);
+  }
+  if (!runner) {
+    debugLog(`openModal: runner not found bib=${bibStr} tab=${tab}`, true);
+    return;
+  }
+
+  const name = runner.Name || runner.NAME || `Bib ${bibStr}`;
+  const status = runner.Status || runner.STATUS || 'On Course';
+
+  document.getElementById('modalName').textContent = name;
+  document.getElementById('modalBib').textContent = `Bib #${bibStr} · ${status}`;
+
+  let bodyHTML = '';
+
+  if (tab === '50k') {
+    const checkpoints = [
+      { label: 'Race Start (7:00 AM)', time: null, fixed: true },
+      { label: 'Green Checkpoint', time: runner['Green Checkpoint'] },
+      { label: `Loop 1 Bottom (${runner['First Loop Color']||'?'})`, time: runner['First Loop Bottom'] },
+      { label: 'Loop 1 Top (Blue Summit)', time: runner['First Loop Top'] },
+      { label: `Loop 2 Bottom (${runner['Second Loop']||'?'})`, time: runner['Second Loop Bottom'] },
+      { label: 'Loop 2 Top (Blue Summit)', time: runner['Second Loop Top'] },
+      { label: `Loop 3 Bottom (${runner['Third Loop']||'?'})`, time: runner['Third Loop Bottom'] },
+      { label: 'Loop 3 Top (Blue Summit)', time: runner['Third Loop Top'] },
+      { label: 'Red Checkpoint', time: runner['Red Checkpoint In'] },
+      { label: 'Finish Line', time: runner['FINISH TIME (Scan)'] },
+    ];
+    let lastDone = -1;
+    checkpoints.forEach((cp, i) => { if (cp.time) lastDone = i; });
+    const currentIdx = lastDone + 1;
+
+    bodyHTML += `<div style="font-family:'Bebas Neue',sans-serif;font-size:0.85rem;letter-spacing:0.1em;color:var(--text-dim);margin:0 0 0.75rem">Race Timeline</div>`;
+    checkpoints.forEach((cp, i) => {
+      const done = !!cp.time || cp.fixed;
+      const isCurrent = i === currentIdx && !runner['FINISH TIME (Scan)'];
+      const color = done ? 'var(--accent)' : isCurrent ? '#60a5fa' : 'var(--border2)';
+      const timeStr = cp.time ? fmtTime(cp.time) : (cp.fixed ? 'May 9, 2026' : isCurrent ? '▶ In progress…' : '—');
+      bodyHTML += `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+        <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;${isCurrent?'box-shadow:0 0 6px #60a5fa':''}"></div>
+        <div style="flex:1;font-size:0.82rem;color:${done||isCurrent?'var(--text)':'var(--text-dim)'}">${cp.label}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:0.78rem;color:${done?'var(--accent)':isCurrent?'#60a5fa':'var(--text-dim)'}">${timeStr}</div>
+      </div>`;
+    });
+
+    const segs = [
+      ['Loop 1 Time', runner['First Loop Elapsed']],
+      ['Descent 1', runner['First Blue Descent Elapsed']],
+      ['Loop 2 Time', runner['Second Loop Elapsed']],
+      ['Descent 2', runner['Second Blue Descent Elapsed']],
+      ['Loop 3 Time', runner['Third Loop Elapsed']],
+      ['Descent 3', runner['Third Blue Descent Elapsed']],
+      ['Total Time', runner['Total Elapsed Time']],
+    ].filter(s => s[1]);
+
+    if (segs.length) {
+      bodyHTML += `<div style="font-family:'Bebas Neue',sans-serif;font-size:0.85rem;letter-spacing:0.1em;color:var(--text-dim);margin:1rem 0 0.5rem">Split Times</div>`;
+      segs.forEach(([label, val]) => {
+        bodyHTML += `<div style="display:flex;justify-content:space-between;padding:0.35rem 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:0.8rem;color:var(--text)">${label}</span>
+          <span style="font-family:'DM Mono',monospace;font-size:0.8rem;color:var(--accent)">${fmtElapsed(val)}</span>
+        </div>`;
+      });
+    }
+
+  } else if (tab === 'ascent') {
+    const cps = [
+      { label: 'Start (6:00 PM, May 8)', time: null, fixed: true },
+      { label: 'Summit Finish', time: runner['FINISH TIME (SCAN)'] },
+    ];
+    bodyHTML += cps.map(cp => `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+      <div style="width:8px;height:8px;border-radius:50%;background:${cp.time||cp.fixed?'var(--accent)':'var(--border2)'};flex-shrink:0"></div>
+      <div style="flex:1;font-size:0.82rem;color:var(--text)">${cp.label}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--accent)">${cp.time ? fmtTime(cp.time) : (cp.fixed ? '—' : '▶ In progress…')}</div>
+    </div>`).join('');
+    if (runner['ELAPSED TIME']) bodyHTML += `<div style="display:flex;justify-content:space-between;padding:0.5rem 0;margin-top:0.5rem">
+      <span style="font-size:0.82rem;color:var(--text)">Total Time</span>
+      <span style="font-family:'DM Mono',monospace;color:var(--accent)">${fmtElapsed(runner['ELAPSED TIME'])}</span>
+    </div>`;
+
+  } else if (tab === 'ambush') {
+    bodyHTML += `<div style="font-family:'Bebas Neue',sans-serif;font-size:0.85rem;letter-spacing:0.1em;color:var(--text-dim);margin-bottom:0.5rem">Team: ${runner['Team Name']||'Unknown'}</div>`;
+    const cps = [
+      { label: 'Start (10:00 AM, May 9)', time: null, fixed: true },
+      { label: 'Green Checkpoint', time: runner['Green Checkpoint'] },
+      { label: `${runner['Loop Color']||'?'} Loop Bottom`, time: runner['Loop Bottom'] },
+      { label: 'Blue Summit', time: runner['Loop Top'] },
+      { label: 'Red CP In', time: runner['Red Checkpoint In'] },
+      { label: 'Red CP Out', time: runner['Red Checkpoint Out'] },
+      { label: 'Finish', time: runner['FINISH TIME (Scan)'] },
+    ];
+    bodyHTML += cps.map(cp => `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+      <div style="width:8px;height:8px;border-radius:50%;background:${cp.time||cp.fixed?'var(--accent)':'var(--border2)'};flex-shrink:0"></div>
+      <div style="flex:1;font-size:0.82rem;color:var(--text)">${cp.label}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--accent)">${cp.time ? fmtTime(cp.time) : (cp.fixed?'—':'—')}</div>
+    </div>`).join('');
+    if (runner['Team Elapsed Time']) bodyHTML += `<div style="display:flex;justify-content:space-between;padding:0.5rem 0;margin-top:0.5rem">
+      <span style="font-size:0.82rem;color:var(--text)">Team Total</span>
+      <span style="font-family:'DM Mono',monospace;color:var(--accent)">${fmtElapsed(runner['Team Elapsed Time'])}</span>
+    </div>`;
+  }
+
+  document.getElementById('modalBody').innerHTML = bodyHTML;
+
+  // Force overlay visible with inline styles as backup in case CSS class fails
+  const overlay = document.getElementById('modalOverlay');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem;opacity:1;pointer-events:all;';
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden'; // prevent scroll behind modal
+}
 
   const name = runner.Name || runner.NAME || `Bib ${bib}`;
   const status = runner.Status || runner.STATUS || '';
@@ -2829,12 +2941,15 @@ document.getElementById('segFocusClose').addEventListener('click', () => {
   document.querySelectorAll('.legend-route').forEach(i => i.classList.remove('active-route'));
 });
 
-document.getElementById('modalClose').addEventListener('click', () => {
-  document.getElementById('modalOverlay').classList.remove('open');
-});
+function closeModal() {
+  const overlay = document.getElementById('modalOverlay');
+  overlay.classList.remove('open');
+  overlay.style.cssText = '';
+  document.body.style.overflow = '';
+}
+document.getElementById('modalClose').addEventListener('click', closeModal);
 document.getElementById('modalOverlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('modalOverlay'))
-    document.getElementById('modalOverlay').classList.remove('open');
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
 });
 
 // ============================================================
