@@ -1926,7 +1926,9 @@ function updateRunnerTargets() {
       const pos = getRunnerRouteAndProgress(r, '50k');
       if (!pos) return;
       const p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
-      all.push({...p, bib:r.Bib, name:r.Name||'', seg:pos.segment||'', color:'#e8c14a', key:'f_'+r.Bib});
+      const segKey = pos.route ? Object.keys(GPX_ROUTES).find(k => GPX_ROUTES[k] === pos.route) : null;
+      const dotColor = pos.fixed ? '#e8c14a' : (ROUTE_COLORS[segKey] || '#e8c14a');
+      all.push({...p, bib:r.Bib, name:r.Name||'', seg:pos.segment||'', color:dotColor, key:'f_'+r.Bib});
     });
   }
 
@@ -1936,7 +1938,9 @@ function updateRunnerTargets() {
       const pos = getRunnerRouteAndProgress(r, 'ascent');
       if (!pos) return;
       const p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
-      all.push({...p, bib:r.BIB, name:r.NAME||'', seg:pos.segment||'', color:'#a78bfa', key:'a_'+r.BIB});
+      const segKey = pos.route ? Object.keys(GPX_ROUTES).find(k => GPX_ROUTES[k] === pos.route) : null;
+      const dotColor = pos.fixed ? '#a78bfa' : (ROUTE_COLORS[segKey] || '#a78bfa');
+      all.push({...p, bib:r.BIB, name:r.NAME||'', seg:pos.segment||'', color:dotColor, key:'a_'+r.BIB});
     });
   }
 
@@ -1946,7 +1950,9 @@ function updateRunnerTargets() {
       const pos = getRunnerRouteAndProgress(r, 'ambush');
       if (!pos) return;
       const p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
-      all.push({...p, bib:r.Bib, name:r.Name||'', seg:pos.segment||'', color:'#fb923c', key:'b_'+r.Bib});
+      const segKey = pos.route ? Object.keys(GPX_ROUTES).find(k => GPX_ROUTES[k] === pos.route) : null;
+      const dotColor = pos.fixed ? '#fb923c' : (ROUTE_COLORS[segKey] || '#fb923c');
+      all.push({...p, bib:r.Bib, name:r.Name||'', seg:pos.segment||'', color:dotColor, key:'b_'+r.Bib});
     });
   }
 
@@ -1955,18 +1961,29 @@ function updateRunnerTargets() {
     seen.add(rp.key);
     targetPositions[rp.key] = { lat: rp.lat, lng: rp.lng };
     if (!currentPositions[rp.key]) currentPositions[rp.key] = { lat: rp.lat, lng: rp.lng };
+
+    const buildMarkerHTML = (color, bib) =>
+      '<div style="background:rgba(10,10,10,0.9);color:'+color+';font-family:DM Mono,monospace;font-size:9px;font-weight:700;padding:1px 3px;border-radius:2px;border:1px solid '+color+'44;white-space:nowrap">#'+bib+'</div>'
+      +'<div style="width:9px;height:9px;background:'+color+';border:1.5px solid #0a0a0a;border-radius:50%;box-shadow:0 0 5px '+color+'99;margin-top:1px"></div>';
+
     if (!runnerMarkers[rp.key]) {
-      // Create marker at current position
       const el = document.createElement('div');
       el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer';
-      el.innerHTML = '<div style="background:rgba(10,10,10,0.9);color:'+rp.color+';font-family:DM Mono,monospace;font-size:9px;font-weight:700;padding:1px 3px;border-radius:2px;border:1px solid '+rp.color+'44;white-space:nowrap">#'+rp.bib+'</div>'
-        +'<div style="width:9px;height:9px;background:'+rp.color+';border:1.5px solid #0a0a0a;border-radius:50%;box-shadow:0 0 5px '+rp.color+'99;margin-top:1px"></div>';
+      el._segColor = rp.color;
+      el.innerHTML = buildMarkerHTML(rp.color, rp.bib);
       const popup = new mapboxgl.Popup({ offset: 20, closeButton: false })
         .setHTML('<div style="background:#111;color:#f0f0f0;font-family:DM Mono,monospace;font-size:11px;padding:5px 8px;border-radius:4px;border-left:3px solid '+rp.color+'"><b style="color:'+rp.color+'">#'+rp.bib+'</b> '+rp.name+'<br><span style="color:#888;font-size:10px">'+rp.seg+'</span></div>');
       runnerMarkers[rp.key] = new mapboxgl.Marker(el)
         .setLngLat([rp.lng, rp.lat])
         .setPopup(popup)
         .addTo(mbMap);
+    } else {
+      // Update dot color if runner moved to a new segment
+      const el = runnerMarkers[rp.key].getElement();
+      if (el._segColor !== rp.color) {
+        el._segColor = rp.color;
+        el.innerHTML = buildMarkerHTML(rp.color, rp.bib);
+      }
     }
   });
 
