@@ -966,6 +966,8 @@ let filterText = '';
 let sortCol = null;
 let sortDir = 'asc';
 let elevChartInst = null;
+let loopChartInst = null;
+let segChartInst = null;
 const lastCheckpointSeen = {};
 let STATE_lastUpdate = null; // runner key -> last checkpoint field seen
 
@@ -1931,11 +1933,15 @@ function startAnimation() {
 
 function animateStep() {
   updateRunnerTargets();
-  if (Object.keys(targetPositions).length > 0) {
+  const moving = Object.keys(targetPositions).length;
+  const fixed = Object.keys(runnerMarkers).length - moving;
+  if (moving > 0) {
     const sample = Object.entries(targetPositions)[0];
-    debugLog(`${Object.keys(targetPositions).length} runners. ${sample[0]}: ${sample[1].lat.toFixed(5)},${sample[1].lng.toFixed(5)}`);
+    debugLog(`${moving} moving, ${fixed} finished. ${sample[0]}: ${sample[1].lat.toFixed(5)},${sample[1].lng.toFixed(5)}`);
+  } else if (Object.keys(runnerMarkers).length > 0) {
+    debugLog(`${Object.keys(runnerMarkers).length} runners all at fixed positions (finished/DNS)`);
   } else {
-    debugLog(`No targets — check data + tab (active: ${activeTab})`, true);
+    debugLog(`No runners — check data loaded and tab (active: ${activeTab})`, true);
   }
   animationFrame = setTimeout(animateStep, 10000);
 }
