@@ -848,6 +848,12 @@ td.team-name {
   <div class="row-count" id="rowCount"></div>
 </div>
 
+<!-- DEBUG PANEL — remove before race day -->
+<div id="debugPanel" style="position:fixed;bottom:1rem;left:1rem;background:rgba(0,0,0,0.92);border:1px solid #333;border-radius:6px;padding:0.75rem 1rem;font-family:'DM Mono',monospace;font-size:0.7rem;color:#4ade80;z-index:9998;max-width:340px;max-height:200px;overflow-y:auto;display:none;">
+  <div style="color:#888;margin-bottom:0.3rem">DEBUG — <button onclick="document.getElementById('debugPanel').style.display='none'" style="background:none;border:none;color:#888;cursor:pointer;font-size:0.7rem">hide</button></div>
+  <div id="debugLog"></div>
+</div>
+
 <!-- TOAST NOTIFICATIONS -->
 <div id="toastContainer" style="position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;display:flex;flex-direction:column;gap:0.5rem;max-width:300px;"></div>
 
@@ -1883,6 +1889,20 @@ let targetPositions = {}; // key -> {lat, lng} — updated every 10s
 let currentPositions = {}; // key -> {lat, lng} — interpolated every frame
 let rafId = null;
 
+function debugLog(msg, warn=false) {
+  console[warn ? 'warn' : 'log']('[TC] ' + msg);
+  const panel = document.getElementById('debugPanel');
+  const log = document.getElementById('debugLog');
+  if (panel && log) {
+    panel.style.display = 'block';
+    const line = document.createElement('div');
+    line.style.color = warn ? '#f87171' : '#4ade80';
+    line.textContent = new Date().toLocaleTimeString('en-US',{hour12:false}) + ' ' + msg;
+    log.insertBefore(line, log.firstChild);
+    while (log.children.length > 20) log.removeChild(log.lastChild);
+  }
+}
+
 function startAnimation() {
   if (animationFrame) clearTimeout(animationFrame);
   // Calculate targets every 10s
@@ -1894,7 +1914,7 @@ function startAnimation() {
     Object.keys(targetPositions).forEach(key => {
       const target = targetPositions[key];
       const cur = currentPositions[key] || { ...target };
-      const LERP = 0.04; // smoothness — lower = smoother but slower
+      const LERP = 0.15; // increased from 0.04 — more visible movement
       const newLat = cur.lat + (target.lat - cur.lat) * LERP;
       const newLng = cur.lng + (target.lng - cur.lng) * LERP;
       const moved = Math.abs(newLat - cur.lat) > 0.000001 || Math.abs(newLng - cur.lng) > 0.000001;
@@ -1910,7 +1930,13 @@ function startAnimation() {
 }
 
 function animateStep() {
-  updateRunnerTargets(); // update targets only
+  updateRunnerTargets();
+  if (Object.keys(targetPositions).length > 0) {
+    const sample = Object.entries(targetPositions)[0];
+    debugLog(`${Object.keys(targetPositions).length} runners. ${sample[0]}: ${sample[1].lat.toFixed(5)},${sample[1].lng.toFixed(5)}`);
+  } else {
+    debugLog(`No targets — check data + tab (active: ${activeTab})`, true);
+  }
   animationFrame = setTimeout(animateStep, 10000);
 }
 
@@ -2084,13 +2110,15 @@ function getRunnerRouteAndProgress(r, type) {
 
   // Build position result with progress in [0, 0.99]
   const buildPos = (segName, lastScanMs, observedPaceSecPerKm, observedSegName, segLabel) => {
-    if (!lastScanMs) return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
+    if (!lastScanMs) {
+      console.warn(`[TC] buildPos: no lastScanMs for ${segName}`);
+      return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
+    }
     const elapsedSec = (now - lastScanMs) / 1000;
-    if (elapsedSec <= 0) return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
     const paceSecPerKm = getEstimatedSegmentPace(observedPaceSecPerKm, observedSegName, segName);
     const segDurSec = segDistKm(segName) * paceSecPerKm;
-    if (segDurSec <= 0) return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
     const progress = Math.min(Math.max(elapsedSec / segDurSec, 0), 0.99);
+    debugLog(`${segLabel}: ${Math.round(elapsedSec/60)}min elapsed, dur=${Math.round(segDurSec/60)}min, ${(progress*100).toFixed(0)}%`);
     return { route: GPX_ROUTES[segName], progress, segment: segLabel };
   };
 
