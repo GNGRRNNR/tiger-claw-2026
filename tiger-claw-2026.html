@@ -503,7 +503,7 @@ td.team-name {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.88);
-  z-index: 1000;
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2039,23 +2039,50 @@ function interpolateAlongRoute(route, fraction) {
   return { lat: route[route.length-1][0], lng: route[route.length-1][1] };
 }
 
-function gradeAdjustedPace(basePace, routeName, progress) {
+// Average grade-adjusted pace across a whole route (samples multiple points)
+function avgGradeAdjustedPace(basePace, routeName) {
   const elevs = ELEVATION_DATA[routeName];
   const pts = GPX_ROUTES[routeName];
   if (!elevs || !pts || elevs.length < 2) return basePace;
-  const idx = Math.min(Math.floor(progress * (elevs.length-1)), elevs.length-2);
-  const rise = elevs[idx+1] - elevs[idx];
-  const run = haversineM(pts[idx][0], pts[idx][1], pts[idx+1][0], pts[idx+1][1]);
-  if (run < 1) return basePace;
-  const grade = rise / run;
-  if (grade > 0.25) return basePace * 3.5;
-  if (grade > 0.15) return basePace * 2.5;
-  if (grade > 0.08) return basePace * 1.8;
-  if (grade > 0.03) return basePace * 1.3;
-  if (grade > -0.03) return basePace;
-  if (grade > -0.08) return basePace * 0.85;
-  if (grade > -0.15) return basePace * 0.9;
-  return basePace * 1.1;
+  
+  let totalPace = 0, totalDist = 0;
+  for (let i = 0; i < elevs.length - 1; i++) {
+    const rise = elevs[i+1] - elevs[i];
+    const run = haversineM(pts[i][0], pts[i][1], pts[i+1][0], pts[i+1][1]);
+    if (run < 1) continue;
+    const grade = rise / run;
+    let mult;
+    if (grade > 0.25) mult = 3.5;
+    else if (grade > 0.15) mult = 2.5;
+    else if (grade > 0.08) mult = 1.8;
+    else if (grade > 0.03) mult = 1.3;
+    else if (grade > -0.03) mult = 1.0;
+    else if (grade > -0.08) mult = 0.85;
+    else if (grade > -0.15) mult = 0.9;
+    else mult = 1.1;
+    totalPace += basePace * mult * run;
+    totalDist += run;
+  }
+  return totalDist > 0 ? totalPace / totalDist : basePace;
+}
+
+// Estimated total time for a segment in seconds (no observed pace)
+function estimateSegmentDuration(segName) {
+  const distKm = segDistKm(segName);
+  const base = SEGMENT_BASE_PACE[segName] || 480;
+  const avgPace = avgGradeAdjustedPace(base, segName);
+  return distKm * avgPace;
+}
+
+// Precompute segment durations once (avoids repeated calculation)
+const SEGMENT_DURATIONS = {}; // populated after GPX_ROUTES defined
+
+// Called once after page loads to pre-warm segment duration calculations
+function initSegmentDurations() {
+  ['green_start','pink','white','yellow','blue_descent','red_finish','ascent'].forEach(seg => {
+    SEGMENT_DURATIONS[seg] = estimateSegmentDuration(seg);
+  });
+  debugLog(`Segment durations (min): green=${Math.round(SEGMENT_DURATIONS.green_start/60)} pink=${Math.round(SEGMENT_DURATIONS.pink/60)} blue=${Math.round(SEGMENT_DURATIONS.blue_descent/60)} red=${Math.round(SEGMENT_DURATIONS.red_finish/60)}`);
 }
 
 // ============================================================
@@ -2080,15 +2107,16 @@ function segDistKm(seg) { return (GPX_DISTANCES[seg] || 1000) / 1000; }
 // to fit the CURRENT segment's relative difficulty.
 function getEstimatedSegmentPace(observedPaceSecPerKm, observedSegName, currentSegName) {
   if (!observedPaceSecPerKm) {
-    // No observed pace — use base table with grade adjustment
+    // No observed pace — use pre-computed average grade-adjusted pace for segment
     const base = SEGMENT_BASE_PACE[currentSegName] || 480;
-    return gradeAdjustedPace(base, currentSegName, 0.5);
+    return avgGradeAdjustedPace(base, currentSegName);
   }
-  // Scale the observed pace by the ratio of base paces between segments
+  // Scale observed pace by relative difficulty between segments
   const obsBase = SEGMENT_BASE_PACE[observedSegName] || 480;
   const curBase = SEGMENT_BASE_PACE[currentSegName] || 480;
   const ratio = curBase / obsBase;
-  return observedPaceSecPerKm * ratio;
+  // Also clamp: observer pace shouldn't imply < 2 min/km or > 25 min/km on current segment
+  return Math.min(Math.max(observedPaceSecPerKm * ratio, 120), 1500);
 }
 
 // Calculate observed pace from two scan timestamps over a known segment
@@ -2111,29 +2139,43 @@ function getRunnerRouteAndProgress(r, type) {
   // Build position result with progress in [0, 0.99]
   const buildPos = (segName, lastScanMs, observedPaceSecPerKm, observedSegName, segLabel) => {
     if (!lastScanMs) {
-      console.warn(`[TC] buildPos: no lastScanMs for ${segName}`);
+      debugLog(`no scan time for ${segLabel}`, true);
       return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
     }
     const elapsedSec = (now - lastScanMs) / 1000;
-    const paceSecPerKm = getEstimatedSegmentPace(observedPaceSecPerKm, observedSegName, segName);
-    const segDurSec = segDistKm(segName) * paceSecPerKm;
+    if (elapsedSec < 0) return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
+    let segDurSec;
+    if (observedPaceSecPerKm) {
+      const pace = getEstimatedSegmentPace(observedPaceSecPerKm, observedSegName, segName);
+      segDurSec = segDistKm(segName) * pace;
+    } else {
+      segDurSec = SEGMENT_DURATIONS[segName] || estimateSegmentDuration(segName);
+    }
+    if (!segDurSec || segDurSec <= 0) return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
     const progress = Math.min(Math.max(elapsedSec / segDurSec, 0), 0.99);
-    debugLog(`${segLabel}: ${Math.round(elapsedSec/60)}min elapsed, dur=${Math.round(segDurSec/60)}min, ${(progress*100).toFixed(0)}%`);
+    debugLog(`${segLabel}: ${Math.round(elapsedSec/60)}min / ${Math.round(segDurSec/60)}min = ${(progress*100).toFixed(0)}%`);
     return { route: GPX_ROUTES[segName], progress, segment: segLabel };
   };
 
-  // Validate sequential timestamps — each scan must be after the previous one
-  // Returns the timestamps in proper order, dropping any that violate sequence
+  // Validate sequence — drop any out-of-order scans
+  // Also handles accidental scans: if a later valid scan exists, earlier ones that
+  // create impossible timelines are dropped
   const validateSequence = (times) => {
     const result = {...times};
+    // Sequential order for 50k
+    const order = ['raceStart','green','l1bot','l1top','l2bot','l2top','l3bot','l3top','red'];
     let prev = result.raceStart;
-    for (const key of Object.keys(result)) {
+    const MIN_BETWEEN_SCANS = 60; // minimum 1 minute between any two checkpoints (sanity check)
+    for (const key of order) {
       if (key === 'raceStart') continue;
-      if (result[key] && result[key] < prev) {
-        // Out of sequence — drop this and all subsequent
-        result[key] = null;
-      } else if (result[key]) {
-        prev = result[key];
+      if (result[key]) {
+        if (result[key] <= prev || (result[key] - prev) < MIN_BETWEEN_SCANS * 1000) {
+          // Out of sequence or impossibly fast — accidental scan, drop it
+          debugLog(`Dropping out-of-sequence scan: ${key} (${new Date(result[key]).toLocaleTimeString()})`, true);
+          result[key] = null;
+        } else {
+          prev = result[key];
+        }
       }
     }
     return result;
@@ -2800,6 +2842,7 @@ document.getElementById('modalOverlay').addEventListener('click', e => {
 // ============================================================
 updateEventStatus();
 setInterval(updateEventStatus, 60000); // update badge every minute
+initSegmentDurations();
 initMap();
 fetchAll();
 setInterval(fetchAll, REFRESH_MS);
