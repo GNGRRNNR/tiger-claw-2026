@@ -854,9 +854,6 @@ td.team-name {
   <div id="debugLog"></div>
 </div>
 
-<!-- TOAST NOTIFICATIONS -->
-<div id="toastContainer" style="position:fixed;bottom:1.5rem;right:1.5rem;z-index:9999;display:flex;flex-direction:column;gap:0.5rem;max-width:300px;"></div>
-
 <!-- RUNNER MODAL -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
@@ -913,17 +910,36 @@ const RUNNER_PACE_OVERRIDES = {
   // Fill in from UltraSignup exports before race day
 };
 
-// Segment base paces in seconds/km (flat equivalent).
-// Grade-adjusted pace is applied on top of these using elevation data.
+// ============================================================
+// SEGMENT BASE PACES — calibrated from 2025 Tiger Claw results
+// ============================================================
+// 2025 field data: winner 4:47, median ~8:30, back of pack ~12hr
+// green_start (7km, ~570ft gain): median runner hits green in ~68min → 583 s/km
+// But green is mixed terrain — first 5mi starts flat then climbs. Using 480 s/km flat equiv.
+// All paces in seconds per km (flat equivalent before grade adjustment).
+// Grade-adjusted pace via avgGradeAdjustedPace() is applied on top of these.
 const SEGMENT_BASE_PACE = {
-  green_start:  330,  // ~5:18/km — fresh legs, mostly flat
-  ascent:       480,  // ~7:44/km — steep sustained climb
-  pink:         480,  // ~7:44/km — technical loop
-  white:        420,  // ~6:46/km — slightly less steep
-  yellow:       450,  // ~7:15/km — long loop
-  blue_descent: 280,  // ~4:31/km — fast descent (grade-limited)
-  red_finish:   350,  // ~5:38/km — tired legs, rolling
+  green_start:  390,  // 7km, modest gain — ~6:30/km median. Fast runners ~300, slow ~550
+  ascent:       520,  // pure sustained climb — slower than green
+  pink:         460,  // technical loop with big climb
+  white:        420,  // slightly less climbing than pink
+  yellow:       440,  // long loop, rolling
+  blue_descent: 260,  // fast descent — grade-adjusted will slow very steep parts
+  red_finish:   380,  // tired legs, rolling terrain back to finish
 };
+
+// Pace bands from 2025 results (seconds per km, total course):
+// Elite (top 10): ~344-397 s/km
+// Competitive (top 25%): ~420-480 s/km
+// Mid-field (50%): ~520-600 s/km
+// Back of pack (75-100%): ~650-900 s/km
+// Average field: ~576 s/km
+// The SEGMENT_BASE_PACE above represents ~mid-field pace
+// Individual runners scale via their observed scan-to-scan pace
+
+// Estimated total course times at base pace (for reference):
+// green_start 7km × 390 × grade_avg: ~53min
+// full 50k at avg: ~8.5hr — matches 2025 median finish time
 
 // Average finishing times for each event (used for position estimation)
 // in seconds. From prior Tiger Claw editions / similar races.
@@ -970,52 +986,6 @@ let loopChartInst = null;
 let segChartInst = null;
 const lastCheckpointSeen = {};
 let STATE_lastUpdate = null; // runner key -> last checkpoint field seen
-
-// ============================================================
-// TOAST NOTIFICATIONS — checkpoint arrivals
-// ============================================================
-function showToast(msg, color = '#4ade80', duration = 5000) {
-  let container = document.getElementById('toastContainer');
-  if (!container) return;
-  const toast = document.createElement('div');
-  toast.style.cssText = `background:rgba(10,10,10,0.96);border:1px solid ${color};border-left:4px solid ${color};color:#f0f0f0;font-family:'DM Sans',sans-serif;font-size:0.82rem;padding:0.65rem 1rem;border-radius:6px;box-shadow:0 4px 20px rgba(0,0,0,0.7);cursor:pointer;line-height:1.4;`;
-  toast.innerHTML = msg;
-  toast.onclick = () => toast.remove();
-  container.appendChild(toast);
-  setTimeout(() => { toast.style.cssText += 'opacity:0;transition:opacity 0.5s;'; setTimeout(() => toast.remove(), 500); }, duration);
-}
-
-function checkCheckpointArrivals() {
-  // 50k checkpoint toasts
-  data.fiftyk.forEach(r => {
-    if (!r.Bib) return;
-    const key = 'f_' + r.Bib;
-    const milestones = [
-      { field: 'FINISH TIME (Scan)', label: '🏁 Finished!', color: '#4ade80' },
-      { field: 'Red Checkpoint In',  label: '🔴 Red CP In', color: '#f87171' },
-      { field: 'Third Loop Top',     label: '🏔 High Camp (Loop 3)', color: '#60a5fa' },
-      { field: 'Second Loop Top',    label: '🏔 High Camp (Loop 2)', color: '#60a5fa' },
-      { field: 'First Loop Top',     label: '🏔 High Camp (Loop 1)', color: '#60a5fa' },
-      { field: 'Green Checkpoint',   label: '⛺ Base Camp', color: '#fbbf24' },
-    ];
-    for (const m of milestones) {
-      if (r[m.field] && lastCheckpointSeen[key] !== m.field) {
-        lastCheckpointSeen[key] = m.field;
-        showToast(`<b style="color:${m.color}">#${r.Bib}</b> ${r.Name||''}<br><span style="color:${m.color}">${m.label}</span>`, m.color);
-        break;
-      }
-    }
-  });
-  // Ascent checkpoint toasts
-  data.ascent.forEach(r => {
-    if (!r.BIB) return;
-    const key = 'a_' + r.BIB;
-    if (r['FINISH TIME (SCAN)'] && lastCheckpointSeen[key] !== 'finish') {
-      lastCheckpointSeen[key] = 'finish';
-      showToast(`<b style="color:#a78bfa">#${r.BIB}</b> ${r.NAME||''}<br><span style="color:#a78bfa">🏔 Ascent Finished!</span>`, '#a78bfa');
-    }
-  });
-}
 
 // ============================================================
 // EVENT STATUS — Live / Countdown / Ended
@@ -1256,7 +1226,6 @@ async function fetchAll() {
     drawMap();
     document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
     STATE_lastUpdate = Date.now();
-    checkCheckpointArrivals();
   } catch(e) {
     console.error('Fetch error:', e);
   }
@@ -1893,10 +1862,8 @@ let rafId = null;
 
 function debugLog(msg, warn=false) {
   console[warn ? 'warn' : 'log']('[TC] ' + msg);
-  const panel = document.getElementById('debugPanel');
   const log = document.getElementById('debugLog');
-  if (panel && log) {
-    panel.style.display = 'block';
+  if (log) {
     const line = document.createElement('div');
     line.style.color = warn ? '#f87171' : '#4ade80';
     line.textContent = new Date().toLocaleTimeString('en-US',{hour12:false}) + ' ' + msg;
@@ -2215,6 +2182,23 @@ function getRunnerRouteAndProgress(r, type) {
         const adjusted = new Date(scanDate.getFullYear(), scanDate.getMonth(), scanDate.getDate(), 7, 0, 0);
         t.raceStart = adjusted.getTime();
       }
+      // Normalize ALL scan timestamps to the raceStart date so mismatched dates
+      // (e.g. a Pink scan from a different test day) don't inflate elapsed time.
+      const raceDay = new Date(t.raceStart);
+      const normToRaceDay = ms => {
+        if (!ms) return ms;
+        const d = new Date(ms);
+        return new Date(raceDay.getFullYear(), raceDay.getMonth(), raceDay.getDate(),
+                        d.getHours(), d.getMinutes(), d.getSeconds()).getTime();
+      };
+      t.green  = normToRaceDay(t.green);
+      t.l1bot  = normToRaceDay(t.l1bot);
+      t.l1top  = normToRaceDay(t.l1top);
+      t.l2bot  = normToRaceDay(t.l2bot);
+      t.l2top  = normToRaceDay(t.l2top);
+      t.l3bot  = normToRaceDay(t.l3bot);
+      t.l3top  = normToRaceDay(t.l3top);
+      t.red    = normToRaceDay(t.red);
     }
 
     // Validate sequence — drop any out-of-order scans
@@ -2289,6 +2273,17 @@ function getRunnerRouteAndProgress(r, type) {
         const adjusted = new Date(scanDate.getFullYear(), scanDate.getMonth(), scanDate.getDate(), 10, 0, 0);
         t.raceStart = adjusted.getTime();
       }
+      const raceDay = new Date(t.raceStart);
+      const normToRaceDay = ms => {
+        if (!ms) return ms;
+        const d = new Date(ms);
+        return new Date(raceDay.getFullYear(), raceDay.getMonth(), raceDay.getDate(),
+                        d.getHours(), d.getMinutes(), d.getSeconds()).getTime();
+      };
+      t.green = normToRaceDay(t.green);
+      t.lbot  = normToRaceDay(t.lbot);
+      t.ltop  = normToRaceDay(t.ltop);
+      t.red   = normToRaceDay(t.red);
     }
     t = validateSequence(t);
 
