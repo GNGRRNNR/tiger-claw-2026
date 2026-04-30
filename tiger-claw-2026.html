@@ -2815,10 +2815,90 @@ document.getElementById('modalOverlay').addEventListener('click', e => {
 });
 
 // ============================================================
+// EVENTS
+// ============================================================
+
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    previousTab = activeTab;
+    activeTab = btn.getAttribute('data-tab');
+    sortCol = null;
+    // Close segment focus if open
+    if (activeSegment) {
+      document.getElementById('segmentFocus').style.display = 'none';
+      activeSegment = null;
+      if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
+      document.querySelectorAll('.legend-route').forEach(i => i.classList.remove('active-route'));
+    }
+    renderTable();
+    updateStats();
+    updateRouteVisibility(activeTab);
+    drawMap();
+  });
+});
+
+// Debounced search
+let searchDebounce = null;
+document.getElementById('searchInput').addEventListener('input', e => {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => { filterText = e.target.value.trim(); renderTable(); }, 200);
+});
+
+// Gender filter
+document.getElementById('genderFilter').addEventListener('change', e => {
+  genderFilter = e.target.value;
+  renderTable();
+});
+
+// Clickable legend routes
+document.querySelectorAll('.legend-route').forEach(item => {
+  item.addEventListener('click', () => {
+    const route = item.getAttribute('data-route');
+    if (!route) return;
+    if (activeSegment === route) {
+      document.getElementById('segmentFocus').style.display = 'none';
+      activeSegment = null;
+      if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
+      resetSegmentStyles();
+      document.querySelectorAll('.legend-route').forEach(i => i.classList.remove('active-route'));
+    } else {
+      document.querySelectorAll('.legend-route').forEach(i => i.classList.remove('active-route'));
+      item.classList.add('active-route');
+      openSegmentFocus(route);
+    }
+  });
+});
+
+// Wrap openSegmentFocus to sync legend highlight
+const _origOpen = openSegmentFocus;
+openSegmentFocus = function(routeName) {
+  document.querySelectorAll('.legend-route').forEach(i => {
+    i.classList.toggle('active-route', i.getAttribute('data-route') === routeName);
+  });
+  _origOpen(routeName);
+};
+
+// Segment focus close
+document.getElementById('segFocusClose').addEventListener('click', () => {
+  document.getElementById('segmentFocus').style.display = 'none';
+  activeSegment = null;
+  if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
+  resetSegmentStyles();
+  document.querySelectorAll('.legend-route').forEach(i => i.classList.remove('active-route'));
+});
+
+// Units toggle
+document.getElementById('unitsMiles').addEventListener('click', () => setUnits('imperial'));
+document.getElementById('unitsKm').addEventListener('click', () => setUnits('metric'));
+
+// ============================================================
 // INIT
 // ============================================================
 updateEventStatus();
-setInterval(updateEventStatus, 60000); // update badge every minute
+setInterval(updateEventStatus, 60000);
 initSegmentDurations();
 initMap();
 fetchAll();
