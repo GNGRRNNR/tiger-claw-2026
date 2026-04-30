@@ -878,7 +878,7 @@ const CSV = {
   ambush: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKzvda8NY-cieHJDTBRBCQSqNuJ8BIq5LJ3n1Hswz-LMXS6bvxAJf5Tn52z5RGQ4zzB8feOfB7pNvP/pub?gid=1246600417&single=true&output=csv'
 };
 
-const REFRESH_MS = 45000;
+const REFRESH_MS = 15000;
 
 const RACE_STARTS = {
   ascent: new Date('2026-05-08T18:00:00-07:00'),
@@ -924,7 +924,7 @@ const SEGMENT_BASE_PACE = {
   pink:         460,  // technical loop with big climb
   white:        420,  // slightly less climbing than pink
   yellow:       440,  // long loop, rolling
-  blue_descent: 260,  // fast descent — grade-adjusted will slow very steep parts
+  blue_descent: 400,  // fast descent — but technical, with tired legs from preceding climb
   red_finish:   380,  // tired legs, rolling terrain back to finish
 };
 
@@ -2105,8 +2105,14 @@ function getEstimatedSegmentPace(observedPaceSecPerKm, observedSegName, currentS
   const obsBase = SEGMENT_BASE_PACE[observedSegName] || 480;
   const curBase = SEGMENT_BASE_PACE[currentSegName] || 480;
   const ratio = curBase / obsBase;
-  // Also clamp: observer pace shouldn't imply < 2 min/km or > 25 min/km on current segment
-  return Math.min(Math.max(observedPaceSecPerKm * ratio, 120), 1500);
+  let predicted = observedPaceSecPerKm * ratio;
+  // Fatigue floor: a slow runner doesn't suddenly become fast on the next segment.
+  // Even on a "faster" segment, predicted pace shouldn't drop below 60% of observed pace.
+  // (Captures: tired legs, technical terrain, conservative downhill running.)
+  const fatigueFloor = observedPaceSecPerKm * 0.6;
+  if (predicted < fatigueFloor) predicted = fatigueFloor;
+  // Clamp: pace shouldn't imply < 2 min/km or > 25 min/km on current segment
+  return Math.min(Math.max(predicted, 120), 1500);
 }
 
 // Calculate observed pace from two scan timestamps over a known segment
@@ -2915,6 +2921,10 @@ initSegmentDurations();
 initMap();
 fetchAll();
 setInterval(fetchAll, REFRESH_MS);
+// Refetch when tab becomes visible again — feels more "live" when returning to the tab
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) fetchAll();
+});
 </script>
 </body>
 </html>
