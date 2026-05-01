@@ -984,6 +984,8 @@ let sortDir = 'asc';
 let elevChartInst = null;
 let loopChartInst = null;
 let segChartInst = null;
+// Forward-progress memory: runners can't go backward on a segment between refreshes
+const PROGRESS_MEMORY = {}; // key: "type_bib_segName" → max progress seen
 const lastCheckpointSeen = {};
 let STATE_lastUpdate = null; // runner key -> last checkpoint field seen
 
@@ -2132,6 +2134,8 @@ function getRunnerRouteAndProgress(r, type) {
     return d ? d.getTime() : null;
   };
 
+  const bib = r.Bib || r.BIB || 'unknown';
+
   // Build position result with progress in [0, 0.99]
   const buildPos = (segName, lastScanMs, observedPaceSecPerKm, observedSegName, segLabel) => {
     if (!lastScanMs) {
@@ -2148,7 +2152,13 @@ function getRunnerRouteAndProgress(r, type) {
       segDurSec = SEGMENT_DURATIONS[segName] || estimateSegmentDuration(segName);
     }
     if (!segDurSec || segDurSec <= 0) return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
-    const progress = Math.min(Math.max(elapsedSec / segDurSec, 0), 0.99);
+    let progress = Math.min(Math.max(elapsedSec / segDurSec, 0), 0.99);
+    // Forward-progress lock: a runner can never go backward on a segment between refreshes
+    const memKey = `${type}_${bib}_${segName}`;
+    if (PROGRESS_MEMORY[memKey] !== undefined && progress < PROGRESS_MEMORY[memKey]) {
+      progress = PROGRESS_MEMORY[memKey];
+    }
+    PROGRESS_MEMORY[memKey] = progress;
     debugLog(`${segLabel}: ${Math.round(elapsedSec/60)}min / ${Math.round(segDurSec/60)}min = ${(progress*100).toFixed(0)}%`);
     return { route: GPX_ROUTES[segName], progress, segment: segLabel };
   };
@@ -2156,17 +2166,17 @@ function getRunnerRouteAndProgress(r, type) {
   // Validate sequence — drop any out-of-order scans
   // Also handles accidental scans: if a later valid scan exists, earlier ones that
   // create impossible timelines are dropped
-  const validateSequence = (times) => {
+  const validateSequence = (times, seqType) => {
     const result = {...times};
-    // Sequential order for 50k
-    const order = ['raceStart','green','l1bot','l1top','l2bot','l2top','l3bot','l3top','red'];
+    const order = seqType === 'ambush'
+      ? ['raceStart','green','lbot','ltop','red']
+      : ['raceStart','green','l1bot','l1top','l2bot','l2top','l3bot','l3top','red'];
     let prev = result.raceStart;
-    const MIN_BETWEEN_SCANS = 60; // minimum 1 minute between any two checkpoints (sanity check)
+    const MIN_BETWEEN_SCANS = 60;
     for (const key of order) {
       if (key === 'raceStart') continue;
       if (result[key]) {
         if (result[key] <= prev || (result[key] - prev) < MIN_BETWEEN_SCANS * 1000) {
-          // Out of sequence or impossibly fast — accidental scan, drop it
           debugLog(`Dropping out-of-sequence scan: ${key} (${new Date(result[key]).toLocaleTimeString()})`, true);
           result[key] = null;
         } else {
@@ -2225,7 +2235,7 @@ function getRunnerRouteAndProgress(r, type) {
     }
 
     // Validate sequence — drop any out-of-order scans
-    t = validateSequence(t);
+    t = validateSequence(t, '50k');
 
     const validColor = c => ['pink','white','yellow'].includes((c||'').toLowerCase()) ? c.toLowerCase() : 'pink';
     const rk1 = validColor(r['First Loop Color']);
@@ -2308,7 +2318,7 @@ function getRunnerRouteAndProgress(r, type) {
       t.ltop  = normToRaceDay(t.ltop);
       t.red   = normToRaceDay(t.red);
     }
-    t = validateSequence(t);
+    t = validateSequence(t, 'ambush');
 
     const validColor = c => ['pink','white','yellow'].includes((c||'').toLowerCase()) ? c.toLowerCase() : 'pink';
     const rk = validColor(r['Loop Color']);
