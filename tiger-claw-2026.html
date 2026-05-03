@@ -907,19 +907,18 @@ const RACE_STARTS = {
 };
 
 const CHECKPOINTS = [
-  // Shared
-  { id: 'start',         label: 'Start / Finish',         lat: 47.527708, lng: -122.034216, color: '#4ade80', tabs: ['50k','ambush','bigcat','ascent'] },
-  // 50k / Ambush only
-  { id: 'basecamp',      label: 'Base Camp Aid Station',  lat: 47.529832, lng: -121.996694, color: '#fbbf24', tabs: ['50k','ambush','bigcat'] },
+  // 50k / Ambush / Big Cat only
+  { id: 'start',         label: 'Start / Finish',         lat: 47.527708, lng: -122.034216, color: '#4ade80', tabs: ['50k','ambush','bigcat'] },
+  { id: 'basecamp',      label: 'Base Camp Aid Station',  lat: 47.529832, lng: -121.996694, color: '#fb923c', tabs: ['50k','ambush','bigcat'] },
   { id: 'pink',          label: 'Pink Loop Checkpoint',   lat: 47.526687, lng: -121.997090, color: '#f472b6', tabs: ['50k','ambush','bigcat'] },
   { id: 'white',         label: 'White Loop Checkpoint',  lat: 47.527259, lng: -121.998629, color: '#e2e8f0', tabs: ['50k','ambush','bigcat'] },
   { id: 'yellow',        label: 'Yellow Loop Checkpoint', lat: 47.527324, lng: -121.998865, color: '#fbbf24', tabs: ['50k','ambush','bigcat'] },
-  { id: 'highcamp',      label: 'High Camp Aid Station',  lat: 47.508742, lng: -121.985226, color: '#60a5fa', tabs: ['50k','ambush','bigcat'] },
+  { id: 'highcamp',      label: 'High Camp Aid Station',  lat: 47.508742, lng: -121.985226, color: '#fb923c', tabs: ['50k','ambush','bigcat'] },
   { id: 'red',           label: 'Red Checkpoint',         lat: 47.529776, lng: -121.996875, color: '#f87171', tabs: ['50k','ambush','bigcat'] },
   // Ascent only
-  { id: 'ascent_start',  label: 'Ascent Start Line',      lat: 47.52975637733785, lng: -121.99551343917848, color: '#a78bfa', tabs: ['ascent','bigcat'] },
+  { id: 'ascent_start',  label: 'Start',                  lat: 47.52975637733785, lng: -121.99551343917848, color: '#4ade80', tabs: ['ascent','bigcat'] },
   { id: 'ascent_cp',     label: 'Ascent Checkpoint',      lat: 47.52966446161007, lng: -121.98757466460309, color: '#fb923c', tabs: ['ascent','bigcat'] },
-  { id: 'ascent_finish', label: 'Ascent Finish Line',     lat: 47.508742, lng: -121.985226, color: '#a78bfa', tabs: ['ascent','bigcat'] },
+  { id: 'ascent_finish', label: 'Finish',                 lat: 47.508742, lng: -121.985226, color: '#f87171', tabs: ['ascent','bigcat'] },
 ];
 
 // ============================================================
@@ -2028,27 +2027,31 @@ function initMap() {
       var el = document.createElement('div');
       el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:default;';
 
+      function badge(emoji, label, color) {
+        return '<div style="font-size:20px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9))">' + emoji + '</div>'
+          + '<div style="background:rgba(10,10,10,0.92);color:' + color + ';font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;border:1px solid ' + color + '55;white-space:nowrap;margin-top:2px;">' + label + '</div>';
+      }
       if (cp.id === 'start') {
-        el.innerHTML = '<div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9))">🏁</div>'
-          + '<div style="background:rgba(10,10,10,0.9);color:#4ade80;font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid #4ade8066;white-space:nowrap;margin-top:1px;">START / FINISH</div>';
-      } else if (cp.id === 'basecamp') {
-        el.innerHTML = '<div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.8))">⛺</div>'
-          + '<div style="background:rgba(10,10,10,0.9);color:#fbbf24;font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid #fbbf2466;white-space:nowrap;margin-top:1px;">BASE CAMP</div>';
-      } else if (cp.id === 'highcamp') {
-        el.innerHTML = '<div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.8))">🏔</div>'
-          + '<div style="background:rgba(10,10,10,0.9);color:#60a5fa;font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid #60a5fa66;white-space:nowrap;margin-top:1px;">HIGH CAMP</div>';
-      } else if (cp.id === 'ascent_start') {
+        // 50k Start: green START, orange /, red FINISH on one badge
         el.innerHTML = '<div style="font-size:20px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9))">🏁</div>'
-          + '<div style="background:rgba(10,10,10,0.9);color:#a78bfa;font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid #a78bfa66;white-space:nowrap;margin-top:1px;">ASCENT START</div>';
+          + '<div style="background:rgba(10,10,10,0.92);font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;border:1px solid #4ade8055;white-space:nowrap;margin-top:2px;">'
+          + '<span style="color:#4ade80">START</span>'
+          + '<span style="color:#fb923c"> / </span>'
+          + '<span style="color:#f87171">FINISH</span>'
+          + '</div>';
+      } else if (cp.id === 'basecamp') {
+        el.innerHTML = badge('⛺', 'BASE CAMP', '#fb923c');
+      } else if (cp.id === 'highcamp') {
+        el.innerHTML = badge('🏔', 'HIGH CAMP', '#fb923c');
+      } else if (cp.id === 'ascent_start') {
+        el.innerHTML = badge('🏁', 'START', '#4ade80');
       } else if (cp.id === 'ascent_cp') {
-        el.innerHTML = '<div style="font-size:20px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9))">⚡</div>'
-          + '<div style="background:rgba(10,10,10,0.9);color:#fb923c;font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid #fb923c66;white-space:nowrap;margin-top:1px;">ASCENT CP</div>';
+        el.innerHTML = badge('⚡', 'ASCENT CP', '#fb923c');
       } else if (cp.id === 'ascent_finish') {
-        el.innerHTML = '<div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9))">🏆</div>'
-          + '<div style="background:rgba(10,10,10,0.9);color:#a78bfa;font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid #a78bfa66;white-space:nowrap;margin-top:1px;">FINISH LINE</div>';
+        el.innerHTML = badge('🏆', 'FINISH', '#f87171');
       } else {
-        // Small colored dot for 50k checkpoints (pink/white/yellow/red)
-        el.innerHTML = '<div style="width:10px;height:10px;background:' + cp.color + ';border:1.5px solid rgba(0,0,0,0.7);border-radius:50%;box-shadow:0 0 6px ' + cp.color + '88;"></div>';
+        // Larger colored dot for 50k checkpoints (pink/white/yellow/red)
+        el.innerHTML = '<div style="width:14px;height:14px;background:' + cp.color + ';border:2px solid rgba(0,0,0,0.8);border-radius:50%;box-shadow:0 0 8px ' + cp.color + 'aa;"></div>';
       }
 
       var marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
@@ -2116,25 +2119,27 @@ function highlightSegment(name) {
   const pts = GPX_ROUTES[name];
   if (pts) {
     const lngs = pts.map(p=>p[1]), lats = pts.map(p=>p[0]);
-    const lngPad = Math.max((Math.max(...lngs)-Math.min(...lngs))*0.25, 0.01);
-    const latPad = Math.max((Math.max(...lats)-Math.min(...lats))*0.25, 0.01);
+    const lngPad = Math.max((Math.max(...lngs)-Math.min(...lngs))*0.06, 0.003);
+    const latPad = Math.max((Math.max(...lats)-Math.min(...lats))*0.06, 0.003);
     mbMap.fitBounds(
       [[Math.min(...lngs)-lngPad, Math.min(...lats)-latPad],
        [Math.max(...lngs)+lngPad, Math.max(...lats)+latPad]],
-      { pitch: is3D ? 45 : 0, bearing: is3D ? -10 : 0, duration: 900, padding: 20 }
+      { pitch: is3D ? 45 : 0, bearing: is3D ? -10 : 0, duration: 700, padding: 30 }
     );
   }
 }
 
 function resetSegmentStyles() {
   if (!mapReady) return;
+  // Reset paint properties for all routes
   Object.keys(GPX_ROUTES).forEach(n => {
     if (mbMap.getLayer('l-'+n)) {
       mbMap.setPaintProperty('l-'+n, 'line-opacity', 0.95);
       mbMap.setPaintProperty('l-'+n, 'line-width', 3);
-      mbMap.setPaintProperty('g-'+n, 'line-opacity', 0.2);
     }
+    if (mbMap.getLayer('g-'+n)) mbMap.setPaintProperty('g-'+n, 'line-opacity', 0.2);
   });
+  // Re-apply correct visibility for current tab (this also reframes the map)
   updateRouteVisibility(activeTab);
 }
 
@@ -3196,12 +3201,21 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     previousTab = activeTab;
     activeTab = btn.getAttribute('data-tab');
     sortCol = null;
-    // Close segment focus if open
-    if (activeSegment) {
-      document.getElementById('segmentFocus').style.display = 'none';
-      activeSegment = null;
-      if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
-      document.querySelectorAll('.legend-route').forEach(i => i.classList.remove('active-route'));
+    // Always fully reset segment state on tab switch
+    document.getElementById('segmentFocus').style.display = 'none';
+    activeSegment = null;
+    if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
+    clearHoverCrosshair();
+    document.querySelectorAll('.legend-route').forEach(i => i.classList.remove('active-route'));
+    // Reset all route styles before switching so nothing carries over
+    if (mapReady) {
+      Object.keys(GPX_ROUTES).forEach(function(n) {
+        if (mbMap.getLayer('l-'+n)) {
+          mbMap.setPaintProperty('l-'+n, 'line-opacity', 0.95);
+          mbMap.setPaintProperty('l-'+n, 'line-width', 3);
+        }
+        if (mbMap.getLayer('g-'+n)) mbMap.setPaintProperty('g-'+n, 'line-opacity', 0.2);
+      });
     }
     renderTable();
     updateStats();
