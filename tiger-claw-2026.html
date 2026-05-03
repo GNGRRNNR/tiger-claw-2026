@@ -917,6 +917,7 @@ const CHECKPOINTS = [
   { id: 'highcamp',      label: 'High Camp Aid Station',  lat: 47.508742, lng: -121.985226, color: '#60a5fa', tabs: ['50k','ambush','bigcat'] },
   { id: 'red',           label: 'Red Checkpoint',         lat: 47.529776, lng: -121.996875, color: '#f87171', tabs: ['50k','ambush','bigcat'] },
   // Ascent only
+  { id: 'ascent_start',  label: 'Ascent Start Line',      lat: 47.52975637733785, lng: -121.99551343917848, color: '#a78bfa', tabs: ['ascent','bigcat'] },
   { id: 'ascent_cp',     label: 'Ascent Checkpoint',      lat: 47.52966446161007, lng: -121.98757466460309, color: '#fb923c', tabs: ['ascent','bigcat'] },
   { id: 'ascent_finish', label: 'Ascent Finish Line',     lat: 47.508742, lng: -121.985226, color: '#a78bfa', tabs: ['ascent','bigcat'] },
 ];
@@ -1009,6 +1010,31 @@ let elevChartInst = null;
 let loopChartInst = null;
 let segChartInst = null;
 let ascentElevChartInst = null;
+let hoverCrosshairMarker = null; // map marker that follows elevation chart hover
+
+// Show a crosshair dot on the map corresponding to a fraction along a named route
+function showHoverCrosshair(routeName, fraction) {
+  if (!mapReady) return;
+  var pos = interpolateAlongRoute(GPX_ROUTES[routeName], fraction);
+  if (!pos) return;
+  if (hoverCrosshairMarker) {
+    hoverCrosshairMarker.setLngLat([pos.lng, pos.lat]);
+    hoverCrosshairMarker.getElement().style.display = 'flex';
+    return;
+  }
+  var el = document.createElement('div');
+  el.style.cssText = 'display:flex;flex-direction:column;align-items:center;pointer-events:none;';
+  el.innerHTML = '<div style="width:14px;height:14px;background:#fff;border:2.5px solid #0a0a0a;border-radius:50%;box-shadow:0 0 8px rgba(255,255,255,0.8);"></div>';
+  hoverCrosshairMarker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+    .setLngLat([pos.lng, pos.lat])
+    .addTo(mbMap);
+}
+
+function clearHoverCrosshair() {
+  if (hoverCrosshairMarker) {
+    hoverCrosshairMarker.getElement().style.display = 'none';
+  }
+}
 
 function drawAscentElevProfile() {
   var elevs = ELEVATION_DATA['ascent'];
@@ -1090,7 +1116,24 @@ function drawAscentElevProfile() {
     return;
   }
 
-  var ctx = document.getElementById('ascentElevChart').getContext('2d');
+  var canvas = document.getElementById('ascentElevChart');
+  var ctx = canvas.getContext('2d');
+
+  // Hover crosshair on canvas — map a cursor X position to a route fraction
+  canvas.addEventListener('mousemove', function(e) {
+    if (!ascentElevChartInst) return;
+    var chart = ascentElevChartInst;
+    var area = chart.chartArea;
+    if (!area) return;
+    var rect = canvas.getBoundingClientRect();
+    var x = e.clientX - rect.left;
+    if (x < area.left || x > area.right) { clearHoverCrosshair(); return; }
+    var fraction = (x - area.left) / (area.right - area.left);
+    fraction = Math.max(0, Math.min(1, fraction));
+    showHoverCrosshair('ascent', fraction);
+  });
+  canvas.addEventListener('mouseleave', function() { clearHoverCrosshair(); });
+
   ascentElevChartInst = new Chart(ctx, {
     type: 'line',
     data: {
@@ -1717,7 +1760,23 @@ function showElevationProfile(routeName, elevations, runnerPositions, routeColor
 
   if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
 
-  const ctx = document.getElementById('elevChart').getContext('2d');
+  const elevCanvas = document.getElementById('elevChart');
+  const ctx = elevCanvas.getContext('2d');
+
+  // Wire hover crosshair for segment focus chart
+  elevCanvas.addEventListener('mousemove', function(e) {
+    if (!elevChartInst) return;
+    const area = elevChartInst.chartArea;
+    if (!area) return;
+    const rect = elevCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x < area.left || x > area.right) { clearHoverCrosshair(); return; }
+    const frac = Math.max(0, Math.min(1, (x - area.left) / (area.right - area.left)));
+    // Map fraction along THIS segment
+    showHoverCrosshair(routeName, frac);
+  });
+  elevCanvas.addEventListener('mouseleave', function() { clearHoverCrosshair(); });
+
   elevChartInst = new Chart(ctx, {
     type: 'line',
     data: {
@@ -1978,6 +2037,9 @@ function initMap() {
       } else if (cp.id === 'highcamp') {
         el.innerHTML = '<div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.8))">🏔</div>'
           + '<div style="background:rgba(10,10,10,0.9);color:#60a5fa;font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid #60a5fa66;white-space:nowrap;margin-top:1px;">HIGH CAMP</div>';
+      } else if (cp.id === 'ascent_start') {
+        el.innerHTML = '<div style="font-size:20px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9))">🏁</div>'
+          + '<div style="background:rgba(10,10,10,0.9);color:#a78bfa;font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid #a78bfa66;white-space:nowrap;margin-top:1px;">ASCENT START</div>';
       } else if (cp.id === 'ascent_cp') {
         el.innerHTML = '<div style="font-size:20px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9))">⚡</div>'
           + '<div style="background:rgba(10,10,10,0.9);color:#fb923c;font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid #fb923c66;white-space:nowrap;margin-top:1px;">ASCENT CP</div>';
