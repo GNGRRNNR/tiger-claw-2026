@@ -907,14 +907,18 @@ const RACE_STARTS = {
 };
 
 const CHECKPOINTS = [
-  { id: 'start',        label: 'Start / Finish',                lat: 47.527708, lng: -122.034216, color: '#4ade80', r: 9, symbol: '🏁' },
-  { id: 'ascent_start', label: 'Ascent Start',                  lat: 47.529744, lng: -121.995642, color: '#a78bfa', r: 6, symbol: '▶' },
-  { id: 'basecamp',     label: '⛺ Base Camp Aid Station',       lat: 47.529832, lng: -121.996694, color: '#fbbf24', r: 8, symbol: '⛺' },
-  { id: 'pink',         label: 'Pink Loop Checkpoint',          lat: 47.526687, lng: -121.997090, color: '#f472b6', r: 5, symbol: '●' },
-  { id: 'white',        label: 'White Loop Checkpoint',         lat: 47.527259, lng: -121.998629, color: '#e2e8f0', r: 5, symbol: '●' },
-  { id: 'yellow',       label: 'Yellow Loop Checkpoint',        lat: 47.527324, lng: -121.998865, color: '#fbbf24', r: 5, symbol: '●' },
-  { id: 'highcamp',     label: '🏔 High Camp Aid Station',      lat: 47.508742, lng: -121.985226, color: '#60a5fa', r: 8, symbol: '🏔' },
-  { id: 'red',          label: 'Red Checkpoint',                lat: 47.529776, lng: -121.996875, color: '#f87171', r: 5, symbol: '●' },
+  // Shared
+  { id: 'start',         label: 'Start / Finish',         lat: 47.527708, lng: -122.034216, color: '#4ade80', tabs: ['50k','ambush','bigcat','ascent'] },
+  // 50k / Ambush only
+  { id: 'basecamp',      label: 'Base Camp Aid Station',  lat: 47.529832, lng: -121.996694, color: '#fbbf24', tabs: ['50k','ambush','bigcat'] },
+  { id: 'pink',          label: 'Pink Loop Checkpoint',   lat: 47.526687, lng: -121.997090, color: '#f472b6', tabs: ['50k','ambush','bigcat'] },
+  { id: 'white',         label: 'White Loop Checkpoint',  lat: 47.527259, lng: -121.998629, color: '#e2e8f0', tabs: ['50k','ambush','bigcat'] },
+  { id: 'yellow',        label: 'Yellow Loop Checkpoint', lat: 47.527324, lng: -121.998865, color: '#fbbf24', tabs: ['50k','ambush','bigcat'] },
+  { id: 'highcamp',      label: 'High Camp Aid Station',  lat: 47.508742, lng: -121.985226, color: '#60a5fa', tabs: ['50k','ambush','bigcat'] },
+  { id: 'red',           label: 'Red Checkpoint',         lat: 47.529776, lng: -121.996875, color: '#f87171', tabs: ['50k','ambush','bigcat'] },
+  // Ascent only
+  { id: 'ascent_cp',     label: 'Ascent Checkpoint',      lat: 47.52966446161007, lng: -121.98757466460309, color: '#fb923c', tabs: ['ascent','bigcat'] },
+  { id: 'ascent_finish', label: 'Ascent Finish Line',     lat: 47.508742, lng: -121.985226, color: '#a78bfa', tabs: ['ascent','bigcat'] },
 ];
 
 // ============================================================
@@ -1425,6 +1429,8 @@ function updatePanelVisibility() {
   document.getElementById('chartsRow').style.display = (!isAscent && hasLoopData) ? 'grid' : 'none';
   if (isAscent) drawAscentElevProfile();
   updateMapLegend(activeTab);
+// Note: updateCheckpointMarkers is called from updatePanelVisibility and after map loads
+  updateCheckpointMarkers(activeTab);
 }
 
 // ============================================================
@@ -1947,41 +1953,50 @@ function initMap() {
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': color, 'line-width': 24, 'line-opacity': 0 }
       });
-      // Click on hit layer (wide) and visible line
-      ['l-', 'h-'].forEach(prefix => {
-        mbMap.on('click', prefix + name, () => openSegmentFocus(name));
-        mbMap.on('mouseenter', prefix + name, () => mbMap.getCanvas().style.cursor = 'pointer');
-        mbMap.on('mouseleave', prefix + name, () => mbMap.getCanvas().style.cursor = '');
-      });
+      // Click on hit layer (wide) and visible line — ascent route is non-interactive
+      if (name !== 'ascent') {
+        ['l-', 'h-'].forEach(prefix => {
+          mbMap.on('click', prefix + name, () => openSegmentFocus(name));
+          mbMap.on('mouseenter', prefix + name, () => mbMap.getCanvas().style.cursor = 'pointer');
+          mbMap.on('mouseleave', prefix + name, () => mbMap.getCanvas().style.cursor = '');
+        });
+      }
     });
 
-    // Checkpoint markers — emoji for aid stations, dots for checkpoints
-    CHECKPOINTS.forEach(cp => {
-      const isAidStation = cp.id === 'basecamp' || cp.id === 'highcamp';
-      const isStart = cp.id === 'start';
-      const el = document.createElement('div');
-      el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer;';
+    // Checkpoint markers — tab-aware, shown/hidden via updateCheckpointMarkers()
+    window._cpMarkers = {};
+    CHECKPOINTS.forEach(function(cp) {
+      var el = document.createElement('div');
+      el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:default;';
 
-      if (isAidStation) {
-        // Big emoji + label badge
-        const emoji = cp.id === 'basecamp' ? '⛺' : '🏔';
-        const shortLabel = cp.id === 'basecamp' ? 'BASE CAMP' : 'HIGH CAMP';
-        el.innerHTML = `
-          <div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.8))">${emoji}</div>
-          <div style="background:rgba(10,10,10,0.9);color:${cp.color};font-family:'DM Mono',monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid ${cp.color}66;white-space:nowrap;margin-top:1px;">${shortLabel}</div>`;
-      } else if (isStart) {
-        el.innerHTML = `<div style="font-size:20px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.8))">🏁</div>`;
+      if (cp.id === 'start') {
+        el.innerHTML = '<div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9))">🏁</div>'
+          + '<div style="background:rgba(10,10,10,0.9);color:#4ade80;font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid #4ade8066;white-space:nowrap;margin-top:1px;">START / FINISH</div>';
+      } else if (cp.id === 'basecamp') {
+        el.innerHTML = '<div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.8))">⛺</div>'
+          + '<div style="background:rgba(10,10,10,0.9);color:#fbbf24;font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid #fbbf2466;white-space:nowrap;margin-top:1px;">BASE CAMP</div>';
+      } else if (cp.id === 'highcamp') {
+        el.innerHTML = '<div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.8))">🏔</div>'
+          + '<div style="background:rgba(10,10,10,0.9);color:#60a5fa;font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid #60a5fa66;white-space:nowrap;margin-top:1px;">HIGH CAMP</div>';
+      } else if (cp.id === 'ascent_cp') {
+        el.innerHTML = '<div style="font-size:20px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9))">⚡</div>'
+          + '<div style="background:rgba(10,10,10,0.9);color:#fb923c;font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid #fb923c66;white-space:nowrap;margin-top:1px;">ASCENT CP</div>';
+      } else if (cp.id === 'ascent_finish') {
+        el.innerHTML = '<div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9))">🏆</div>'
+          + '<div style="background:rgba(10,10,10,0.9);color:#a78bfa;font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid #a78bfa66;white-space:nowrap;margin-top:1px;">FINISH LINE</div>';
       } else {
-        // Small colored dot for regular checkpoints
-        el.innerHTML = `<div style="width:${cp.r*2}px;height:${cp.r*2}px;background:${cp.color};border:1.5px solid rgba(0,0,0,0.7);border-radius:50%;box-shadow:0 0 6px ${cp.color}88;"></div>`;
+        // Small colored dot for 50k checkpoints (pink/white/yellow/red)
+        el.innerHTML = '<div style="width:10px;height:10px;background:' + cp.color + ';border:1.5px solid rgba(0,0,0,0.7);border-radius:50%;box-shadow:0 0 6px ' + cp.color + '88;"></div>';
       }
 
-      new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+      var marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([cp.lng, cp.lat])
         .setPopup(new mapboxgl.Popup({ offset: 8, closeButton: false })
-          .setHTML(`<div style="background:#111;color:${cp.color};font-family:'DM Mono',monospace;font-size:11px;padding:5px 8px;border-radius:4px;border-left:3px solid ${cp.color}"><b>${cp.label}</b></div>`))
+          .setHTML('<div style="background:#111;color:' + cp.color + ';font-family:DM Mono,monospace;font-size:11px;padding:5px 8px;border-radius:4px;border-left:3px solid ' + cp.color + '"><b>' + cp.label + '</b></div>'))
         .addTo(mbMap);
+      window._cpMarkers[cp.id] = { marker: marker, el: el, tabs: cp.tabs };
     });
+    updateCheckpointMarkers(activeTab);
 
     mapReady = true;
     updateRouteVisibility(activeTab);
@@ -1990,6 +2005,15 @@ function initMap() {
   });
 
   new ResizeObserver(() => mbMap && mbMap.resize()).observe(document.getElementById('courseMap'));
+}
+
+function updateCheckpointMarkers(tab) {
+  if (!window._cpMarkers) return;
+  Object.keys(window._cpMarkers).forEach(function(id) {
+    var entry = window._cpMarkers[id];
+    var show = entry.tabs.indexOf(tab) !== -1;
+    entry.el.style.display = show ? 'flex' : 'none';
+  });
 }
 
 function updateRouteVisibility(tab) {
