@@ -875,7 +875,11 @@ td.team-name {
 const CSV = {
   ascent: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKzvda8NY-cieHJDTBRBCQSqNuJ8BIq5LJ3n1Hswz-LMXS6bvxAJf5Tn52z5RGQ4zzB8feOfB7pNvP/pub?gid=0&single=true&output=csv',
   fiftyk: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKzvda8NY-cieHJDTBRBCQSqNuJ8BIq5LJ3n1Hswz-LMXS6bvxAJf5Tn52z5RGQ4zzB8feOfB7pNvP/pub?gid=1023891274&single=true&output=csv',
-  ambush: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKzvda8NY-cieHJDTBRBCQSqNuJ8BIq5LJ3n1Hswz-LMXS6bvxAJf5Tn52z5RGQ4zzB8feOfB7pNvP/pub?gid=1246600417&single=true&output=csv'
+  ambush: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKzvda8NY-cieHJDTBRBCQSqNuJ8BIq5LJ3n1Hswz-LMXS6bvxAJf5Tn52z5RGQ4zzB8feOfB7pNvP/pub?gid=1246600417&single=true&output=csv',
+  // Ascent Checkpoint scans — from the Yellow Pi in Ascent mode
+  // Publish this tab from: 1RY2cN7IT62M-b8FsYUYH3HCe_FiS0w9XLOyaW9B5Ays → ASCENT CHECKPOINT SCANS
+  // File > Share > Publish to web → select that tab → CSV → copy URL here
+  ascent_cp: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQaiqwDwGmvyj8CipJRmssF76n4nxFloaw1FcSpDpiMRPHmTbU_-r69aGsQSgef1A9sD9PHONEwPVmG/pub?gid=1688634074&single=true&output=csv'
 };
 
 const REFRESH_MS = 15000;
@@ -973,7 +977,7 @@ function getRunnerPace(bib, segmentName) {
 // Example from UltraSignup 50k result: finished in 9h 30min = 34200s / 50km = 684 s/km
 // That's their total pace — we use it as a scalar against segment base paces
 // ============================================================
-let data = { ascent: [], fiftyk: [], ambush: [] };
+let data = { ascent: [], fiftyk: [], ambush: [], ascent_cp: {} }; // ascent_cp: { bib -> timestamp }
 let activeTab = 'ascent';
 let previousTab = 'ascent';
 let units = 'imperial';
@@ -1210,6 +1214,7 @@ async function fetchAll() {
       fetch(CSV.fiftyk + '&t=' + Date.now()),
       fetch(CSV.ambush + '&t=' + Date.now()),
     ]);
+    // Note: ascent_cp is fetched separately below (conditional on URL being set)
 
     if (ascentRes.status === 'fulfilled' && ascentRes.value.ok)
       data.ascent = parseCSV(await ascentRes.value.text());
@@ -1217,6 +1222,24 @@ async function fetchAll() {
       data.fiftyk = parseCSV(await fiftyRes.value.text());
     if (ambushRes.status === 'fulfilled' && ambushRes.value.ok)
       data.ambush = parseCSV(await ambushRes.value.text());
+    // Ascent checkpoint scans — one row per scan, take earliest per bib
+    if (CSV.ascent_cp) {
+      try {
+        const cpRes = await fetch(CSV.ascent_cp + '&t=' + Date.now());
+        if (cpRes.ok) {
+          const cpRows = parseCSV(await cpRes.text());
+          const cpMap = {};
+          cpRows.forEach(row => {
+            const bib = (row['BIB'] || row['Bib'] || '').trim();
+            const ts  = (row['TIMESTAMP'] || row['Timestamp'] || '').trim();
+            if (!bib || !ts) return;
+            // Keep earliest scan per bib
+            if (!cpMap[bib] || ts < cpMap[bib]) cpMap[bib] = ts;
+          });
+          data.ascent_cp = cpMap;
+        }
+      } catch(e) { console.warn('ascent_cp fetch failed', e); }
+    }
 
     updateStats();
     renderTable();
@@ -2279,7 +2302,43 @@ function getRunnerRouteAndProgress(r, type) {
     if (status === 'DNS') return null;
     if (r['FINISH TIME (SCAN)'] || status === 'FINISHED')
       return { fixed: true, lat: 47.508742, lng: -121.985226, segment: 'Finished' };
+
     const raceStart = new Date('2026-05-08T18:00:00-07:00').getTime();
+    const bibStr = String(r.BIB || '').trim();
+
+    // Ascent checkpoint scan — 22.8% through the route (0.5mi mark)
+    const CP_PROGRESS = 0.228;
+    const cpTs = data.ascent_cp && data.ascent_cp[bibStr] ? parseTime(data.ascent_cp[bibStr]) : null;
+
+    if (cpTs && cpTs > raceStart) {
+      // Runner has been scanned at the checkpoint — we know their pace to that point
+      const distToCheckpointKm = segDistKm('ascent') * CP_PROGRESS; // km to checkpoint
+      const elapsedToCheckpointSec = (cpTs - raceStart) / 1000;
+      const observedPaceSecPerKm = elapsedToCheckpointSec / distToCheckpointKm;
+
+      // How far past the checkpoint are they now?
+      const elapsedSinceCpSec = (now - cpTs) / 1000;
+      // Remaining distance on ascent from checkpoint to summit
+      const remainingKm = segDistKm('ascent') * (1 - CP_PROGRESS);
+      // Adjusted pace for the steeper upper section (upper ascent is harder — multiply by 1.2)
+      const upperPaceSec = observedPaceSecPerKm * 1.2;
+      const estRemainingTimeSec = remainingKm * upperPaceSec;
+
+      // Progress from checkpoint position forward
+      const progressFromCp = Math.min(elapsedSinceCpSec / estRemainingTimeSec, 0.99);
+      const totalProgress = Math.min(CP_PROGRESS + progressFromCp * (1 - CP_PROGRESS), 0.99);
+
+      const memKey = type + '_' + bib + '_ascent';
+      const memProgress = PROGRESS_MEMORY[memKey] || 0;
+      const finalProgress = Math.max(totalProgress, memProgress);
+      PROGRESS_MEMORY[memKey] = finalProgress;
+
+      const paceMin = Math.round(observedPaceSecPerKm / 60 * 10) / 10;
+      debugLog(`Ascent #${bibStr}: CP scan at ${new Date(cpTs).toLocaleTimeString()} · pace ${paceMin}min/km · ${(finalProgress*100).toFixed(0)}% through`);
+      return { route: GPX_ROUTES['ascent'], progress: finalProgress, segment: `Ascent · ${paceMin}min/km` };
+    }
+
+    // No checkpoint scan yet — estimate from race start
     return buildPos('ascent', raceStart, null, null, 'Ascent Course');
   }
 
@@ -2786,8 +2845,11 @@ function openModal(bib, tab) {
     }
 
   } else if (tab === 'ascent') {
+    const bibStr = String(runner.BIB || '').trim();
+    const cpTime = data.ascent_cp && data.ascent_cp[bibStr] ? data.ascent_cp[bibStr] : null;
     const cps = [
       { label: 'Start (6:00 PM, May 8)', time: null, fixed: true },
+      { label: '⚡ Ascent Checkpoint (~0.5mi)', time: cpTime },
       { label: 'Summit Finish', time: runner['FINISH TIME (SCAN)'] },
     ];
     bodyHTML += cps.map(cp => `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0;border-bottom:1px solid var(--border);">
