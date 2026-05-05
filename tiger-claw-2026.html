@@ -1468,6 +1468,7 @@ function updatePanelVisibility() {
 
   if (isAscent) drawAscentElevProfile();
   updateMapLegend(activeTab);
+  updateCheckpointMarkers(activeTab);
 }
 
 // ============================================================
@@ -1931,7 +1932,7 @@ function updateMapLegend(tab) {
   // Ascent-specific checkpoint dot labels
   const isAscent = tab === 'ascent';
   document.getElementById('legendBaseCamp').style.display = isAscent ? 'none' : '';
-  document.getElementById('legendHighCamp').style.display = isAscent ? '' : '';
+  document.getElementById('legendHighCamp').style.display = isAscent ? 'none' : '';
   document.getElementById('legendAscentCP').style.display = isAscent ? '' : 'none';
 }
 
@@ -1948,9 +1949,9 @@ function initMap() {
     container: 'courseMap',
     style: 'mapbox://styles/mapbox/satellite-streets-v12',
     center: [-121.987, 47.530],
-    zoom: 12.8,
-    pitch: 68,
-    bearing: 165,
+    zoom: 13.36,
+    pitch: 71,
+    bearing: 151.4,
     antialias: true,
     performanceMetricsCollection: false,
     collectResourceTiming: false,
@@ -2042,7 +2043,12 @@ function updateCheckpointMarkers(tab) {
   if (!window._cpMarkers) return;
   Object.keys(window._cpMarkers).forEach(function(id) {
     var entry = window._cpMarkers[id];
-    entry.el.style.display = entry.tabs.indexOf(tab) !== -1 ? 'flex' : 'none';
+    var show = entry.tabs.indexOf(tab) !== -1;
+    var markerEl = entry.marker.getElement();
+    if (markerEl) {
+      markerEl.style.visibility = show ? 'visible' : 'hidden';
+      markerEl.style.pointerEvents = show ? 'auto' : 'none';
+    }
   });
 }
 
@@ -2067,7 +2073,7 @@ function updateRouteVisibility(tab) {
     mbMap.fitBounds(
       [[Math.min(...lngs)-lngPad, Math.min(...lats)-latPad],
        [Math.max(...lngs)+lngPad, Math.max(...lats)+latPad]],
-      { pitch: is3D ? 68 : 0, bearing: is3D ? 165 : 0, duration: 800, padding: 10 }
+      { pitch: is3D ? 71 : 0, bearing: is3D ? 165 : 0, duration: 800, padding: 10 }
     );
   }
 }
@@ -2089,7 +2095,7 @@ function highlightSegment(name) {
     mbMap.fitBounds(
       [[Math.min(...lngs)-lngPad, Math.min(...lats)-latPad],
        [Math.max(...lngs)+lngPad, Math.max(...lats)+latPad]],
-      { pitch: is3D ? 68 : 0, bearing: is3D ? 165 : 0, duration: 700, padding: 30 }
+      { pitch: is3D ? 71 : 0, bearing: is3D ? 165 : 0, duration: 700, padding: 30 }
     );
   }
 }
@@ -2116,7 +2122,7 @@ function setMapDimension(mode) {
   document.getElementById('btn2d').style.color = !is3D ? 'var(--black)' : 'var(--text-muted)';
   if (is3D) {
     mbMap.setTerrain({ source: 'dem', exaggeration: 1.5 });
-    mbMap.easeTo({ pitch: 68, bearing: 165, duration: 800 });
+    mbMap.easeTo({ pitch: 71, bearing: 165, duration: 800 });
   } else {
     mbMap.setTerrain(null);
     mbMap.easeTo({ pitch: 0, bearing: 0, duration: 800 });
