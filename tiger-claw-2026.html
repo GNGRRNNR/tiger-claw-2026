@@ -1947,10 +1947,10 @@ function initMap() {
   mbMap = new mapboxgl.Map({
     container: 'courseMap',
     style: 'mapbox://styles/mapbox/satellite-streets-v12',
-    center: [-121.987, 47.515],
+    center: [-121.987, 47.530],
     zoom: 12.8,
     pitch: 68,
-    bearing: -35,
+    bearing: 165,
     antialias: true,
     performanceMetricsCollection: false,
     collectResourceTiming: false,
@@ -2067,7 +2067,7 @@ function updateRouteVisibility(tab) {
     mbMap.fitBounds(
       [[Math.min(...lngs)-lngPad, Math.min(...lats)-latPad],
        [Math.max(...lngs)+lngPad, Math.max(...lats)+latPad]],
-      { pitch: is3D ? 68 : 0, bearing: is3D ? -35 : 0, duration: 800, padding: 10 }
+      { pitch: is3D ? 68 : 0, bearing: is3D ? 165 : 0, duration: 800, padding: 10 }
     );
   }
 }
@@ -2089,7 +2089,7 @@ function highlightSegment(name) {
     mbMap.fitBounds(
       [[Math.min(...lngs)-lngPad, Math.min(...lats)-latPad],
        [Math.max(...lngs)+lngPad, Math.max(...lats)+latPad]],
-      { pitch: is3D ? 68 : 0, bearing: is3D ? -35 : 0, duration: 700, padding: 30 }
+      { pitch: is3D ? 68 : 0, bearing: is3D ? 165 : 0, duration: 700, padding: 30 }
     );
   }
 }
@@ -2116,7 +2116,7 @@ function setMapDimension(mode) {
   document.getElementById('btn2d').style.color = !is3D ? 'var(--black)' : 'var(--text-muted)';
   if (is3D) {
     mbMap.setTerrain({ source: 'dem', exaggeration: 1.5 });
-    mbMap.easeTo({ pitch: 50, bearing: -15, duration: 800 });
+    mbMap.easeTo({ pitch: 68, bearing: 165, duration: 800 });
   } else {
     mbMap.setTerrain(null);
     mbMap.easeTo({ pitch: 0, bearing: 0, duration: 800 });
