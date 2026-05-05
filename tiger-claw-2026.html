@@ -2038,6 +2038,14 @@ function initMap() {
   new ResizeObserver(() => mbMap && mbMap.resize()).observe(document.getElementById('courseMap'));
 }
 
+function updateCheckpointMarkers(tab) {
+  if (!window._cpMarkers) return;
+  Object.keys(window._cpMarkers).forEach(function(id) {
+    var entry = window._cpMarkers[id];
+    entry.el.style.display = entry.tabs.indexOf(tab) !== -1 ? 'flex' : 'none';
+  });
+}
+
 function updateRouteVisibility(tab) {
   if (!mapReady) return;
   const visible = new Set(ROUTE_TABS[tab] || ROUTE_TABS['50k']);
