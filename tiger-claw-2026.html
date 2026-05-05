@@ -789,13 +789,17 @@ td.team-name {
       <div class="legend-dot" style="background:#4ade80;border:2px solid #0a0a0a"></div>
       <span>Start / Finish</span>
     </div>
-    <div class="legend-item">
+    <div class="legend-item" id="legendBaseCamp">
       <div class="legend-dot" style="background:#fbbf24;border:2px solid #0a0a0a"></div>
       <span>Base Camp Aid Station</span>
     </div>
-    <div class="legend-item">
+    <div class="legend-item" id="legendHighCamp">
       <div class="legend-dot" style="background:#60a5fa;border:2px solid #0a0a0a"></div>
       <span>High Camp Aid Station</span>
+    </div>
+    <div class="legend-item" id="legendAscentCP" style="display:none">
+      <div class="legend-dot" style="background:#fb923c;border:2px solid #0a0a0a"></div>
+      <span>⚡ Ascent Checkpoint</span>
     </div>
     <div class="legend-item">
       <div class="legend-dot" style="background:#e8c14a;width:8px;height:8px;border-radius:2px"></div>
@@ -836,7 +840,19 @@ td.team-name {
   </div>
 </div>
 
-<!-- CHARTS -->
+<!-- ASCENT ELEVATION PANEL — shown only on ascent tab -->
+<div id="ascentElevPanel" style="display:none;border-bottom:1px solid var(--border);background:var(--surface2);padding:1rem 1.5rem;">
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:0.1em;color:#a78bfa;margin-bottom:0.75rem;">
+    Ascent Course — Elevation Profile
+    <span id="ascentElevStats" style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--text-dim);margin-left:1rem;font-weight:400;"></span>
+  </div>
+  <div style="position:relative;height:220px;">
+    <canvas id="ascentElevChart"></canvas>
+  </div>
+  <div id="ascentRunnerList" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.75rem;"></div>
+</div>
+
+<!-- CHARTS — 50k/ambush only -->
 <div class="charts-row" id="chartsRow" style="display:none">
   <div class="chart-panel">
     <div class="chart-title">Loop Order Distribution</div>
@@ -883,7 +899,11 @@ td.team-name {
 const CSV = {
   ascent: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKzvda8NY-cieHJDTBRBCQSqNuJ8BIq5LJ3n1Hswz-LMXS6bvxAJf5Tn52z5RGQ4zzB8feOfB7pNvP/pub?gid=0&single=true&output=csv',
   fiftyk: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKzvda8NY-cieHJDTBRBCQSqNuJ8BIq5LJ3n1Hswz-LMXS6bvxAJf5Tn52z5RGQ4zzB8feOfB7pNvP/pub?gid=1023891274&single=true&output=csv',
-  ambush: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKzvda8NY-cieHJDTBRBCQSqNuJ8BIq5LJ3n1Hswz-LMXS6bvxAJf5Tn52z5RGQ4zzB8feOfB7pNvP/pub?gid=1246600417&single=true&output=csv'
+  ambush: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKzvda8NY-cieHJDTBRBCQSqNuJ8BIq5LJ3n1Hswz-LMXS6bvxAJf5Tn52z5RGQ4zzB8feOfB7pNvP/pub?gid=1246600417&single=true&output=csv',
+  // Ascent Checkpoint scans — from the Yellow Pi in Ascent mode
+  // Publish this tab from: 1RY2cN7IT62M-b8FsYUYH3HCe_FiS0w9XLOyaW9B5Ays → ASCENT CHECKPOINT SCANS
+  // File > Share > Publish to web → select that tab → CSV → copy URL here
+  ascent_cp: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQaiqwDwGmvyj8CipJRmssF76n4nxFloaw1FcSpDpiMRPHmTbU_-r69aGsQSgef1A9sD9PHONEwPVmG/pub?gid=1688634074&single=true&output=csv'
 };
 
 const REFRESH_MS = 15000;
@@ -895,14 +915,16 @@ const RACE_STARTS = {
 };
 
 const CHECKPOINTS = [
-  { id: 'start',        label: 'Start / Finish',                lat: 47.527708, lng: -122.034216, color: '#4ade80', r: 9, symbol: '🏁' },
-  { id: 'ascent_start', label: 'Ascent Start',                  lat: 47.529744, lng: -121.995642, color: '#a78bfa', r: 6, symbol: '▶' },
-  { id: 'basecamp',     label: '⛺ Base Camp Aid Station',       lat: 47.529832, lng: -121.996694, color: '#fbbf24', r: 8, symbol: '⛺' },
-  { id: 'pink',         label: 'Pink Loop Checkpoint',          lat: 47.526687, lng: -121.997090, color: '#f472b6', r: 5, symbol: '●' },
-  { id: 'white',        label: 'White Loop Checkpoint',         lat: 47.527259, lng: -121.998629, color: '#e2e8f0', r: 5, symbol: '●' },
-  { id: 'yellow',       label: 'Yellow Loop Checkpoint',        lat: 47.527324, lng: -121.998865, color: '#fbbf24', r: 5, symbol: '●' },
-  { id: 'highcamp',     label: '🏔 High Camp Aid Station',      lat: 47.508742, lng: -121.985226, color: '#60a5fa', r: 8, symbol: '🏔' },
-  { id: 'red',          label: 'Red Checkpoint',                lat: 47.529776, lng: -121.996875, color: '#f87171', r: 5, symbol: '●' },
+  { id: 'start',         label: 'Start / Finish',         lat: 47.527708, lng: -122.034216, color: '#4ade80', tabs: ['50k','ambush','bigcat'] },
+  { id: 'basecamp',      label: 'Base Camp Aid Station',  lat: 47.529832, lng: -121.996694, color: '#fb923c', tabs: ['50k','ambush','bigcat'] },
+  { id: 'pink',          label: 'Pink Loop Checkpoint',   lat: 47.526687, lng: -121.997090, color: '#f472b6', tabs: ['50k','ambush','bigcat'] },
+  { id: 'white',         label: 'White Loop Checkpoint',  lat: 47.527259, lng: -121.998629, color: '#e2e8f0', tabs: ['50k','ambush','bigcat'] },
+  { id: 'yellow',        label: 'Yellow Loop Checkpoint', lat: 47.527324, lng: -121.998865, color: '#fbbf24', tabs: ['50k','ambush','bigcat'] },
+  { id: 'highcamp',      label: 'High Camp Aid Station',  lat: 47.508742, lng: -121.985226, color: '#fb923c', tabs: ['50k','ambush','bigcat'] },
+  { id: 'red',           label: 'Red Checkpoint',         lat: 47.529776, lng: -121.996875, color: '#f87171', tabs: ['50k','ambush','bigcat'] },
+  { id: 'ascent_start',  label: 'Start',                  lat: 47.52975637733785, lng: -121.99551343917848, color: '#4ade80', tabs: ['ascent','bigcat'] },
+  { id: 'ascent_cp',     label: 'Ascent Checkpoint',      lat: 47.52966446161007, lng: -121.98757466460309, color: '#fb923c', tabs: ['ascent','bigcat'] },
+  { id: 'ascent_finish', label: 'Finish',                 lat: 47.508742, lng: -121.985226, color: '#f87171', tabs: ['ascent','bigcat'] },
 ];
 
 // ============================================================
@@ -981,7 +1003,7 @@ function getRunnerPace(bib, segmentName) {
 // Example from UltraSignup 50k result: finished in 9h 30min = 34200s / 50km = 684 s/km
 // That's their total pace — we use it as a scalar against segment base paces
 // ============================================================
-let data = { ascent: [], fiftyk: [], ambush: [] };
+let data = { ascent: [], fiftyk: [], ambush: [], ascent_cp: {} }; // ascent_cp: { bib -> timestamp }
 let activeTab = 'ascent';
 let previousTab = 'ascent';
 let units = 'imperial';
@@ -992,6 +1014,181 @@ let sortDir = 'asc';
 let elevChartInst = null;
 let loopChartInst = null;
 let segChartInst = null;
+let ascentElevChartInst = null;
+
+// Draw the full ascent elevation profile with animated runner dots
+// Called whenever ascent tab is active or data refreshes
+let hoverCrosshairMarker = null;
+
+function showHoverCrosshair(routeName, fraction) {
+  if (!mapReady) return;
+  var pos = interpolateAlongRoute(GPX_ROUTES[routeName], fraction);
+  if (!pos) return;
+  if (hoverCrosshairMarker) {
+    hoverCrosshairMarker.setLngLat([pos.lng, pos.lat]);
+    hoverCrosshairMarker.getElement().style.display = 'flex';
+    return;
+  }
+  var el = document.createElement('div');
+  el.style.cssText = 'display:flex;flex-direction:column;align-items:center;pointer-events:none;';
+  el.innerHTML = '<div style="width:14px;height:14px;background:#fff;border:2.5px solid #0a0a0a;border-radius:50%;box-shadow:0 0 8px rgba(255,255,255,0.8);"></div>';
+  hoverCrosshairMarker = new mapboxgl.Marker({ element: el, anchor: 'center' }).setLngLat([pos.lng, pos.lat]).addTo(mbMap);
+}
+
+function clearHoverCrosshair() {
+  if (hoverCrosshairMarker) hoverCrosshairMarker.getElement().style.display = 'none';
+}
+
+function drawAscentElevProfile() {
+  const elevs = ELEVATION_DATA['ascent'];
+  const pts   = GPX_ROUTES['ascent'];
+  if (!elevs || !pts) return;
+
+  // Build cumulative distance axis
+  const distKm = [0];
+  for (let i = 1; i < pts.length; i++) {
+    distKm.push(distKm[distKm.length-1] + haversineM(pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1])/1000);
+  }
+  const totalKm = distKm[distKm.length-1];
+
+  const elevDisplay = elevs.map(e => units === 'imperial' ? Math.round(e*3.281) : Math.round(e));
+  const elevUnit = units === 'imperial' ? 'ft' : 'm';
+  const distUnit = units === 'imperial' ? 'mi' : 'km';
+  const xLabels  = distKm.map(d => units === 'imperial' ? (d*0.621371).toFixed(2) : d.toFixed(2));
+
+  // Checkpoint marker at 22.8% through
+  const cpIdx = Math.round(0.228 * (elevDisplay.length - 1));
+  const cpDist = xLabels[cpIdx];
+  const cpElev = elevDisplay[cpIdx];
+
+  // Runner dots
+  const runnerDots = [];
+  data.ascent.forEach(r => {
+    if (!r.BIB) return;
+    const pos = getRunnerRouteAndProgress(r, 'ascent');
+    if (!pos || pos.fixed) return;
+    const idx = Math.min(Math.round(pos.progress * (elevDisplay.length-1)), elevDisplay.length-1);
+    runnerDots.push({
+      x: xLabels[idx],
+      y: elevDisplay[idx],
+      bib: r.BIB,
+      name: r.NAME||'',
+      progress: pos.progress
+    });
+  });
+
+  // Stats line
+  let gain = 0;
+  for (let i = 1; i < elevs.length; i++) { const d = elevs[i]-elevs[i-1]; if(d>0) gain+=d; }
+  const minE = Math.min(...elevs), maxE = Math.max(...elevs);
+  document.getElementById('ascentElevStats').textContent =
+    `${fmtDist(GPX_DISTANCES['ascent'])} · +${fmtElev(gain)} gain · ${fmtElev(minE)}–${fmtElev(maxE)}`;
+
+  // Runner chips below chart
+  document.getElementById('ascentRunnerList').innerHTML = runnerDots.length === 0
+    ? '<span style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--text-dim)">No runners on course yet</span>'
+    : runnerDots.map(rd => `
+        <div style="display:flex;align-items:center;gap:0.4rem;background:var(--surface3);border:1px solid #a78bfa44;border-radius:3px;padding:0.2rem 0.5rem;">
+          <span style="font-family:'Bebas Neue',sans-serif;font-size:0.9rem;color:#a78bfa">#${rd.bib}</span>
+          <span style="font-size:0.7rem;color:var(--text)">${rd.name}</span>
+          <span style="font-size:0.65rem;color:var(--text-dim);margin-left:0.25rem">${Math.round(rd.progress*100)}%</span>
+        </div>`).join('');
+
+  // Checkpoint annotation dataset
+  const cpDataset = {
+    label: '⚡ Ascent CP',
+    data: [{ x: cpDist, y: cpElev }],
+    borderColor: '#fb923c',
+    backgroundColor: '#fb923c',
+    pointRadius: 10,
+    pointStyle: 'triangle',
+    showLine: false,
+    pointBorderColor: '#0a0a0a',
+    pointBorderWidth: 1.5,
+  };
+
+  const runnerDataset = {
+    label: 'Runners',
+    data: runnerDots.map(rd => ({ x: rd.x, y: rd.y })),
+    borderColor: '#0a0a0a',
+    backgroundColor: '#a78bfa',
+    pointRadius: 8,
+    pointStyle: 'circle',
+    showLine: false,
+    pointBorderColor: '#0a0a0a',
+    pointBorderWidth: 1.5,
+  };
+
+  if (ascentElevChartInst) {
+    // Update runner positions without full redraw for smooth animation feel
+    ascentElevChartInst.data.datasets[1].data = cpDataset.data;
+    ascentElevChartInst.data.datasets[2].data = runnerDataset.data;
+    ascentElevChartInst.update('none'); // no animation on data update (position already animated on map)
+    return;
+  }
+
+  const ctx = document.getElementById('ascentElevChart').getContext('2d');
+  ascentElevChartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: xLabels,
+      datasets: [
+        {
+          label: `Elevation (${elevUnit})`,
+          data: elevDisplay,
+          borderColor: '#a78bfa',
+          backgroundColor: '#a78bfa22',
+          borderWidth: 2.5,
+          pointRadius: 0,
+          fill: true,
+          tension: 0.4,
+        },
+        cpDataset,
+        runnerDataset,
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 600 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: ctx => `${ctx[0].label} ${distUnit}`,
+            label: ctx => {
+              if (ctx.datasetIndex === 1) return `⚡ Ascent Checkpoint · ${ctx.parsed.y}${elevUnit}`;
+              if (ctx.datasetIndex === 2) {
+                const rd = runnerDots[ctx.dataIndex];
+                return rd ? `#${rd.bib} ${rd.name} · ${ctx.parsed.y}${elevUnit}` : '';
+              }
+              return `${ctx.parsed.y}${elevUnit}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'category',
+          ticks: {
+            color: '#555',
+            font: { family: 'DM Mono', size: 9 },
+            maxTicksLimit: 7,
+            callback: (val, i) => {
+              const step = Math.ceil(xLabels.length / 6);
+              return i % step === 0 ? `${xLabels[i]}${distUnit}` : '';
+            }
+          },
+          grid: { color: '#1a1a1a' }
+        },
+        y: {
+          ticks: { color: '#555', font: { family: 'DM Mono', size: 9 }, callback: v => `${v}${elevUnit}` },
+          grid: { color: '#1a1a1a' }
+        }
+      }
+    }
+  });
+}
 // Forward-progress memory: runners can't go backward on a segment between refreshes
 const PROGRESS_MEMORY = {}; // key: "type_bib_segName" → max progress seen
 const lastCheckpointSeen = {};
@@ -1218,6 +1415,7 @@ async function fetchAll() {
       fetch(CSV.fiftyk + '&t=' + Date.now()),
       fetch(CSV.ambush + '&t=' + Date.now()),
     ]);
+    // Note: ascent_cp is fetched separately below (conditional on URL being set)
 
     if (ascentRes.status === 'fulfilled' && ascentRes.value.ok)
       data.ascent = parseCSV(await ascentRes.value.text());
@@ -1225,14 +1423,30 @@ async function fetchAll() {
       data.fiftyk = parseCSV(await fiftyRes.value.text());
     if (ambushRes.status === 'fulfilled' && ambushRes.value.ok)
       data.ambush = parseCSV(await ambushRes.value.text());
+    // Ascent checkpoint scans — one row per scan, take earliest per bib
+    if (CSV.ascent_cp) {
+      try {
+        const cpRes = await fetch(CSV.ascent_cp + '&t=' + Date.now());
+        if (cpRes.ok) {
+          const cpRows = parseCSV(await cpRes.text());
+          const cpMap = {};
+          cpRows.forEach(row => {
+            const bib = (row['BIB'] || row['Bib'] || '').trim();
+            const ts  = (row['TIMESTAMP'] || row['Timestamp'] || '').trim();
+            if (!bib || !ts) return;
+            // Keep earliest scan per bib
+            if (!cpMap[bib] || ts < cpMap[bib]) cpMap[bib] = ts;
+          });
+          data.ascent_cp = cpMap;
+        }
+      } catch(e) { console.warn('ascent_cp fetch failed', e); }
+    }
 
     updateStats();
     renderTable();
     updateLoopChart();
     updateSegChart();
-    // Show charts panel only when 50k data has loop data
-    const hasLoopData = data.fiftyk.some(r => r['First Loop Color']);
-    document.getElementById('chartsRow').style.display = hasLoopData ? 'grid' : 'none';
+    updatePanelVisibility();
     drawMap();
     document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
     STATE_lastUpdate = Date.now();
@@ -1240,6 +1454,20 @@ async function fetchAll() {
     console.error('Fetch error:', e);
   }
   document.getElementById('loadingBar').classList.remove('active');
+}
+
+// ============================================================
+// PANEL VISIBILITY — ascent elevation vs 50k charts
+// ============================================================
+function updatePanelVisibility() {
+  const isAscent = activeTab === 'ascent';
+  const hasLoopData = data.fiftyk.some(r => r['First Loop Color']);
+
+  document.getElementById('ascentElevPanel').style.display = isAscent ? 'block' : 'none';
+  document.getElementById('chartsRow').style.display = (!isAscent && hasLoopData) ? 'grid' : 'none';
+
+  if (isAscent) drawAscentElevProfile();
+  updateMapLegend(activeTab);
 }
 
 // ============================================================
@@ -1686,6 +1914,27 @@ const ROUTE_TABS = {
   bigcat:  ['ascent','green_start','pink','white','yellow','blue_descent','red_finish'],
 };
 
+// Which legend route items to show per tab
+const LEGEND_TABS = {
+  ascent:  ['ascent'],
+  '50k':   ['green_start','pink','white','yellow','blue_descent','red_finish'],
+  ambush:  ['green_start','pink','white','yellow','blue_descent','red_finish'],
+  bigcat:  ['ascent','green_start','pink','white','yellow','blue_descent','red_finish'],
+};
+
+function updateMapLegend(tab) {
+  const visible = new Set(LEGEND_TABS[tab] || LEGEND_TABS['50k']);
+  document.querySelectorAll('.legend-route').forEach(item => {
+    const route = item.getAttribute('data-route');
+    item.style.display = visible.has(route) ? '' : 'none';
+  });
+  // Ascent-specific checkpoint dot labels
+  const isAscent = tab === 'ascent';
+  document.getElementById('legendBaseCamp').style.display = isAscent ? 'none' : '';
+  document.getElementById('legendHighCamp').style.display = isAscent ? '' : '';
+  document.getElementById('legendAscentCP').style.display = isAscent ? '' : 'none';
+}
+
 mapboxgl.accessToken = 'pk.eyJ1IjoiZ25ncnJubnIiLCJhIjoiY21vaGdsaWtqMDFuNTJwcHQ0em83bWltaCJ9.DdC1VfJKIjSpNo3uLDLNLw';
 
 let mbMap = null;
@@ -1698,10 +1947,10 @@ function initMap() {
   mbMap = new mapboxgl.Map({
     container: 'courseMap',
     style: 'mapbox://styles/mapbox/satellite-streets-v12',
-    center: [-121.988, 47.519],
-    zoom: 11.8,
-    pitch: 62,
-    bearing: -28,
+    center: [-121.987, 47.515],
+    zoom: 12.8,
+    pitch: 68,
+    bearing: -35,
     antialias: true,
     performanceMetricsCollection: false,
     collectResourceTiming: false,
@@ -1740,44 +1989,48 @@ function initMap() {
         layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: { 'line-color': color, 'line-width': 24, 'line-opacity': 0 }
       });
-      // Click on hit layer (wide) and visible line
-      ['l-', 'h-'].forEach(prefix => {
-        mbMap.on('click', prefix + name, () => openSegmentFocus(name));
-        mbMap.on('mouseenter', prefix + name, () => mbMap.getCanvas().style.cursor = 'pointer');
-        mbMap.on('mouseleave', prefix + name, () => mbMap.getCanvas().style.cursor = '');
-      });
+      if (name !== 'ascent') {
+        ['l-', 'h-'].forEach(prefix => {
+          mbMap.on('click', prefix + name, () => openSegmentFocus(name));
+          mbMap.on('mouseenter', prefix + name, () => mbMap.getCanvas().style.cursor = 'pointer');
+          mbMap.on('mouseleave', prefix + name, () => mbMap.getCanvas().style.cursor = '');
+        });
+      }
     });
 
-    // Checkpoint markers — emoji for aid stations, dots for checkpoints
-    CHECKPOINTS.forEach(cp => {
-      const isAidStation = cp.id === 'basecamp' || cp.id === 'highcamp';
-      const isStart = cp.id === 'start';
-      const el = document.createElement('div');
-      el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer;';
-
-      if (isAidStation) {
-        // Big emoji + label badge
-        const emoji = cp.id === 'basecamp' ? '⛺' : '🏔';
-        const shortLabel = cp.id === 'basecamp' ? 'BASE CAMP' : 'HIGH CAMP';
-        el.innerHTML = `
-          <div style="font-size:22px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.8))">${emoji}</div>
-          <div style="background:rgba(10,10,10,0.9);color:${cp.color};font-family:'DM Mono',monospace;font-size:8px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid ${cp.color}66;white-space:nowrap;margin-top:1px;">${shortLabel}</div>`;
-      } else if (isStart) {
-        el.innerHTML = `<div style="font-size:20px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.8))">🏁</div>`;
-      } else {
-        // Small colored dot for regular checkpoints
-        el.innerHTML = `<div style="width:${cp.r*2}px;height:${cp.r*2}px;background:${cp.color};border:1.5px solid rgba(0,0,0,0.7);border-radius:50%;box-shadow:0 0 6px ${cp.color}88;"></div>`;
+    // Checkpoint markers — tab-aware
+    window._cpMarkers = {};
+    CHECKPOINTS.forEach(function(cp) {
+      var el = document.createElement('div');
+      el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:default;';
+      function badge(emoji, label, color) {
+        return '<div style="font-size:20px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9))">'+emoji+'</div>'
+          +'<div style="background:rgba(10,10,10,0.92);color:'+color+';font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;border:1px solid '+color+'55;white-space:nowrap;margin-top:2px;">'+label+'</div>';
       }
-
-      new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+      if (cp.id === 'start') {
+        el.innerHTML = '<div style="font-size:20px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9))">🏁</div>'
+          +'<div style="background:rgba(10,10,10,0.92);font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;border:1px solid #4ade8055;white-space:nowrap;margin-top:2px;">'
+          +'<span style="color:#4ade80">START</span><span style="color:#fb923c"> / </span><span style="color:#f87171">FINISH</span></div>';
+      } else if (cp.id === 'basecamp') { el.innerHTML = badge('⛺','BASE CAMP','#fb923c');
+      } else if (cp.id === 'highcamp') { el.innerHTML = badge('🏔','HIGH CAMP','#fb923c');
+      } else if (cp.id === 'ascent_start') { el.innerHTML = badge('🏁','START','#4ade80');
+      } else if (cp.id === 'ascent_cp') { el.innerHTML = badge('⚡','ASCENT CP','#fb923c');
+      } else if (cp.id === 'ascent_finish') { el.innerHTML = badge('🏆','FINISH','#f87171');
+      } else {
+        el.innerHTML = '<div style="width:14px;height:14px;background:'+cp.color+';border:2px solid rgba(0,0,0,0.8);border-radius:50%;box-shadow:0 0 8px '+cp.color+'aa;"></div>';
+      }
+      var marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([cp.lng, cp.lat])
         .setPopup(new mapboxgl.Popup({ offset: 8, closeButton: false })
-          .setHTML(`<div style="background:#111;color:${cp.color};font-family:'DM Mono',monospace;font-size:11px;padding:5px 8px;border-radius:4px;border-left:3px solid ${cp.color}"><b>${cp.label}</b></div>`))
+          .setHTML('<div style="background:#111;color:'+cp.color+';font-family:DM Mono,monospace;font-size:11px;padding:5px 8px;border-radius:4px;border-left:3px solid '+cp.color+'"><b>'+cp.label+'</b></div>'))
         .addTo(mbMap);
+      window._cpMarkers[cp.id] = { marker: marker, el: el, tabs: cp.tabs };
     });
+    updateCheckpointMarkers(activeTab);
 
     mapReady = true;
     updateRouteVisibility(activeTab);
+    updateCheckpointMarkers(activeTab);
     startAnimation();
     // No fly-in — just fit to full course from a good angle
   });
@@ -1806,7 +2059,7 @@ function updateRouteVisibility(tab) {
     mbMap.fitBounds(
       [[Math.min(...lngs)-lngPad, Math.min(...lats)-latPad],
        [Math.max(...lngs)+lngPad, Math.max(...lats)+latPad]],
-      { pitch: is3D ? 62 : 0, bearing: is3D ? -28 : 0, duration: 800, padding: 10 }
+      { pitch: is3D ? 68 : 0, bearing: is3D ? -35 : 0, duration: 800, padding: 10 }
     );
   }
 }
@@ -1823,12 +2076,12 @@ function highlightSegment(name) {
   const pts = GPX_ROUTES[name];
   if (pts) {
     const lngs = pts.map(p=>p[1]), lats = pts.map(p=>p[0]);
-    const lngPad = Math.max((Math.max(...lngs)-Math.min(...lngs))*0.25, 0.01);
-    const latPad = Math.max((Math.max(...lats)-Math.min(...lats))*0.25, 0.01);
+    const lngPad = Math.max((Math.max(...lngs)-Math.min(...lngs))*0.06, 0.003);
+    const latPad = Math.max((Math.max(...lats)-Math.min(...lats))*0.06, 0.003);
     mbMap.fitBounds(
       [[Math.min(...lngs)-lngPad, Math.min(...lats)-latPad],
        [Math.max(...lngs)+lngPad, Math.max(...lats)+latPad]],
-      { pitch: is3D ? 45 : 0, bearing: is3D ? -10 : 0, duration: 900, padding: 20 }
+      { pitch: is3D ? 68 : 0, bearing: is3D ? -35 : 0, duration: 700, padding: 30 }
     );
   }
 }
@@ -2287,7 +2540,43 @@ function getRunnerRouteAndProgress(r, type) {
     if (status === 'DNS') return null;
     if (r['FINISH TIME (SCAN)'] || status === 'FINISHED')
       return { fixed: true, lat: 47.508742, lng: -121.985226, segment: 'Finished' };
+
     const raceStart = new Date('2026-05-08T18:00:00-07:00').getTime();
+    const bibStr = String(r.BIB || '').trim();
+
+    // Ascent checkpoint scan — 22.8% through the route (0.5mi mark)
+    const CP_PROGRESS = 0.228;
+    const cpTs = data.ascent_cp && data.ascent_cp[bibStr] ? parseTime(data.ascent_cp[bibStr]) : null;
+
+    if (cpTs && cpTs > raceStart) {
+      // Runner has been scanned at the checkpoint — we know their pace to that point
+      const distToCheckpointKm = segDistKm('ascent') * CP_PROGRESS; // km to checkpoint
+      const elapsedToCheckpointSec = (cpTs - raceStart) / 1000;
+      const observedPaceSecPerKm = elapsedToCheckpointSec / distToCheckpointKm;
+
+      // How far past the checkpoint are they now?
+      const elapsedSinceCpSec = (now - cpTs) / 1000;
+      // Remaining distance on ascent from checkpoint to summit
+      const remainingKm = segDistKm('ascent') * (1 - CP_PROGRESS);
+      // Adjusted pace for the steeper upper section (upper ascent is harder — multiply by 1.2)
+      const upperPaceSec = observedPaceSecPerKm * 1.2;
+      const estRemainingTimeSec = remainingKm * upperPaceSec;
+
+      // Progress from checkpoint position forward
+      const progressFromCp = Math.min(elapsedSinceCpSec / estRemainingTimeSec, 0.99);
+      const totalProgress = Math.min(CP_PROGRESS + progressFromCp * (1 - CP_PROGRESS), 0.99);
+
+      const memKey = type + '_' + bib + '_ascent';
+      const memProgress = PROGRESS_MEMORY[memKey] || 0;
+      const finalProgress = Math.max(totalProgress, memProgress);
+      PROGRESS_MEMORY[memKey] = finalProgress;
+
+      const paceMin = Math.round(observedPaceSecPerKm / 60 * 10) / 10;
+      debugLog(`Ascent #${bibStr}: CP scan at ${new Date(cpTs).toLocaleTimeString()} · pace ${paceMin}min/km · ${(finalProgress*100).toFixed(0)}% through`);
+      return { route: GPX_ROUTES['ascent'], progress: finalProgress, segment: `Ascent · ${paceMin}min/km` };
+    }
+
+    // No checkpoint scan yet — estimate from race start
     return buildPos('ascent', raceStart, null, null, 'Ascent Course');
   }
 
@@ -2564,7 +2853,7 @@ function renderTable() {
       <th data-col="Total Elapsed Time">Total Time</th>`;
   } else if (tab === 'ascent') {
     html += `<th data-col="BIB">Bib</th><th data-col="NAME">Name</th><th data-col="GENDER">Gender</th><th data-col="STATUS">Status</th>
-      <th data-col="FINISH TIME (SCAN)">Finish Scan</th><th data-col="ELAPSED TIME">Elapsed</th>`;
+      <th data-col="ASCENT CHECKPOINT">CP Scan</th><th data-col="FINISH TIME (SCAN)">Finish Scan</th><th data-col="ELAPSED TIME">Elapsed</th>`;
   } else if (tab === 'ambush') {
     html += `<th data-col="Bib">Bib</th><th data-col="Team Name">Team</th><th data-col="Name">Name</th>
       <th data-col="Status">Status</th>
@@ -2639,10 +2928,12 @@ function renderTable() {
         <td class="elapsed-val">${fmtElapsed(r['Total Elapsed Time'])}</td>`;
     } else if (tab === 'ascent') {
       const isBigCat = data.fiftyk.some(f => (f.Name||'').trim().toUpperCase() === (r.NAME||'').trim().toUpperCase());
+      const cpScanTime = data.ascent_cp && data.ascent_cp[String(r.BIB||'').trim()] ? data.ascent_cp[String(r.BIB||'').trim()] : '';
       html += `<td class="bib">${r.BIB||''}</td>
         <td class="name">${r.NAME||''}${isBigCat?' <span class="bigcat-icon">🐅</span>':''}</td>
         <td style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--text-muted)">${r.GENDER||r.Gender||''}</td>
         <td>${statusBadge(r.STATUS)}</td>
+        <td class="time-val" style="color:#fb923c">${fmtTime(cpScanTime)}</td>
         <td class="time-val">${fmtTime(r['FINISH TIME (SCAN)'])}</td>
         <td class="elapsed-val">${fmtElapsed(r['ELAPSED TIME'])}</td>`;
     } else if (tab === 'ambush') {
@@ -2794,8 +3085,11 @@ function openModal(bib, tab) {
     }
 
   } else if (tab === 'ascent') {
+    const bibStr = String(runner.BIB || '').trim();
+    const cpTime = data.ascent_cp && data.ascent_cp[bibStr] ? data.ascent_cp[bibStr] : null;
     const cps = [
       { label: 'Start (6:00 PM, May 8)', time: null, fixed: true },
+      { label: '⚡ Ascent Checkpoint (~0.5mi)', time: cpTime },
       { label: 'Summit Finish', time: runner['FINISH TIME (SCAN)'] },
     ];
     bodyHTML += cps.map(cp => `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0;border-bottom:1px solid var(--border);">
@@ -2872,6 +3166,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     renderTable();
     updateStats();
     updateRouteVisibility(activeTab);
+    updatePanelVisibility();
     drawMap();
   });
 });
@@ -2938,6 +3233,7 @@ setInterval(updateEventStatus, 60000);
 initSegmentDurations();
 initMap();
 fetchAll();
+updateMapLegend(activeTab);
 setInterval(fetchAll, REFRESH_MS);
 // Refetch when tab becomes visible again — feels more "live" when returning to the tab
 document.addEventListener('visibilitychange', () => {
