@@ -1086,13 +1086,14 @@ function drawAscentElevProfile() {
 
   // Runner chips below chart
   document.getElementById('ascentRunnerList').innerHTML = runnerDots.length === 0
-    ? '<span style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--text-dim)">No runners on course yet</span>'
-    : runnerDots.map(rd => `
-        <div style="display:flex;align-items:center;gap:0.4rem;background:var(--surface3);border:1px solid #a78bfa44;border-radius:3px;padding:0.2rem 0.5rem;">
-          <span style="font-family:'Bebas Neue',sans-serif;font-size:0.9rem;color:#a78bfa">#${rd.bib}</span>
-          <span style="font-size:0.7rem;color:var(--text)">${rd.name}</span>
-          <span style="font-size:0.65rem;color:var(--text-dim);margin-left:0.25rem">${Math.round(rd.progress*100)}%</span>
-        </div>`).join('');
+    ? '<span style="font-family:DM Mono,monospace;font-size:0.7rem;color:var(--text-dim)">No runners on course yet</span>'
+    : runnerDots.map(rd =>
+        '<div style="display:flex;align-items:center;gap:0.4rem;background:var(--surface3);border:1px solid #a78bfa44;border-radius:3px;padding:0.2rem 0.5rem;">'
+        + '<span style="font-family:Bebas Neue,sans-serif;font-size:0.9rem;color:#a78bfa">#' + rd.bib + '</span>'
+        + '<span style="font-size:0.7rem;color:var(--text)">' + rd.name + '</span>'
+        + '<span style="font-size:0.65rem;color:var(--text-dim);margin-left:0.25rem">' + Math.round(rd.progress*100) + '%</span>'
+        + '</div>'
+      ).join('');
 
   // Checkpoint annotation dataset
   const cpDataset = {
