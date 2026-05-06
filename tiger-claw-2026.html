@@ -1425,28 +1425,51 @@ function loopTag(color) {
 // ============================================================
 // FETCH DATA
 // ============================================================
+// Fetches a CSV up to 3 times and returns the version that at least 2 of 3 agree on.
+// Google's edge servers cache CSVs inconsistently — single fetches can flip between
+// fresh and stale. Voting across multiple fetches converges on the true current state
+// regardless of whether rows were added, edited, or deleted.
+async function fetchWithConsensus(url) {
+  const attempts = [];
+  for (let i = 0; i < 3; i++) {
+    try {
+      const res = await fetch(url + '&t=' + Date.now() + '_' + i);
+      if (res.ok) attempts.push(await res.text());
+    } catch(e) { /* skip failed attempt */ }
+    // Tiny stagger so we don't hit the same edge server's instant cache
+    if (i < 2) await new Promise(r => setTimeout(r, 150));
+  }
+  if (attempts.length === 0) return null;
+  if (attempts.length === 1) return attempts[0];
+  // Vote: return the response that appears most often
+  const counts = {};
+  for (const t of attempts) counts[t] = (counts[t] || 0) + 1;
+  let winner = attempts[0], best = 0;
+  for (const t in counts) {
+    if (counts[t] > best) { best = counts[t]; winner = t; }
+  }
+  return winner;
+}
+
 async function fetchAll() {
   document.getElementById('loadingBar').classList.add('active');
   try {
-    const [ascentRes, fiftyRes, ambushRes] = await Promise.allSettled([
-      fetch(CSV.ascent + '&t=' + Date.now()),
-      fetch(CSV.fiftyk + '&t=' + Date.now()),
-      fetch(CSV.ambush + '&t=' + Date.now()),
+    const [ascentText, fiftyText, ambushText] = await Promise.all([
+      fetchWithConsensus(CSV.ascent),
+      fetchWithConsensus(CSV.fiftyk),
+      fetchWithConsensus(CSV.ambush),
     ]);
-    // Note: ascent_cp is fetched separately below (conditional on URL being set)
 
-    if (ascentRes.status === 'fulfilled' && ascentRes.value.ok)
-      data.ascent = parseCSV(await ascentRes.value.text());
-    if (fiftyRes.status === 'fulfilled' && fiftyRes.value.ok)
-      data.fiftyk = parseCSV(await fiftyRes.value.text());
-    if (ambushRes.status === 'fulfilled' && ambushRes.value.ok)
-      data.ambush = parseCSV(await ambushRes.value.text());
+    if (ascentText !== null) data.ascent = parseCSV(ascentText);
+    if (fiftyText  !== null) data.fiftyk = parseCSV(fiftyText);
+    if (ambushText !== null) data.ambush = parseCSV(ambushText);
+
     // Ascent checkpoint scans — one row per scan, take earliest per bib
     if (CSV.ascent_cp) {
       try {
-        const cpRes = await fetch(CSV.ascent_cp + '&t=' + Date.now());
-        if (cpRes.ok) {
-          const cpRows = parseCSV(await cpRes.text());
+        const cpText = await fetchWithConsensus(CSV.ascent_cp);
+        if (cpText !== null) {
+          const cpRows = parseCSV(cpText);
           const cpMap = {};
           cpRows.forEach(row => {
             const bib = (row['BIB'] || row['Bib'] || '').trim();
