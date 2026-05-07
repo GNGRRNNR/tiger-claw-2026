@@ -913,6 +913,7 @@ td.team-name {
     <div class="empty-state" id="emptyState">Loading race data…</div>
   </div>
   <div class="row-count" id="rowCount"></div>
+  <div id="lastUpdated" style="font-family:'DM Mono',monospace;font-size:0.75rem;color:#888;margin-top:0.25rem;"></div>
 </div>
 
 <!-- DEBUG PANEL — remove before race day -->
@@ -949,7 +950,7 @@ const CSV = {
   ascent_cp: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQaiqwDwGmvyj8CipJRmssF76n4nxFloaw1FcSpDpiMRPHmTbU_-r69aGsQSgef1A9sD9PHONEwPVmG/pub?gid=1688634074&single=true&output=csv'
 };
 
-const REFRESH_MS = 15000;
+const REFRESH_MS = 30000;
 
 const RACE_STARTS = {
   ascent: new Date('2026-05-08T18:00:00-07:00'),
@@ -1493,6 +1494,7 @@ async function fetchWithConsensus(url) {
 // display a flickery one-off result. Genuine changes (deletions, additions)
 // will consistently win 2-of-3 and replace this cleanly.
 const confirmedText = { ascent: null, fiftyk: null, ambush: null, ascent_cp: null };
+let lastConfidentFetch = null;
 
 async function fetchAll() {
   document.getElementById('loadingBar').classList.add('active');
@@ -1508,12 +1510,15 @@ async function fetchAll() {
     // but a single stale cache hit won't cause a flicker.
     if (ascentResult.text !== null && (ascentResult.confident || confirmedText.ascent === null)) {
       confirmedText.ascent = ascentResult.text;
+      if (ascentResult.confident) lastConfidentFetch = Date.now();
     }
     if (fiftyResult.text !== null && (fiftyResult.confident || confirmedText.fiftyk === null)) {
       confirmedText.fiftyk = fiftyResult.text;
+      if (fiftyResult.confident) lastConfidentFetch = Date.now();
     }
     if (ambushResult.text !== null && (ambushResult.confident || confirmedText.ambush === null)) {
       confirmedText.ambush = ambushResult.text;
+      if (ambushResult.confident) lastConfidentFetch = Date.now();
     }
 
     if (confirmedText.ascent !== null) data.ascent = parseCSV(confirmedText.ascent);
@@ -3544,6 +3549,16 @@ initMap();
 fetchAll();
 updateMapLegend(activeTab);
 setInterval(fetchAll, REFRESH_MS);
+// Tick the "Updated Xs ago" display every second
+setInterval(() => {
+  const el = document.getElementById('lastUpdated');
+  if (!el) return;
+  if (lastConfidentFetch === null) { el.textContent = 'Waiting for first sync…'; return; }
+  const secs = Math.floor((Date.now() - lastConfidentFetch) / 1000);
+  const label = secs < 60 ? `${secs}s ago` : `${Math.floor(secs/60)}m ${secs%60}s ago`;
+  el.textContent = `Updated ${label}`;
+  el.style.color = secs > 90 ? '#facc15' : '#888';
+}, 1000);
 // Refetch when tab becomes visible again — feels more "live" when returning to the tab
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) fetchAll();
