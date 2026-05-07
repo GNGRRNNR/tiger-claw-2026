@@ -749,6 +749,30 @@ td.team-name {
 
 <!-- MAP -->
 <div class="map-section">
+  <!-- FOLLOW RUNNER BAR -->
+  <div id="followBar" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+    <div style="position:relative;flex:1;max-width:280px;">
+      <span style="position:absolute;left:0.6rem;top:50%;transform:translateY(-50%);color:var(--text-dim);font-size:0.75rem;pointer-events:none;">🔍</span>
+      <input type="text" id="followInput" placeholder="Follow a runner (name or bib)…" autocomplete="off" style="
+        width:100%;background:var(--surface3);border:1px solid var(--border2);border-radius:4px;
+        color:var(--text);font-family:'DM Mono',monospace;font-size:0.78rem;
+        padding:0.45rem 0.75rem 0.45rem 2rem;outline:none;transition:border-color 0.15s;"
+        oninput="onFollowInput(this.value)" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'">
+      <!-- Autocomplete dropdown -->
+      <div id="followDropdown" style="display:none;position:absolute;top:calc(100% + 3px);left:0;right:0;
+        background:var(--surface);border:1px solid var(--border2);border-radius:4px;z-index:100;
+        box-shadow:0 8px 24px rgba(0,0,0,0.6);max-height:200px;overflow-y:auto;"></div>
+    </div>
+    <div id="followTags" style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;"></div>
+    <button id="followClearBtn" onclick="clearFollowing()" style="display:none;
+      background:var(--surface3);border:1px solid var(--border2);border-radius:4px;
+      color:var(--text-muted);font-family:'DM Mono',monospace;font-size:0.72rem;
+      padding:0.4rem 0.7rem;cursor:pointer;white-space:nowrap;">Clear all</button>
+    <span style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--text-dim);white-space:nowrap;">
+      Up to 5 runners
+    </span>
+  </div>
+
   <div class="map-title">
     Course Map — Live Positions
     <div style="display:flex;border:1px solid var(--border2);border-radius:4px;overflow:hidden;margin-left:0.75rem;flex-shrink:0;">
@@ -849,7 +873,26 @@ td.team-name {
   <div style="position:relative;height:220px;">
     <canvas id="ascentElevChart"></canvas>
   </div>
-  <div id="ascentRunnerList" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.75rem;"></div>
+  <div style="margin-top:0.75rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+    <span id="ascentRunnerCount" style="font-family:'DM Mono',monospace;font-size:0.68rem;color:var(--text-dim)"></span>
+    <button id="ascentRunnerToggle" onclick="toggleAscentRunnerList()" style="
+      background:var(--surface3);border:1px solid var(--border2);border-radius:4px;color:var(--text-muted);
+      font-family:'DM Mono',monospace;font-size:0.68rem;padding:0.25rem 0.6rem;cursor:pointer;">
+      Show runners ▾
+    </button>
+  </div>
+  <div id="ascentRunnerList" style="display:none;margin-top:0.5rem;max-height:160px;overflow-y:auto;
+    border:1px solid var(--border);border-radius:4px;background:var(--surface);">
+    <table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
+      <thead><tr style="background:var(--surface2);">
+        <th style="padding:0.35rem 0.6rem;text-align:left;font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--text-dim);border-bottom:1px solid var(--border);font-weight:400;letter-spacing:0.08em;text-transform:uppercase;">Bib</th>
+        <th style="padding:0.35rem 0.6rem;text-align:left;font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--text-dim);border-bottom:1px solid var(--border);font-weight:400;letter-spacing:0.08em;text-transform:uppercase;">Name</th>
+        <th style="padding:0.35rem 0.6rem;text-align:right;font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--text-dim);border-bottom:1px solid var(--border);font-weight:400;letter-spacing:0.08em;text-transform:uppercase;">Progress</th>
+        <th style="padding:0.35rem 0.6rem;text-align:center;font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--text-dim);border-bottom:1px solid var(--border);font-weight:400;letter-spacing:0.08em;text-transform:uppercase;">Follow</th>
+      </tr></thead>
+      <tbody id="ascentRunnerListBody"></tbody>
+    </table>
+  </div>
 </div>
 
 <!-- CHARTS — 50k/ambush only -->
@@ -1084,15 +1127,8 @@ function drawAscentElevProfile() {
   document.getElementById('ascentElevStats').textContent =
     `${fmtDist(GPX_DISTANCES['ascent'])} · +${fmtElev(gain)} gain · ${fmtElev(minE)}–${fmtElev(maxE)}`;
 
-  // Runner chips below chart
-  document.getElementById('ascentRunnerList').innerHTML = runnerDots.length === 0
-    ? `<span style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--text-dim)">No runners on course yet</span>`
-    : runnerDots.map(rd => `
-        <div style="display:flex;align-items:center;gap:0.4rem;background:var(--surface3);border:1px solid #a78bfa44;border-radius:3px;padding:0.2rem 0.5rem;">
-          <span style="font-family:'Bebas Neue',sans-serif;font-size:0.9rem;color:#a78bfa">#${rd.bib}</span>
-          <span style="font-size:0.7rem;color:var(--text)">${rd.name}</span>
-          <span style="font-size:0.65rem;color:var(--text-dim);margin-left:0.25rem">${Math.round(rd.progress*100)}%</span>
-        </div>`).join('');
+  // Runner chips below chart — delegated to renderAscentRunnerList
+  renderAscentRunnerList(runnerDots);
 
   // Checkpoint annotation dataset
   const cpDataset = {
@@ -1957,8 +1993,177 @@ function openSegmentFocus(routeName) {
 
 
 // ============================================================
-// MAP — Mapbox GL JS with satellite + GPX routes
+// FOLLOW RUNNER — highlight 1-5 runners, dim the rest
 // ============================================================
+let followedKeys = new Set(); // marker keys like 'a_74', 'f_12'
+
+function getFollowCandidates() {
+  const tab = activeTab;
+  const results = [];
+  if (tab === 'ascent' || tab === 'bigcat') {
+    data.ascent.forEach(r => {
+      if (!r.BIB) return;
+      results.push({ key: 'a_' + r.BIB, bib: r.BIB, name: r.NAME || '', label: `#${r.BIB} ${r.NAME||''}` });
+    });
+  }
+  if (tab === '50k' || tab === 'bigcat') {
+    data.fiftyk.forEach(r => {
+      if (!r.Bib) return;
+      results.push({ key: 'f_' + r.Bib, bib: r.Bib, name: r.Name || '', label: `#${r.Bib} ${r.Name||''}` });
+    });
+  }
+  if (tab === 'ambush') {
+    data.ambush.forEach(r => {
+      if (!r.Bib) return;
+      results.push({ key: 'b_' + r.Bib, bib: r.Bib, name: r.Name || '', label: `#${r.Bib} ${r.Name||''}` });
+    });
+  }
+  return results;
+}
+
+function onFollowInput(val) {
+  const dropdown = document.getElementById('followDropdown');
+  if (!val.trim()) { dropdown.style.display = 'none'; return; }
+  const q = val.toLowerCase();
+  const candidates = getFollowCandidates().filter(c =>
+    c.bib.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
+  ).slice(0, 10);
+  if (!candidates.length) { dropdown.style.display = 'none'; return; }
+  dropdown.innerHTML = candidates.map(c => `
+    <div onclick="addFollow('${c.key}','${c.bib}','${c.name.replace(/'/g,"\\'")}')"
+      style="padding:0.5rem 0.75rem;cursor:pointer;font-family:'DM Mono',monospace;font-size:0.78rem;
+             border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0.5rem;"
+      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <span style="color:var(--accent);font-family:'Bebas Neue',sans-serif;font-size:1rem;">#${c.bib}</span>
+      <span style="color:var(--text)">${c.name}</span>
+    </div>`).join('');
+  dropdown.style.display = 'block';
+}
+
+function addFollow(key, bib, name) {
+  if (followedKeys.size >= 5) return;
+  followedKeys.add(key);
+  document.getElementById('followInput').value = '';
+  document.getElementById('followDropdown').style.display = 'none';
+  renderFollowTags();
+  applyFollowDimming();
+}
+
+function removeFollow(key) {
+  followedKeys.delete(key);
+  renderFollowTags();
+  applyFollowDimming();
+}
+
+function clearFollowing() {
+  followedKeys.clear();
+  renderFollowTags();
+  applyFollowDimming();
+}
+
+function renderFollowTags() {
+  const tagsEl = document.getElementById('followTags');
+  const clearBtn = document.getElementById('followClearBtn');
+  if (!followedKeys.size) { tagsEl.innerHTML = ''; clearBtn.style.display = 'none'; return; }
+  clearBtn.style.display = '';
+  // Find names for each key
+  const all = getFollowCandidates();
+  const map = Object.fromEntries(all.map(c => [c.key, c]));
+  tagsEl.innerHTML = [...followedKeys].map(k => {
+    const c = map[k] || { bib: k.split('_')[1], name: '' };
+    return `<div style="display:flex;align-items:center;gap:0.3rem;background:#1a1200;
+      border:1px solid var(--accent);border-radius:3px;padding:0.2rem 0.5rem;">
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:0.9rem;color:var(--accent)">#${c.bib}</span>
+      <span style="font-size:0.7rem;color:var(--text)">${c.name}</span>
+      <button onclick="removeFollow('${k}')" style="background:none;border:none;color:var(--text-dim);
+        cursor:pointer;font-size:0.8rem;padding:0 0.1rem;line-height:1;margin-left:0.2rem;">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function applyFollowDimming() {
+  Object.entries(runnerMarkers).forEach(([key, marker]) => {
+    const el = marker.getElement();
+    if (!el) return;
+    if (followedKeys.size === 0) {
+      el.style.opacity = '1';
+      el.style.filter = '';
+      el.style.zIndex = '';
+    } else if (followedKeys.has(key)) {
+      el.style.opacity = '1';
+      el.style.filter = 'drop-shadow(0 0 6px var(--accent))';
+      el.style.zIndex = '10';
+    } else {
+      el.style.opacity = '0.15';
+      el.style.filter = '';
+      el.style.zIndex = '';
+    }
+  });
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('#followBar')) {
+    const dd = document.getElementById('followDropdown');
+    if (dd) dd.style.display = 'none';
+  }
+});
+
+// ============================================================
+// ASCENT RUNNER LIST — collapsible panel
+// ============================================================
+let ascentRunnerListOpen = false;
+
+function toggleAscentRunnerList() {
+  ascentRunnerListOpen = !ascentRunnerListOpen;
+  const list = document.getElementById('ascentRunnerList');
+  const btn = document.getElementById('ascentRunnerToggle');
+  list.style.display = ascentRunnerListOpen ? 'block' : 'none';
+  btn.textContent = ascentRunnerListOpen ? 'Hide runners ▴' : 'Show runners ▾';
+}
+
+function renderAscentRunnerList(runnerDots) {
+  const countEl = document.getElementById('ascentRunnerCount');
+  const bodyEl = document.getElementById('ascentRunnerListBody');
+  if (!countEl || !bodyEl) return;
+
+  const onCourse = runnerDots.filter(rd => !rd.fixed);
+  countEl.textContent = onCourse.length
+    ? `${onCourse.length} runner${onCourse.length !== 1 ? 's' : ''} on course`
+    : 'No runners on course yet';
+
+  if (!onCourse.length) { bodyEl.innerHTML = ''; return; }
+
+  // Sort by progress descending (leader first)
+  const sorted = [...onCourse].sort((a, b) => b.progress - a.progress);
+  bodyEl.innerHTML = sorted.map(rd => {
+    const key = 'a_' + rd.bib;
+    const isFollowed = followedKeys.has(key);
+    return `<tr style="border-bottom:1px solid var(--border);${isFollowed ? 'background:#1a1200;' : ''}">
+      <td style="padding:0.3rem 0.6rem;font-family:'Bebas Neue',sans-serif;font-size:1rem;color:#a78bfa;">#${rd.bib}</td>
+      <td style="padding:0.3rem 0.6rem;font-size:0.78rem;color:var(--text);">${rd.name}</td>
+      <td style="padding:0.3rem 0.6rem;text-align:right;">
+        <div style="display:inline-flex;align-items:center;gap:0.4rem;">
+          <div style="width:60px;height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;">
+            <div style="width:${Math.round(rd.progress*100)}%;height:100%;background:#a78bfa;border-radius:2px;"></div>
+          </div>
+          <span style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--text-dim);">${Math.round(rd.progress*100)}%</span>
+        </div>
+      </td>
+      <td style="padding:0.3rem 0.6rem;text-align:center;">
+        <button onclick="${isFollowed ? `removeFollow('${key}')` : `addFollow('${key}','${rd.bib}','${rd.name.replace(/'/g,"\\'")}')`}"
+          style="background:${isFollowed ? 'var(--accent)' : 'var(--surface3)'};
+            border:1px solid ${isFollowed ? 'var(--accent)' : 'var(--border2)'};border-radius:3px;
+            color:${isFollowed ? 'var(--black)' : 'var(--text-muted)'};
+            font-family:'DM Mono',monospace;font-size:0.65rem;padding:0.2rem 0.45rem;cursor:pointer;">
+          ${isFollowed ? '★ Following' : '☆ Follow'}
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+
 const ROUTE_COLORS = {
   green_start: '#4ade80', ascent: '#a78bfa', pink: '#f472b6',
   white: '#e2e8f0', yellow: '#fbbf24', blue_descent: '#60a5fa', red_finish: '#f87171',
@@ -2337,6 +2542,9 @@ function updateRunnerTargets() {
       delete currentPositions[k];
     }
   });
+
+  // Apply follow dimming every time markers update
+  applyFollowDimming();
 }
 
 function updateRunnerPositions() { updateRunnerTargets(); }
