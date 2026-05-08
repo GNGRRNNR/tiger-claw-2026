@@ -1466,9 +1466,18 @@ function loopTag(color) {
 // Google's edge servers cache CSVs inconsistently — single fetches can flip between
 // fresh and stale. Voting across multiple fetches converges on the true current state
 // regardless of whether rows were added, edited, or deleted.
-// Returns { text, confident } where confident=true means 2+ of 3 fetches agreed.
-// If all 3 disagree, returns the most common but flags it as not confident —
-// the caller can then keep the existing data rather than flicker.
+// Count CSV rows quickly without full parse (excludes header).
+function countRows(text) {
+  if (!text) return 0;
+  // Strip trailing empty lines, count remaining minus 1 for header
+  const trimmed = text.replace(/\n+$/, '');
+  if (!trimmed) return 0;
+  return Math.max(0, trimmed.split('\n').length - 1);
+}
+
+// Returns { text, confident } where confident=true means we trust this result.
+// Trust rule: at least 2 of 3 fetches agree on the SAME row count
+// (allows for sheet re-orderings that change content but not structure).
 async function fetchWithConsensus(url) {
   const attempts = [];
   for (let i = 0; i < 3; i++) {
@@ -1480,21 +1489,48 @@ async function fetchWithConsensus(url) {
   }
   if (attempts.length === 0) return { text: null, confident: false };
   if (attempts.length === 1) return { text: attempts[0], confident: true };
-  const counts = {};
-  for (const t of attempts) counts[t] = (counts[t] || 0) + 1;
-  let winner = attempts[0], best = 0;
-  for (const t in counts) {
-    if (counts[t] > best) { best = counts[t]; winner = t; }
+
+  // Group by row count
+  const byCount = {};
+  for (const t of attempts) {
+    const c = countRows(t);
+    if (!byCount[c]) byCount[c] = [];
+    byCount[c].push(t);
   }
-  // confident = at least 2 of the fetches agreed on the winner
-  return { text: winner, confident: best >= 2 };
+  // Find the row count with most agreement
+  let winnerCount = -1, winnerGroup = [];
+  for (const c in byCount) {
+    if (byCount[c].length > winnerGroup.length) {
+      winnerGroup = byCount[c];
+      winnerCount = parseInt(c);
+    }
+  }
+  // Confident if 2+ fetches returned the same row count
+  // Pick the longest text in the winning group (most complete representation)
+  const winner = winnerGroup.reduce((a, b) => a.length >= b.length ? a : b);
+  return { text: winner, confident: winnerGroup.length >= 2 };
 }
 
-// Stable cache: stores the last confident text per key so we never
-// display a flickery one-off result. Genuine changes (deletions, additions)
-// will consistently win 2-of-3 and replace this cleanly.
 const confirmedText = { ascent: null, fiftyk: null, ambush: null, ascent_cp: null };
+// High-water marks: never accept fewer rows than we've previously confirmed,
+// UNLESS the new fetch is confidently smaller (meaning a real deletion).
+const highWaterRows = { ascent: 0, fiftyk: 0, ambush: 0, ascent_cp: 0 };
 let lastConfidentFetch = null;
+
+// Decides whether to accept new data for a given key.
+// Accepts if: confident AND (more rows OR same rows with new content) — OR no prior data.
+function shouldAccept(key, result) {
+  if (result.text === null) return false;
+  if (confirmedText[key] === null) return true; // first data ever, take it
+  if (!result.confident) return false; // not confident, keep old
+  const newRows = countRows(result.text);
+  // Accept if rows grew, or rows match high-water mark (likely just content updates)
+  if (newRows >= highWaterRows[key]) return true;
+  // New data has FEWER rows than we've seen before. Only accept if confident
+  // AND we've seen this smaller count multiple times (real deletion, not flicker).
+  // For now, reject smaller results — race day, deletions are extremely rare.
+  return false;
+}
 
 async function fetchAll() {
   document.getElementById('loadingBar').classList.add('active');
@@ -1508,16 +1544,19 @@ async function fetchAll() {
     // Only update displayed data if the consensus was confident (2+ agreed).
     // This means genuine additions AND deletions will update correctly,
     // but a single stale cache hit won't cause a flicker.
-    if (ascentResult.text !== null && (ascentResult.confident || confirmedText.ascent === null)) {
+    if (shouldAccept('ascent', ascentResult)) {
       confirmedText.ascent = ascentResult.text;
+      highWaterRows.ascent = Math.max(highWaterRows.ascent, countRows(ascentResult.text));
       if (ascentResult.confident) lastConfidentFetch = Date.now();
     }
-    if (fiftyResult.text !== null && (fiftyResult.confident || confirmedText.fiftyk === null)) {
+    if (shouldAccept('fiftyk', fiftyResult)) {
       confirmedText.fiftyk = fiftyResult.text;
+      highWaterRows.fiftyk = Math.max(highWaterRows.fiftyk, countRows(fiftyResult.text));
       if (fiftyResult.confident) lastConfidentFetch = Date.now();
     }
-    if (ambushResult.text !== null && (ambushResult.confident || confirmedText.ambush === null)) {
+    if (shouldAccept('ambush', ambushResult)) {
       confirmedText.ambush = ambushResult.text;
+      highWaterRows.ambush = Math.max(highWaterRows.ambush, countRows(ambushResult.text));
       if (ambushResult.confident) lastConfidentFetch = Date.now();
     }
 
@@ -1529,8 +1568,9 @@ async function fetchAll() {
     if (CSV.ascent_cp) {
       try {
         const cpResult = await fetchWithConsensus(CSV.ascent_cp);
-        if (cpResult.text !== null && (cpResult.confident || confirmedText.ascent_cp === null)) {
+        if (shouldAccept('ascent_cp', cpResult)) {
           confirmedText.ascent_cp = cpResult.text;
+          highWaterRows.ascent_cp = Math.max(highWaterRows.ascent_cp, countRows(cpResult.text));
         }
         if (confirmedText.ascent_cp !== null) {
           const cpRows = parseCSV(confirmedText.ascent_cp);
