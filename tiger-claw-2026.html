@@ -1519,6 +1519,7 @@ async function fetchSingle(url, timeoutMs = 10000) {
     });
     if (res.ok) {
       const text = await res.text();
+      // gviz returns HTML error page instead of CSV when rate-limited — detect and reject
       if (text.trim().startsWith('<')) return { text: null, confident: false };
       return { text, confident: true };
     }
@@ -1528,24 +1529,20 @@ async function fetchSingle(url, timeoutMs = 10000) {
 }
 
 async function fetchWithConsensus(url) {
-  // First fetch of session: single request only — avoid 429 rate limiting
+  // Skip consensus on the very first fetch of a session — render fast.
   if (!window._firstFetchDone) {
     return await fetchSingle(url);
   }
-  // Subsequent fetches: 2 attempts spaced 2s apart (not 3 × 150ms which triggers 429)
   const attempts = [];
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 3; i++) {
     try {
       const res = await fetch(url + '&t=' + Date.now() + '_' + i + '_' + Math.random().toString(36).slice(2,8), {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
       });
-      if (res.ok) {
-        const text = await res.text();
-        if (!text.trim().startsWith('<')) attempts.push(text);
-      }
-    } catch(e) { /* skip */ }
-    if (i < 1) await new Promise(r => setTimeout(r, 2000));
+      if (res.ok) attempts.push(await res.text());
+    } catch(e) { /* skip failed attempt */ }
+    if (i < 2) await new Promise(r => setTimeout(r, 150));
   }
   if (attempts.length === 0) return { text: null, confident: false };
   if (attempts.length === 1) return { text: attempts[0], confident: true };
@@ -1661,21 +1658,12 @@ function shouldAccept(key, result) {
 
 async function fetchAll() {
   document.getElementById('loadingBar').classList.add('active');
-  const isFirst = !window._firstFetchDone;
   try {
-    let ascentResult, fiftyResult, ambushResult;
-    if (isFirst) {
-      // Sequential on first load to avoid hitting Google's 429 rate limit
-      ascentResult = await fetchWithConsensus(CSV.ascent);
-      fiftyResult  = await fetchWithConsensus(CSV.fiftyk);
-      ambushResult = await fetchWithConsensus(CSV.ambush);
-    } else {
-      [ascentResult, fiftyResult, ambushResult] = await Promise.all([
-        fetchWithConsensus(CSV.ascent),
-        fetchWithConsensus(CSV.fiftyk),
-        fetchWithConsensus(CSV.ambush),
-      ]);
-    }
+    const [ascentResult, fiftyResult, ambushResult] = await Promise.all([
+      fetchWithConsensus(CSV.ascent),
+      fetchWithConsensus(CSV.fiftyk),
+      fetchWithConsensus(CSV.ambush),
+    ]);
 
     // Only update displayed data if the consensus was confident (2+ agreed).
     // This means genuine additions AND deletions will update correctly,
@@ -3736,9 +3724,13 @@ updateEventStatus();
 setInterval(updateEventStatus, 60000);
 initSegmentDurations();
 initMap();
-fetchAll();
 updateMapLegend(activeTab);
-setInterval(fetchAll, REFRESH_MS);
+// Delay first fetch 3s — lets Squarespace finish its own Google requests first,
+// avoiding the gviz 429 rate limit on cold load.
+setTimeout(() => {
+  fetchAll();
+  setInterval(fetchAll, REFRESH_MS);
+}, 3000);
 // Tick the "Updated Xs ago" display every second
 setInterval(() => {
   const el = document.getElementById('lastUpdated');
