@@ -979,10 +979,31 @@ const CHECKPOINTS = [
 // When we have real UltraSignup data we can refine these per-runner.
 // To add a runner's historical pace: add their bib to RUNNER_PACE_OVERRIDES.
 // Format: { bibNumber: paceSec } where paceSec = seconds per flat km.
+// Per-runner pace overrides derived from May 8, 2026 ascent results.
+// Calculation: actual_ascent_pace_sec_per_km × (400/520) — converts the
+// ascent-segment pace (where SEGMENT_BASE_PACE.ascent = 520) into the
+// flat-equivalent scalar that getRunnerPace() expects (reference = 400 s/km).
+// Field stats: n=40, median=560 s/km, range=347–967 s/km.
 const RUNNER_PACE_OVERRIDES = {
-  // Example: 42: 360 means bib 42 runs ~10 min/mile flat pace
-  // Fill in from UltraSignup exports before race day
+  11: 465, 12: 602, 13: 378, 14: 672, 15: 560, 18: 445, 19: 481, 20: 515,
+  22: 580, 26: 681, 28: 688, 30: 347, 31: 655, 33: 645, 34: 558, 35: 538,
+  37: 440, 38: 620, 39: 571, 41: 560, 42: 583, 43: 967, 44: 757, 46: 852,
+  47: 508, 48: 356, 51: 475, 53: 464, 54: 382, 56: 474, 58: 754, 60: 645,
+  62: 429, 63: 505, 64: 537, 67: 675, 68: 574, 70: 608, 71: 754, 74: 522,
 };
+
+// Variance buffer: tomorrow's race is longer than the ascent, so per-runner
+// pace from a 30–80 min effort over-predicts speed on a multi-hour course.
+// A flat fatigue multiplier widens predicted segment durations a bit, and
+// scales further as race elapsed time grows. 1.0 = exact, 1.15 = +15% slower.
+const PACE_VARIANCE_BASE = 1.10;            // baseline slowdown vs ascent pace
+const PACE_VARIANCE_PER_HOUR = 0.03;        // additional 3% slower per race hour
+const PACE_VARIANCE_MAX = 1.35;             // cap at +35%
+function paceVarianceMultiplier(raceStartMs) {
+  if (!raceStartMs) return PACE_VARIANCE_BASE;
+  const hoursIn = Math.max(0, (Date.now() - raceStartMs) / 3600000);
+  return Math.min(PACE_VARIANCE_MAX, PACE_VARIANCE_BASE + hoursIn * PACE_VARIANCE_PER_HOUR);
+}
 
 // ============================================================
 // SEGMENT BASE PACES — calibrated from 2025 Tiger Claw results
@@ -1517,6 +1538,73 @@ const confirmedText = { ascent: null, fiftyk: null, ambush: null, ascent_cp: nul
 const highWaterRows = { ascent: 0, fiftyk: 0, ambush: 0, ascent_cp: 0 };
 let lastConfidentFetch = null;
 
+// CELL-LEVEL HIGH-WATER MARK
+// Once we've seen a non-empty value for a runner's timestamp/status/elapsed field,
+// we never let a later fetch blank it out. This guards against stale Google CSV
+// cache hits that pass row-count consensus but contain blank cells for cells we
+// previously had populated (the "scan time appears, then disappears" bug).
+const STICKY_FIELDS = {
+  ascent: ['STATUS','START TIME (SCAN)','FINISH TIME (SCAN)','ELAPSED TIME','GENDER'],
+  fiftyk: ['Status','Start Time','Green Checkpoint','Loop Color','First Loop Color',
+           'Loop Bottom','Red Checkpoint Out','Red Checkpoint In','FINISH TIME (Scan)',
+           'Total Elapsed Time'],
+  ambush: ['Status','Green Checkpoint','Loop Color','Loop Bottom',
+           'Red Checkpoint Out','Red Checkpoint In','FINISH TIME (Scan)','Total Elapsed Time'],
+};
+const BIB_KEY = { ascent: 'BIB', fiftyk: 'Bib', ambush: 'Bib' };
+
+// Merge new rows into prior rows: for each runner, if the new row has a blank
+// value in a sticky field but the prior row had a value, keep the prior value.
+// Returns the merged array (preserves new row order/structure otherwise).
+function mergeRows(key, prevRows, newRows) {
+  if (!Array.isArray(prevRows) || prevRows.length === 0) return newRows;
+  if (!Array.isArray(newRows)) return prevRows;
+  const bibKey = BIB_KEY[key];
+  const fields = STICKY_FIELDS[key] || [];
+  const prevByBib = new Map();
+  prevRows.forEach(r => {
+    const bib = r && r[bibKey] ? String(r[bibKey]).trim() : '';
+    if (bib) prevByBib.set(bib, r);
+  });
+  return newRows.map(r => {
+    const bib = r && r[bibKey] ? String(r[bibKey]).trim() : '';
+    if (!bib) return r;
+    const prev = prevByBib.get(bib);
+    if (!prev) return r;
+    let patched = null;
+    for (const f of fields) {
+      const newVal = r[f];
+      const prevVal = prev[f];
+      const newBlank = (newVal === undefined || newVal === null || String(newVal).trim() === '');
+      const prevHas  = (prevVal !== undefined && prevVal !== null && String(prevVal).trim() !== '');
+      if (newBlank && prevHas) {
+        if (!patched) patched = { ...r };
+        patched[f] = prevVal;
+      }
+    }
+    return patched || r;
+  });
+}
+
+// Same idea for the ascent_cp scan map (bib -> earliest timestamp).
+// Once we have a timestamp for a bib, never let it be erased; only allow
+// the timestamp to move EARLIER (per the "earliest scan wins" rule).
+function mergeAscentCp(prevMap, newMap) {
+  if (!prevMap) return newMap || {};
+  if (!newMap) return prevMap;
+  const merged = { ...newMap };
+  for (const bib in prevMap) {
+    const prevTs = prevMap[bib];
+    const newTs  = merged[bib];
+    if (!newTs && prevTs) {
+      merged[bib] = prevTs; // restore lost timestamp
+    } else if (prevTs && newTs && prevTs < newTs) {
+      merged[bib] = prevTs; // keep earliest
+    }
+  }
+  return merged;
+}
+
 // Decides whether to accept new data for a given key.
 // Accepts if: confident AND (more rows OR same rows with new content) — OR no prior data.
 function shouldAccept(key, result) {
@@ -1560,9 +1648,9 @@ async function fetchAll() {
       if (ambushResult.confident) lastConfidentFetch = Date.now();
     }
 
-    if (confirmedText.ascent !== null) data.ascent = parseCSV(confirmedText.ascent);
-    if (confirmedText.fiftyk !== null) data.fiftyk = parseCSV(confirmedText.fiftyk);
-    if (confirmedText.ambush !== null) data.ambush = parseCSV(confirmedText.ambush);
+    if (confirmedText.ascent !== null) data.ascent = mergeRows('ascent', data.ascent, parseCSV(confirmedText.ascent));
+    if (confirmedText.fiftyk !== null) data.fiftyk = mergeRows('fiftyk', data.fiftyk, parseCSV(confirmedText.fiftyk));
+    if (confirmedText.ambush !== null) data.ambush = mergeRows('ambush', data.ambush, parseCSV(confirmedText.ambush));
 
     // Ascent checkpoint scans — one row per scan, take earliest per bib
     if (CSV.ascent_cp) {
@@ -1582,7 +1670,7 @@ async function fetchAll() {
             // Keep earliest scan per bib
             if (!cpMap[bib] || ts < cpMap[bib]) cpMap[bib] = ts;
           });
-          data.ascent_cp = cpMap;
+          data.ascent_cp = mergeAscentCp(data.ascent_cp, cpMap);
         }
       } catch(e) { console.warn('ascent_cp fetch failed', e); }
     }
@@ -2764,7 +2852,20 @@ function getRunnerRouteAndProgress(r, type) {
       const pace = getEstimatedSegmentPace(observedPaceSecPerKm, observedSegName, segName);
       segDurSec = segDistKm(segName) * pace;
     } else {
-      segDurSec = SEGMENT_DURATIONS[segName] || estimateSegmentDuration(segName);
+      // No real-time scan-to-scan pace yet. If we have a per-runner pace override
+      // (e.g. seeded from yesterday's ascent), use it as a synthetic observed pace
+      // so the runner's dot moves at their actual fitness — not the field average.
+      const personalScalar = RUNNER_PACE_OVERRIDES[String(bib)];
+      if (personalScalar) {
+        // Scale base pace by personal ratio (matches getRunnerPace() math)
+        const basePace = SEGMENT_BASE_PACE[segName] || 480;
+        const personalSegPace = basePace * (personalScalar / 400);
+        // Apply variance buffer so longer races don't over-predict speed.
+        const variance = paceVarianceMultiplier(lastScanMs);
+        segDurSec = segDistKm(segName) * personalSegPace * variance;
+      } else {
+        segDurSec = SEGMENT_DURATIONS[segName] || estimateSegmentDuration(segName);
+      }
     }
     if (!segDurSec || segDurSec <= 0) return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
     let progress = Math.min(Math.max(elapsedSec / segDurSec, 0), 0.99);
