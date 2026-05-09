@@ -940,20 +940,19 @@ td.team-name {
 // ============================================================
 // CONFIG
 // ============================================================
-// Direct read URLs from the Final Results spreadsheet — bypasses publish-to-web cache.
-// Uses the gviz endpoint with sheet names (no gid required) so this stays robust
-// even if tabs are recreated or renumbered.
-// Final Results sheet: 1_7iVj9ELWGJFjCfs0lqN7mheJnlmO3L03IwmVAvJDAI
-// Requires sheet to be set to "Anyone with the link can view" (Viewer only, not Editor).
 const FINAL_RESULTS_ID = '1_7iVj9ELWGJFjCfs0lqN7mheJnlmO3L03IwmVAvJDAI';
-const sheetCsvUrl = (sheetName) =>
-  `https://docs.google.com/spreadsheets/d/${FINAL_RESULTS_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+const SHEETS_API_KEY = 'AIzaSyBJbSNFryaZsfiYstixiHshalDyp76r0rA';
+
+// Sheets API v4 — reads directly from the sheet with no caching, no gviz 429s.
+// Returns rows as a 2D array via the values endpoint.
+const sheetApiUrl = (sheetName) =>
+  `https://sheets.googleapis.com/v4/spreadsheets/${FINAL_RESULTS_ID}/values/${encodeURIComponent(sheetName)}?key=${SHEETS_API_KEY}`;
 
 const CSV = {
-  ascent:    sheetCsvUrl('ASCENT RESULTS'),
-  fiftyk:    sheetCsvUrl('50K RESULTS'),
-  ambush:    sheetCsvUrl('AMBUSH RESULTS'),
-  ascent_cp: sheetCsvUrl('DB_ASCENT_CP'),
+  ascent:    sheetApiUrl('ASCENT RESULTS'),
+  fiftyk:    sheetApiUrl('50K RESULTS'),
+  ambush:    sheetApiUrl('AMBUSH RESULTS'),
+  ascent_cp: sheetApiUrl('DB_ASCENT_CP'),
 };
 
 const REFRESH_MS = 30000;
@@ -1508,64 +1507,36 @@ function countRows(text) {
 // Fast single-fetch for initial page load — consensus voting is expensive
 // (3x sequential fetches per source × 4 sources = ~12 round trips before anything renders)
 // On first load we just want SOMETHING on screen; the next interval tick brings consensus.
-async function fetchSingle(url, timeoutMs = 10000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url + '&t=' + Date.now() + '_' + Math.random().toString(36).slice(2,8), {
-      cache: 'no-store',
-      signal: controller.signal,
-      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
-    });
-    if (res.ok) {
-      const text = await res.text();
-      // gviz returns HTML error page instead of CSV when rate-limited — detect and reject
-      if (text.trim().startsWith('<')) return { text: null, confident: false };
-      return { text, confident: true };
-    }
-  } catch(e) { /* timeout or network error */ }
-  finally { clearTimeout(timer); }
-  return { text: null, confident: false };
-}
-
+// Fetches data via Sheets API v4 (JSON) and converts to CSV-compatible format.
+// No caching, no rate limiting, no gviz 429s.
 async function fetchWithConsensus(url) {
-  // Skip consensus on the very first fetch of a session — render fast.
-  if (!window._firstFetchDone) {
-    return await fetchSingle(url);
-  }
-  const attempts = [];
-  for (let i = 0; i < 3; i++) {
-    try {
-      const res = await fetch(url + '&t=' + Date.now() + '_' + i + '_' + Math.random().toString(36).slice(2,8), {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
-      });
-      if (res.ok) attempts.push(await res.text());
-    } catch(e) { /* skip failed attempt */ }
-    if (i < 2) await new Promise(r => setTimeout(r, 150));
-  }
-  if (attempts.length === 0) return { text: null, confident: false };
-  if (attempts.length === 1) return { text: attempts[0], confident: true };
-
-  // Group by row count
-  const byCount = {};
-  for (const t of attempts) {
-    const c = countRows(t);
-    if (!byCount[c]) byCount[c] = [];
-    byCount[c].push(t);
-  }
-  // Find the row count with most agreement
-  let winnerCount = -1, winnerGroup = [];
-  for (const c in byCount) {
-    if (byCount[c].length > winnerGroup.length) {
-      winnerGroup = byCount[c];
-      winnerCount = parseInt(c);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) {
+      console.warn('[TC] Sheets API error:', res.status, url);
+      return { text: null, confident: false };
     }
+    const json = await res.json();
+    // Convert Sheets API v4 response to CSV text for compatibility
+    const rows = json.values || [];
+    if (rows.length === 0) return { text: '', confident: true };
+    const csv = rows.map(row =>
+      row.map(cell => {
+        const s = String(cell ?? '');
+        return s.includes(',') || s.includes('"') || s.includes('\n')
+          ? '"' + s.replace(/"/g, '""') + '"'
+          : s;
+      }).join(',')
+    ).join('\n');
+    return { text: csv, confident: true };
+  } catch(e) {
+    console.warn('[TC] Sheets API fetch failed:', e.message);
+    return { text: null, confident: false };
+  } finally {
+    clearTimeout(timer);
   }
-  // Confident if 2+ fetches returned the same row count
-  // Pick the longest text in the winning group (most complete representation)
-  const winner = winnerGroup.reduce((a, b) => a.length >= b.length ? a : b);
-  return { text: winner, confident: winnerGroup.length >= 2 };
 }
 
 const confirmedText = { ascent: null, fiftyk: null, ambush: null, ascent_cp: null };
@@ -1723,7 +1694,7 @@ async function fetchAll() {
     console.error('Fetch error:', e);
   }
   document.getElementById('loadingBar').classList.remove('active');
-  window._firstFetchDone = true; // subsequent fetches use full consensus voting
+
 }
 
 // ============================================================
@@ -3724,13 +3695,9 @@ updateEventStatus();
 setInterval(updateEventStatus, 60000);
 initSegmentDurations();
 initMap();
+fetchAll();
 updateMapLegend(activeTab);
-// Delay first fetch 3s — lets Squarespace finish its own Google requests first,
-// avoiding the gviz 429 rate limit on cold load.
-setTimeout(() => {
-  fetchAll();
-  setInterval(fetchAll, REFRESH_MS);
-}, 3000);
+setInterval(fetchAll, REFRESH_MS);
 // Tick the "Updated Xs ago" display every second
 setInterval(() => {
   const el = document.getElementById('lastUpdated');
