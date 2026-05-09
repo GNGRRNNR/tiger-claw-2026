@@ -1504,7 +1504,10 @@ function countRows(text) {
 // On first load we just want SOMETHING on screen; the next interval tick brings consensus.
 async function fetchSingle(url) {
   try {
-    const res = await fetch(url + '&t=' + Date.now());
+    const res = await fetch(url + '&t=' + Date.now() + '_' + Math.random().toString(36).slice(2,8), {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
+    });
     if (res.ok) {
       const text = await res.text();
       return { text, confident: true };
@@ -1521,7 +1524,10 @@ async function fetchWithConsensus(url) {
   const attempts = [];
   for (let i = 0; i < 3; i++) {
     try {
-      const res = await fetch(url + '&t=' + Date.now() + '_' + i);
+      const res = await fetch(url + '&t=' + Date.now() + '_' + i + '_' + Math.random().toString(36).slice(2,8), {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
+      });
       if (res.ok) attempts.push(await res.text());
     } catch(e) { /* skip failed attempt */ }
     if (i < 2) await new Promise(r => setTimeout(r, 150));
