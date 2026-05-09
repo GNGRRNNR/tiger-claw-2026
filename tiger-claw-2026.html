@@ -1463,11 +1463,11 @@ function elapsedMs(str) {
 // STATUS
 // ============================================================
 function statusBadge(status) {
-  const s = (status || '').toUpperCase();
+  const s = String(status || '').trim().toUpperCase();
   if (s === 'FINISHED') return `<span class="status-badge status-finished">Finished</span>`;
   if (s === 'DNF') return `<span class="status-badge status-dnf">DNF</span>`;
   if (s === 'DNS') return `<span class="status-badge status-dns">DNS</span>`;
-  if (s !== '') return `<span class="status-badge status-active">${status}</span>`;
+  if (s !== '') return `<span class="status-badge status-active">${s}</span>`;
   return `<span class="status-badge status-blank">On Course</span>`;
 }
 
@@ -1499,7 +1499,25 @@ function countRows(text) {
 // Returns { text, confident } where confident=true means we trust this result.
 // Trust rule: at least 2 of 3 fetches agree on the SAME row count
 // (allows for sheet re-orderings that change content but not structure).
+// Fast single-fetch for initial page load — consensus voting is expensive
+// (3x sequential fetches per source × 4 sources = ~12 round trips before anything renders)
+// On first load we just want SOMETHING on screen; the next interval tick brings consensus.
+async function fetchSingle(url) {
+  try {
+    const res = await fetch(url + '&t=' + Date.now());
+    if (res.ok) {
+      const text = await res.text();
+      return { text, confident: true };
+    }
+  } catch(e) { /* fall through */ }
+  return { text: null, confident: false };
+}
+
 async function fetchWithConsensus(url) {
+  // Skip consensus on the very first fetch of a session — render fast.
+  if (!window._firstFetchDone) {
+    return await fetchSingle(url);
+  }
   const attempts = [];
   for (let i = 0; i < 3; i++) {
     try {
@@ -1687,6 +1705,7 @@ async function fetchAll() {
     console.error('Fetch error:', e);
   }
   document.getElementById('loadingBar').classList.remove('active');
+  window._firstFetchDone = true; // subsequent fetches use full consensus voting
 }
 
 // ============================================================
@@ -3169,8 +3188,8 @@ function renderPodium(allRows, tab) {
   genders.forEach(g => {
     const finished = allRows.filter(r => {
       const gender = getGender(r, tab);
-      // Check all possible status field names
-      const status = (r.Status || r.STATUS || r.status || '').toUpperCase();
+      // Check all possible status field names — TRIM and uppercase to handle whitespace
+      const status = String(r.Status || r.STATUS || r.status || '').trim().toUpperCase();
       return gender === g.key && status === 'FINISHED';
     })
     .map(r => ({ ...r, _rankMs: getElapsedMsForRanking(r, tab) }))
