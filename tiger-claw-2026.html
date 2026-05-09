@@ -940,14 +940,20 @@ td.team-name {
 // ============================================================
 // CONFIG
 // ============================================================
+// Direct read URLs from the Final Results spreadsheet — bypasses publish-to-web cache.
+// Uses the gviz endpoint with sheet names (no gid required) so this stays robust
+// even if tabs are recreated or renumbered.
+// Final Results sheet: 1_7iVj9ELWGJFjCfs0lqN7mheJnlmO3L03IwmVAvJDAI
+// Requires sheet to be set to "Anyone with the link can view" (Viewer only, not Editor).
+const FINAL_RESULTS_ID = '1_7iVj9ELWGJFjCfs0lqN7mheJnlmO3L03IwmVAvJDAI';
+const sheetCsvUrl = (sheetName) =>
+  `https://docs.google.com/spreadsheets/d/${FINAL_RESULTS_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+
 const CSV = {
-  ascent: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKzvda8NY-cieHJDTBRBCQSqNuJ8BIq5LJ3n1Hswz-LMXS6bvxAJf5Tn52z5RGQ4zzB8feOfB7pNvP/pub?gid=0&single=true&output=csv',
-  fiftyk: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKzvda8NY-cieHJDTBRBCQSqNuJ8BIq5LJ3n1Hswz-LMXS6bvxAJf5Tn52z5RGQ4zzB8feOfB7pNvP/pub?gid=1023891274&single=true&output=csv',
-  ambush: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRKzvda8NY-cieHJDTBRBCQSqNuJ8BIq5LJ3n1Hswz-LMXS6bvxAJf5Tn52z5RGQ4zzB8feOfB7pNvP/pub?gid=1246600417&single=true&output=csv',
-  // Ascent Checkpoint scans — from the Yellow Pi in Ascent mode
-  // Publish this tab from: 1RY2cN7IT62M-b8FsYUYH3HCe_FiS0w9XLOyaW9B5Ays → ASCENT CHECKPOINT SCANS
-  // File > Share > Publish to web → select that tab → CSV → copy URL here
-  ascent_cp: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQaiqwDwGmvyj8CipJRmssF76n4nxFloaw1FcSpDpiMRPHmTbU_-r69aGsQSgef1A9sD9PHONEwPVmG/pub?gid=1688634074&single=true&output=csv'
+  ascent:    sheetCsvUrl('ASCENT RESULTS'),
+  fiftyk:    sheetCsvUrl('50K RESULTS'),
+  ambush:    sheetCsvUrl('AMBUSH RESULTS'),
+  ascent_cp: sheetCsvUrl('DB_ASCENT_CP'),
 };
 
 const REFRESH_MS = 30000;
