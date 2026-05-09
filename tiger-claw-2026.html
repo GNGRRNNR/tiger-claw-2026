@@ -1508,7 +1508,7 @@ function countRows(text) {
 // Fast single-fetch for initial page load — consensus voting is expensive
 // (3x sequential fetches per source × 4 sources = ~12 round trips before anything renders)
 // On first load we just want SOMETHING on screen; the next interval tick brings consensus.
-async function fetchSingle(url, timeoutMs = 8000) {
+async function fetchSingle(url, timeoutMs = 10000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -1519,30 +1519,33 @@ async function fetchSingle(url, timeoutMs = 8000) {
     });
     if (res.ok) {
       const text = await res.text();
-      // gviz sometimes returns an HTML error page instead of CSV — detect and reject
       if (text.trim().startsWith('<')) return { text: null, confident: false };
       return { text, confident: true };
     }
-  } catch(e) { /* timeout or network error — fall through */ }
+  } catch(e) { /* timeout or network error */ }
   finally { clearTimeout(timer); }
   return { text: null, confident: false };
 }
 
 async function fetchWithConsensus(url) {
-  // Skip consensus on the very first fetch of a session — render fast.
+  // First fetch of session: single request only — avoid 429 rate limiting
   if (!window._firstFetchDone) {
     return await fetchSingle(url);
   }
+  // Subsequent fetches: 2 attempts spaced 2s apart (not 3 × 150ms which triggers 429)
   const attempts = [];
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 2; i++) {
     try {
       const res = await fetch(url + '&t=' + Date.now() + '_' + i + '_' + Math.random().toString(36).slice(2,8), {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
       });
-      if (res.ok) attempts.push(await res.text());
-    } catch(e) { /* skip failed attempt */ }
-    if (i < 2) await new Promise(r => setTimeout(r, 150));
+      if (res.ok) {
+        const text = await res.text();
+        if (!text.trim().startsWith('<')) attempts.push(text);
+      }
+    } catch(e) { /* skip */ }
+    if (i < 1) await new Promise(r => setTimeout(r, 2000));
   }
   if (attempts.length === 0) return { text: null, confident: false };
   if (attempts.length === 1) return { text: attempts[0], confident: true };
@@ -1656,64 +1659,78 @@ function shouldAccept(key, result) {
   return false;
 }
 
-function applyAndRender() {
-  if (confirmedText.ascent !== null) data.ascent = mergeRows('ascent', data.ascent, parseCSV(confirmedText.ascent));
-  if (confirmedText.fiftyk !== null) data.fiftyk = mergeRows('fiftyk', data.fiftyk, parseCSV(confirmedText.fiftyk));
-  if (confirmedText.ambush !== null) data.ambush = mergeRows('ambush', data.ambush, parseCSV(confirmedText.ambush));
-  updateStats();
-  renderTable();
-  updateLoopChart();
-  updateSegChart();
-  updatePanelVisibility();
-  drawMap();
-  document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
-  STATE_lastUpdate = Date.now();
-}
-
 async function fetchAll() {
   document.getElementById('loadingBar').classList.add('active');
   const isFirst = !window._firstFetchDone;
   try {
-    const handleResult = (key, result) => {
-      if (shouldAccept(key, result)) {
-        confirmedText[key] = result.text;
-        highWaterRows[key] = Math.max(highWaterRows[key], countRows(result.text));
-        if (result.confident) lastConfidentFetch = Date.now();
-        if (isFirst) applyAndRender();
-      }
-    };
-
-    const fetches = [
-      fetchWithConsensus(CSV.ascent).then(r => handleResult('ascent', r)),
-      fetchWithConsensus(CSV.fiftyk).then(r => handleResult('fiftyk', r)),
-      fetchWithConsensus(CSV.ambush).then(r => handleResult('ambush', r)),
-    ];
-
-    if (CSV.ascent_cp) {
-      fetches.push(
-        fetchWithConsensus(CSV.ascent_cp).then(cpResult => {
-          if (shouldAccept('ascent_cp', cpResult)) {
-            confirmedText.ascent_cp = cpResult.text;
-            highWaterRows.ascent_cp = Math.max(highWaterRows.ascent_cp, countRows(cpResult.text));
-          }
-          if (confirmedText.ascent_cp !== null) {
-            const cpRows = parseCSV(confirmedText.ascent_cp);
-            const cpMap = {};
-            cpRows.forEach(row => {
-              const bib = (row['BIB'] || row['Bib'] || '').trim();
-              const ts  = (row['TIMESTAMP'] || row['Timestamp'] || '').trim();
-              if (!bib || !ts) return;
-              if (!cpMap[bib] || ts < cpMap[bib]) cpMap[bib] = ts;
-            });
-            data.ascent_cp = mergeAscentCp(data.ascent_cp, cpMap);
-          }
-        }).catch(e => console.warn('ascent_cp fetch failed', e))
-      );
+    let ascentResult, fiftyResult, ambushResult;
+    if (isFirst) {
+      // Sequential on first load to avoid hitting Google's 429 rate limit
+      ascentResult = await fetchWithConsensus(CSV.ascent);
+      fiftyResult  = await fetchWithConsensus(CSV.fiftyk);
+      ambushResult = await fetchWithConsensus(CSV.ambush);
+    } else {
+      [ascentResult, fiftyResult, ambushResult] = await Promise.all([
+        fetchWithConsensus(CSV.ascent),
+        fetchWithConsensus(CSV.fiftyk),
+        fetchWithConsensus(CSV.ambush),
+      ]);
     }
 
-    await Promise.all(fetches);
-    applyAndRender();
+    // Only update displayed data if the consensus was confident (2+ agreed).
+    // This means genuine additions AND deletions will update correctly,
+    // but a single stale cache hit won't cause a flicker.
+    if (shouldAccept('ascent', ascentResult)) {
+      confirmedText.ascent = ascentResult.text;
+      highWaterRows.ascent = Math.max(highWaterRows.ascent, countRows(ascentResult.text));
+      if (ascentResult.confident) lastConfidentFetch = Date.now();
+    }
+    if (shouldAccept('fiftyk', fiftyResult)) {
+      confirmedText.fiftyk = fiftyResult.text;
+      highWaterRows.fiftyk = Math.max(highWaterRows.fiftyk, countRows(fiftyResult.text));
+      if (fiftyResult.confident) lastConfidentFetch = Date.now();
+    }
+    if (shouldAccept('ambush', ambushResult)) {
+      confirmedText.ambush = ambushResult.text;
+      highWaterRows.ambush = Math.max(highWaterRows.ambush, countRows(ambushResult.text));
+      if (ambushResult.confident) lastConfidentFetch = Date.now();
+    }
 
+    if (confirmedText.ascent !== null) data.ascent = mergeRows('ascent', data.ascent, parseCSV(confirmedText.ascent));
+    if (confirmedText.fiftyk !== null) data.fiftyk = mergeRows('fiftyk', data.fiftyk, parseCSV(confirmedText.fiftyk));
+    if (confirmedText.ambush !== null) data.ambush = mergeRows('ambush', data.ambush, parseCSV(confirmedText.ambush));
+
+    // Ascent checkpoint scans — one row per scan, take earliest per bib
+    if (CSV.ascent_cp) {
+      try {
+        const cpResult = await fetchWithConsensus(CSV.ascent_cp);
+        if (shouldAccept('ascent_cp', cpResult)) {
+          confirmedText.ascent_cp = cpResult.text;
+          highWaterRows.ascent_cp = Math.max(highWaterRows.ascent_cp, countRows(cpResult.text));
+        }
+        if (confirmedText.ascent_cp !== null) {
+          const cpRows = parseCSV(confirmedText.ascent_cp);
+          const cpMap = {};
+          cpRows.forEach(row => {
+            const bib = (row['BIB'] || row['Bib'] || '').trim();
+            const ts  = (row['TIMESTAMP'] || row['Timestamp'] || '').trim();
+            if (!bib || !ts) return;
+            // Keep earliest scan per bib
+            if (!cpMap[bib] || ts < cpMap[bib]) cpMap[bib] = ts;
+          });
+          data.ascent_cp = mergeAscentCp(data.ascent_cp, cpMap);
+        }
+      } catch(e) { console.warn('ascent_cp fetch failed', e); }
+    }
+
+    updateStats();
+    renderTable();
+    updateLoopChart();
+    updateSegChart();
+    updatePanelVisibility();
+    drawMap();
+    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+    STATE_lastUpdate = Date.now();
   } catch(e) {
     console.error('Fetch error:', e);
   }
