@@ -955,7 +955,7 @@ const CSV = {
   ascent_cp: sheetApiUrl('DB_ASCENT_CP'),
 };
 
-const REFRESH_MS = 30000;
+const REFRESH_MS = 90000;
 
 const RACE_STARTS = {
   ascent: new Date('2026-05-08T18:00:00-07:00'),
@@ -1629,26 +1629,26 @@ function shouldAccept(key, result) {
 
 async function fetchAll() {
   document.getElementById('loadingBar').classList.add('active');
+  const delay = ms => new Promise(r => setTimeout(r, ms));
   try {
-    const [ascentResult, fiftyResult, ambushResult] = await Promise.all([
-      fetchWithConsensus(CSV.ascent),
-      fetchWithConsensus(CSV.fiftyk),
-      fetchWithConsensus(CSV.ambush),
-    ]);
-
-    // Only update displayed data if the consensus was confident (2+ agreed).
-    // This means genuine additions AND deletions will update correctly,
-    // but a single stale cache hit won't cause a flicker.
+    // Fetch sheets sequentially with 3s gaps to avoid quota burst
+    const ascentResult = await fetchWithConsensus(CSV.ascent);
     if (shouldAccept('ascent', ascentResult)) {
       confirmedText.ascent = ascentResult.text;
       highWaterRows.ascent = Math.max(highWaterRows.ascent, countRows(ascentResult.text));
       if (ascentResult.confident) lastConfidentFetch = Date.now();
     }
+    await delay(3000);
+
+    const fiftyResult = await fetchWithConsensus(CSV.fiftyk);
     if (shouldAccept('fiftyk', fiftyResult)) {
       confirmedText.fiftyk = fiftyResult.text;
       highWaterRows.fiftyk = Math.max(highWaterRows.fiftyk, countRows(fiftyResult.text));
       if (fiftyResult.confident) lastConfidentFetch = Date.now();
     }
+    await delay(3000);
+
+    const ambushResult = await fetchWithConsensus(CSV.ambush);
     if (shouldAccept('ambush', ambushResult)) {
       confirmedText.ambush = ambushResult.text;
       highWaterRows.ambush = Math.max(highWaterRows.ambush, countRows(ambushResult.text));
@@ -1659,8 +1659,15 @@ async function fetchAll() {
     if (confirmedText.fiftyk !== null) data.fiftyk = mergeRows('fiftyk', data.fiftyk, parseCSV(confirmedText.fiftyk));
     if (confirmedText.ambush !== null) data.ambush = mergeRows('ambush', data.ambush, parseCSV(confirmedText.ambush));
 
-    // Ascent checkpoint scans — one row per scan, take earliest per bib
+    // Render after main 3 sheets so the table updates before ascent_cp slow fetch
+    updateStats(); renderTable(); updateLoopChart(); updateSegChart();
+    updatePanelVisibility(); drawMap();
+    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+    STATE_lastUpdate = Date.now();
+
+    // Ascent checkpoint scans — fetch last
     if (CSV.ascent_cp) {
+      await delay(3000);
       try {
         const cpResult = await fetchWithConsensus(CSV.ascent_cp);
         if (shouldAccept('ascent_cp', cpResult)) {
@@ -1674,7 +1681,6 @@ async function fetchAll() {
             const bib = (row['BIB'] || row['Bib'] || '').trim();
             const ts  = (row['TIMESTAMP'] || row['Timestamp'] || '').trim();
             if (!bib || !ts) return;
-            // Keep earliest scan per bib
             if (!cpMap[bib] || ts < cpMap[bib]) cpMap[bib] = ts;
           });
           data.ascent_cp = mergeAscentCp(data.ascent_cp, cpMap);
@@ -1682,19 +1688,10 @@ async function fetchAll() {
       } catch(e) { console.warn('ascent_cp fetch failed', e); }
     }
 
-    updateStats();
-    renderTable();
-    updateLoopChart();
-    updateSegChart();
-    updatePanelVisibility();
-    drawMap();
-    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
-    STATE_lastUpdate = Date.now();
   } catch(e) {
     console.error('Fetch error:', e);
   }
   document.getElementById('loadingBar').classList.remove('active');
-
 }
 
 // ============================================================
