@@ -3055,17 +3055,20 @@ function updateRunnerTargets() {
     if (!currentPositions[rp.key]) currentPositions[rp.key] = { lat: rp.lat, lng: rp.lng };
 
     const buildMarkerHTML = (color, bib) =>
-      '<div style="background:rgba(10,10,10,0.9);color:'+color+';font-family:DM Mono,monospace;font-size:9px;font-weight:700;padding:1px 3px;border-radius:2px;border:1px solid '+color+'44;white-space:nowrap">#'+bib+'</div>'
-      +'<div style="width:9px;height:9px;background:'+color+';border:1.5px solid #0a0a0a;border-radius:50%;box-shadow:0 0 5px '+color+'99;margin-top:1px"></div>';
+      '<div style="position:relative;width:11px;height:11px;cursor:pointer;">' +
+        '<div style="position:absolute;bottom:14px;left:50%;transform:translateX(-50%);background:rgba(10,10,10,0.92);color:'+color+';font-family:DM Mono,monospace;font-size:9px;font-weight:700;padding:1px 4px;border-radius:2px;border:1px solid '+color+'55;white-space:nowrap;pointer-events:none;">#'+bib+'</div>' +
+        '<div style="width:11px;height:11px;background:'+color+';border:1.5px solid #0a0a0a;border-radius:50%;box-shadow:0 0 6px '+color+'cc;"></div>' +
+      '</div>';
 
     if (!runnerMarkers[rp.key]) {
       const el = document.createElement('div');
-      el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer';
+      el.style.cssText = 'cursor:pointer;';
       el._segColor = rp.color;
       el.innerHTML = buildMarkerHTML(rp.color, rp.bib);
-      const popup = new mapboxgl.Popup({ offset: 20, closeButton: false })
+      const popup = new mapboxgl.Popup({ offset: 14, closeButton: false })
         .setHTML('<div style="background:#111;color:#f0f0f0;font-family:DM Mono,monospace;font-size:11px;padding:5px 8px;border-radius:4px;border-left:3px solid '+rp.color+'"><b style="color:'+rp.color+'">#'+rp.bib+'</b> '+rp.name+'<br><span style="color:#888;font-size:10px">'+rp.seg+'</span></div>');
-      runnerMarkers[rp.key] = new mapboxgl.Marker(el)
+      // anchor:'center' keeps the dot at the lat/lng — the bib label floats above as UI overlay
+      runnerMarkers[rp.key] = new mapboxgl.Marker({ element: el, anchor: 'center' })
         .setLngLat([rp.lng, rp.lat])
         .setPopup(popup)
         .addTo(mbMap);
@@ -3256,8 +3259,11 @@ function buildExpectedSequence(type, r, raceStart) {
     const ts = c => (r[c] && parseTS(r[c])?.getTime()) || null;
     seq.push({ route: 'green_start', progress: 0,   t: raceStart, key: 'start' });
     seq.push({ route: 'green_start', progress: 1.0, t: ts('Green Checkpoint'), key: 'green' });
-    seq.push({ route: loop,           progress: 1.0, t: ts('Loop Bottom'), key: 'l_bot' });
-    seq.push({ route: 'blue_descent', progress: 1.0, t: ts('Loop Top'), key: 'l_top' });
+    seq.push({ route: loop,           progress: 0,   t: ts('Loop Bottom'), key: 'l_bot' });
+    seq.push({ route: loop,           progress: 1.0, t: ts('Loop Top'), key: 'l_top' });
+    // Descent from Loop top (Blue) to Red CP via blue_descent
+    seq.push({ route: 'blue_descent', progress: 0,   t: ts('Loop Top'), key: 'bd_start' });
+    seq.push({ route: 'blue_descent', progress: 1.0, t: ts('Red Checkpoint In'), key: 'bd_end' });
     seq.push({ route: 'red_finish',   progress: 0.05, t: ts('Red Checkpoint In'), key: 'red' });
     seq.push({ route: 'red_finish',   progress: 1.0, t: ts('FINISH TIME (Scan)'), key: 'finish' });
     return seq;
@@ -3270,20 +3276,35 @@ function buildExpectedSequence(type, r, raceStart) {
     const c3 = colorOf(r['Third Loop']);
     seq.push({ route: 'green_start', progress: 0,   t: raceStart, key: 'start' });
     seq.push({ route: 'green_start', progress: 1.0, t: ts('Green Checkpoint'), key: 'green' });
+    // Loop Bottom = start of climb (c.0); Loop Top = summit (c.1.0).
+    // Between L<N>top and L<N+1>bot the runner descends blue_descent.
+    // After the last loop's top, blue_descent leads to Red CP, then red_finish to Finish.
     if (c1) {
-      seq.push({ route: c1,            progress: 1.0, t: ts('First Loop Bottom'), key: 'l1_bot' });
-      seq.push({ route: 'blue_descent', progress: 1.0, t: ts('First Loop Top'), key: 'l1_top' });
+      seq.push({ route: c1, progress: 0,   t: ts('First Loop Bottom'), key: 'l1_bot' });
+      seq.push({ route: c1, progress: 1.0, t: ts('First Loop Top'),    key: 'l1_top' });
+    }
+    // Descent from L1 top (Blue summit) to L2 bottom — via blue_descent route
+    if (c1 && c2) {
+      seq.push({ route: 'blue_descent', progress: 0,   t: ts('First Loop Top'), key: 'bd1_start' });
+      seq.push({ route: 'blue_descent', progress: 1.0, t: null,                 key: 'bd1_end' });
     }
     if (c2) {
-      seq.push({ route: c2,            progress: 1.0, t: ts('Second Loop Bottom'), key: 'l2_bot' });
-      seq.push({ route: 'blue_descent', progress: 1.0, t: ts('Second Loop Top'), key: 'l2_top' });
+      seq.push({ route: c2, progress: 0,   t: ts('Second Loop Bottom'), key: 'l2_bot' });
+      seq.push({ route: c2, progress: 1.0, t: ts('Second Loop Top'),    key: 'l2_top' });
+    }
+    if (c2 && c3) {
+      seq.push({ route: 'blue_descent', progress: 0,   t: ts('Second Loop Top'), key: 'bd2_start' });
+      seq.push({ route: 'blue_descent', progress: 1.0, t: null,                  key: 'bd2_end' });
     }
     if (c3) {
-      seq.push({ route: c3,            progress: 1.0, t: ts('Third Loop Bottom'), key: 'l3_bot' });
-      seq.push({ route: 'blue_descent', progress: 1.0, t: ts('Third Loop Top'), key: 'l3_top' });
+      seq.push({ route: c3, progress: 0,   t: ts('Third Loop Bottom'), key: 'l3_bot' });
+      seq.push({ route: c3, progress: 1.0, t: ts('Third Loop Top'),    key: 'l3_top' });
     }
-    seq.push({ route: 'red_finish',   progress: 0.05, t: ts('Red Checkpoint In'), key: 'red' });
-    seq.push({ route: 'red_finish',   progress: 1.0, t: ts('FINISH TIME (Scan)'), key: 'finish' });
+    // Final descent — from last loop top to Red CP, via blue_descent
+    seq.push({ route: 'blue_descent', progress: 0,    t: ts('Third Loop Top') || ts('Second Loop Top') || ts('First Loop Top'), key: 'bd_final_start' });
+    seq.push({ route: 'blue_descent', progress: 1.0,  t: ts('Red Checkpoint In'), key: 'bd_final_end' });
+    seq.push({ route: 'red_finish', progress: 0.05, t: ts('Red Checkpoint In'), key: 'red' });
+    seq.push({ route: 'red_finish', progress: 1.0,  t: ts('FINISH TIME (Scan)'), key: 'finish' });
     return seq;
   }
   return [];
