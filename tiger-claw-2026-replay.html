@@ -3009,42 +3009,15 @@ function updateRunnerTargets() {
   const tab = activeTab;
 
   // Only show runners relevant to current tab
-  // Cluster offset for finished runners so they don't stack on one point.
-  // Deterministic radial layout: each bib gets a unique angle + radius.
-  // 1° latitude ≈ 111km, so 0.0003° ≈ 33m — tight cluster, distinct dots.
-  const clusterOffset = (bib, idx, totalAtPoint) => {
-    // Deterministic angle from bib value; radius ramps with index to fan outward
-    const seed = parseInt(String(bib).replace(/[^0-9]/g, ''), 10) || idx;
-    const ring = Math.floor(idx / 8);                // 8 dots per ring
-    const slot = idx % 8;
-    const baseAngle = (seed * 137.508) % 360;        // golden-angle scatter
-    const angle = ((baseAngle + slot * 45) * Math.PI) / 180;
-    const radius = 0.00015 + ring * 0.00025;         // ~17m + ~28m per ring
-    return { dLat: Math.sin(angle) * radius, dLng: Math.cos(angle) * radius };
-  };
-
-  // Counters per finish location so we can assign cluster indices
-  const finishCounts = new Map();  // "lat,lng" -> running count
-  const getClusterIdx = (lat, lng) => {
-    const k = lat.toFixed(5) + ',' + lng.toFixed(5);
-    const n = finishCounts.get(k) || 0;
-    finishCounts.set(k, n + 1);
-    return n;
-  };
-
   if (tab === '50k' || tab === 'bigcat') {
     data.fiftyk.forEach(r => {
       if (!r.Bib) return;
       const pos = getRunnerRouteAndProgress(r, '50k');
       if (!pos) return;
-      let p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
-      if (pos.fixed) {
-        const idx = getClusterIdx(p.lat, p.lng);
-        const off = clusterOffset(r.Bib, idx);
-        p = { lat: p.lat + off.dLat, lng: p.lng + off.dLng };
-      }
+      if (pos.fixed && pos.segment === 'Finished') return;  // hide finishers
+      const p = interpolateAlongRoute(pos.route, pos.progress);
       const segKey = pos.route ? Object.keys(GPX_ROUTES).find(k => GPX_ROUTES[k] === pos.route) : null;
-      const dotColor = pos.fixed ? '#e8c14a' : (ROUTE_COLORS[segKey] || '#e8c14a');
+      const dotColor = ROUTE_COLORS[segKey] || '#e8c14a';
       all.push({...p, bib:r.Bib, name:r.Name||'', seg:pos.segment||'', color:dotColor, key:'f_'+r.Bib});
     });
   }
@@ -3054,14 +3027,10 @@ function updateRunnerTargets() {
       if (!r.BIB) return;
       const pos = getRunnerRouteAndProgress(r, 'ascent');
       if (!pos) return;
-      let p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
-      if (pos.fixed) {
-        const idx = getClusterIdx(p.lat, p.lng);
-        const off = clusterOffset(r.BIB, idx);
-        p = { lat: p.lat + off.dLat, lng: p.lng + off.dLng };
-      }
+      if (pos.fixed && pos.segment === 'Finished') return;  // hide finishers
+      const p = interpolateAlongRoute(pos.route, pos.progress);
       const segKey = pos.route ? Object.keys(GPX_ROUTES).find(k => GPX_ROUTES[k] === pos.route) : null;
-      const dotColor = pos.fixed ? '#a78bfa' : (ROUTE_COLORS[segKey] || '#a78bfa');
+      const dotColor = ROUTE_COLORS[segKey] || '#a78bfa';
       all.push({...p, bib:r.BIB, name:r.NAME||'', seg:pos.segment||'', color:dotColor, key:'a_'+r.BIB});
     });
   }
@@ -3071,14 +3040,10 @@ function updateRunnerTargets() {
       if (!r.Bib) return;
       const pos = getRunnerRouteAndProgress(r, 'ambush');
       if (!pos) return;
-      let p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
-      if (pos.fixed) {
-        const idx = getClusterIdx(p.lat, p.lng);
-        const off = clusterOffset(r.Bib, idx);
-        p = { lat: p.lat + off.dLat, lng: p.lng + off.dLng };
-      }
+      if (pos.fixed && pos.segment === 'Finished') return;  // hide finishers
+      const p = interpolateAlongRoute(pos.route, pos.progress);
       const segKey = pos.route ? Object.keys(GPX_ROUTES).find(k => GPX_ROUTES[k] === pos.route) : null;
-      const dotColor = pos.fixed ? '#fb923c' : (ROUTE_COLORS[segKey] || '#fb923c');
+      const dotColor = ROUTE_COLORS[segKey] || '#fb923c';
       all.push({...p, bib:r.Bib, name:r.Name||'', seg:pos.segment||'', color:dotColor, key:'b_'+r.Bib});
     });
   }
