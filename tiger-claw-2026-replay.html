@@ -3168,11 +3168,14 @@ function getRunnerRouteAndProgress(r, type) {
     if (!segDurSec || segDurSec <= 0) return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
     let progress = Math.min(Math.max(elapsedSec / segDurSec, 0), 0.99);
     // Forward-progress lock: a runner can never go backward on a segment between refreshes
+    // (LIVE MODE ONLY — disabled in replay so scrubbing back/forth works.)
     const memKey = `${type}_${bib}_${segName}`;
-    if (PROGRESS_MEMORY[memKey] !== undefined && progress < PROGRESS_MEMORY[memKey]) {
-      progress = PROGRESS_MEMORY[memKey];
+    if (!replayMode) {
+      if (PROGRESS_MEMORY[memKey] !== undefined && progress < PROGRESS_MEMORY[memKey]) {
+        progress = PROGRESS_MEMORY[memKey];
+      }
+      PROGRESS_MEMORY[memKey] = progress;
     }
-    PROGRESS_MEMORY[memKey] = progress;
     debugLog(`${segLabel}: ${Math.round(elapsedSec/60)}min / ${Math.round(segDurSec/60)}min = ${(progress*100).toFixed(0)}%`);
     return { route: GPX_ROUTES[segName], progress, segment: segLabel };
   };
@@ -3204,7 +3207,12 @@ function getRunnerRouteAndProgress(r, type) {
   if (type === '50k') {
     const status = (r.Status||'').toUpperCase();
     if (status === 'DNS') return null;
-    if (r['FINISH TIME (Scan)'] || status === 'FINISHED')
+    // In replay mode, don't short-circuit to finish line if virtual now is before
+    // the finish scan — we need to project the runner back onto the course.
+    const finishStr = r['FINISH TIME (Scan)'];
+    const finishMs = finishStr ? parseTime(finishStr) : null;
+    const isFinishedNow = finishMs ? (now >= finishMs) : (status === 'FINISHED' && !replayMode);
+    if (isFinishedNow)
       return { fixed: true, lat: 47.527708, lng: -122.034216, segment: 'Finished' };
 
     let t = {
@@ -3218,6 +3226,14 @@ function getRunnerRouteAndProgress(r, type) {
       l3top:    parseTime(r['Third Loop Top']),
       red:      parseTime(r['Red Checkpoint In']),
     };
+    // REPLAY: hide checkpoint scans that occurred AFTER virtual now,
+    // so the runner is correctly projected back onto an earlier segment.
+    if (replayMode) {
+      for (const k of Object.keys(t)) {
+        if (k === 'raceStart') continue;
+        if (t[k] && t[k] > now) t[k] = null;
+      }
+    }
 
     // TESTING SUPPORT: shift race start to match scan dates
     const allScans = [t.green, t.l1bot, t.l1top, t.l2bot, t.l2top, t.l3bot, t.l3top, t.red].filter(x => x);
@@ -3291,7 +3307,10 @@ function getRunnerRouteAndProgress(r, type) {
   if (type === 'ascent') {
     const status = (r.STATUS||'').toUpperCase();
     if (status === 'DNS') return null;
-    if (r['FINISH TIME (SCAN)'] || status === 'FINISHED')
+    const finishStr = r['FINISH TIME (SCAN)'];
+    const finishMs = finishStr ? parseTime(finishStr) : null;
+    const isFinishedNow = finishMs ? (now >= finishMs) : (status === 'FINISHED' && !replayMode);
+    if (isFinishedNow)
       return { fixed: true, lat: 47.508742, lng: -121.985226, segment: 'Finished' };
 
     const raceStart = new Date('2026-05-08T18:00:00-07:00').getTime();
@@ -3299,7 +3318,9 @@ function getRunnerRouteAndProgress(r, type) {
 
     // Ascent checkpoint scan — 22.8% through the route (0.5mi mark)
     const CP_PROGRESS = 0.228;
-    const cpTs = data.ascent_cp && data.ascent_cp[bibStr] ? parseTime(data.ascent_cp[bibStr]) : null;
+    let cpTs = data.ascent_cp && data.ascent_cp[bibStr] ? parseTime(data.ascent_cp[bibStr]) : null;
+    // REPLAY: mask checkpoint scan if it occurred after virtual now
+    if (replayMode && cpTs && cpTs > now) cpTs = null;
 
     if (cpTs && cpTs > raceStart) {
       // Runner has been scanned at the checkpoint — we know their pace to that point
@@ -3336,7 +3357,10 @@ function getRunnerRouteAndProgress(r, type) {
   if (type === 'ambush') {
     const status = (r.Status||'').toUpperCase();
     if (status === 'DNS') return null;
-    if (r['FINISH TIME (Scan)'])
+    const finishStr = r['FINISH TIME (Scan)'];
+    const finishMs = finishStr ? parseTime(finishStr) : null;
+    const isFinishedNow = finishMs ? (now >= finishMs) : false;
+    if (isFinishedNow)
       return { fixed: true, lat: 47.527708, lng: -122.034216, segment: 'Finished' };
 
     let t = {
@@ -3346,6 +3370,13 @@ function getRunnerRouteAndProgress(r, type) {
       ltop:   parseTime(r['Loop Top']),
       red:    parseTime(r['Red Checkpoint In']),
     };
+    // REPLAY: hide checkpoint scans that occurred AFTER virtual now
+    if (replayMode) {
+      for (const k of Object.keys(t)) {
+        if (k === 'raceStart') continue;
+        if (t[k] && t[k] > now) t[k] = null;
+      }
+    }
 
     const allScans = [t.green, t.lbot, t.ltop, t.red].filter(x => x);
     if (allScans.length > 0) {
@@ -4020,6 +4051,10 @@ document.getElementById('unitsKm').addEventListener('click', () => setUnits('met
 // ============================================================
 function enterReplayMode() {
   replayMode = true;
+  // Reset forward-progress memory so dots can move freely with virtual time
+  if (typeof PROGRESS_MEMORY === 'object') {
+    for (const k of Object.keys(PROGRESS_MEMORY)) delete PROGRESS_MEMORY[k];
+  }
   document.getElementById('replayBar').classList.add('active');
   document.getElementById('replayToggle').classList.add('active');
   document.querySelector('.replay-toggle-label').textContent = 'EXIT REPLAY';
@@ -4032,6 +4067,10 @@ function enterReplayMode() {
 function exitReplayMode() {
   replayMode = false;
   replayPlaying = false;
+  // Reset progress memory so live mode picks up from current real time cleanly
+  if (typeof PROGRESS_MEMORY === 'object') {
+    for (const k of Object.keys(PROGRESS_MEMORY)) delete PROGRESS_MEMORY[k];
+  }
   if (replayRaf) { cancelAnimationFrame(replayRaf); replayRaf = null; }
   document.getElementById('replayBar').classList.remove('active');
   document.getElementById('replayToggle').classList.remove('active');
