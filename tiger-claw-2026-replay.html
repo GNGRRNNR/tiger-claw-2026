@@ -265,59 +265,128 @@ body {
 .mapboxgl-popup-tip { display:none!important; }
 
 /* ============================================================
-   REPLAY CONTROL BAR
+   REPLAY CONTROL BAR — clear CTA, prominent active state
    ============================================================ */
 .replay-bar {
   margin-top: 0.75rem;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 0.75rem 1rem;
+  padding: 1rem 1.25rem;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.75rem;
 }
-.replay-top {
+.replay-bar.active {
+  background: linear-gradient(180deg, rgba(232,193,74,0.06) 0%, var(--surface) 100%);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(232,193,74,0.2);
+}
+
+/* CTA section (shown when replay is inactive) */
+.replay-cta {
   display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.replay-bar.active .replay-cta { display: none; }
+.cta-icon {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--black);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem; flex-shrink: 0;
+  box-shadow: 0 0 18px rgba(232,193,74,0.4);
+  animation: ctaPulse 2.4s ease-in-out infinite;
+}
+@keyframes ctaPulse {
+  0%, 100% { box-shadow: 0 0 18px rgba(232,193,74,0.4); }
+  50% { box-shadow: 0 0 28px rgba(232,193,74,0.7); }
+}
+.cta-text { flex: 1; min-width: 0; }
+.cta-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.15rem;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  line-height: 1.1;
+}
+.cta-sub {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.cta-button {
+  background: var(--accent);
+  color: var(--black);
+  border: none;
+  border-radius: 6px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  padding: 0.7rem 1.25rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  box-shadow: 0 0 14px rgba(232,193,74,0.35);
+}
+.cta-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 22px rgba(232,193,74,0.55);
+}
+
+/* Active-mode top row */
+.replay-top {
+  display: none;
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
 }
-.replay-toggle {
-  background: var(--surface3);
+.replay-bar.active .replay-top { display: flex; }
+.replay-exit {
+  margin-left: auto;
+  background: transparent;
   color: var(--text-muted);
   border: 1px solid var(--border2);
-  border-radius: 6px;
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 0.95rem;
-  letter-spacing: 0.1em;
-  padding: 0.45rem 0.85rem;
+  border-radius: 4px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  padding: 0.35rem 0.6rem;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  letter-spacing: 0.05em;
   transition: all 0.15s;
 }
-.replay-toggle:hover {
-  background: var(--surface2);
-  color: var(--text);
-  border-color: var(--accent);
+.replay-exit:hover { color: var(--text); border-color: var(--accent); }
+.replay-mode-toggle {
+  display: flex;
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  overflow: hidden;
 }
-.replay-toggle.active {
+.rmode {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.rmode.active {
   background: var(--accent);
   color: var(--black);
-  border-color: var(--accent);
-  box-shadow: 0 0 14px rgba(232,193,74,0.35);
 }
-.replay-icon { font-size: 1.1rem; line-height: 1; }
 .replay-info {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  opacity: 0.4;
-  transition: opacity 0.2s;
 }
-.replay-bar.active .replay-info { opacity: 1; }
 .replay-clock {
   font-family: 'Bebas Neue', sans-serif;
   font-size: 1.75rem;
@@ -335,11 +404,7 @@ body {
 .replay-speeds {
   display: flex;
   gap: 3px;
-  margin-left: auto;
-  opacity: 0.4;
-  transition: opacity 0.2s;
 }
-.replay-bar.active .replay-speeds { opacity: 1; }
 .rspd {
   background: var(--surface3);
   border: 1px solid var(--border2);
@@ -357,16 +422,20 @@ body {
   border-color: var(--accent);
 }
 .replay-controls {
-  display: flex;
+  display: none;
   align-items: center;
   gap: 0.75rem;
-  opacity: 0.35;
-  pointer-events: none;
-  transition: opacity 0.2s;
 }
-.replay-bar.active .replay-controls {
-  opacity: 1;
-  pointer-events: auto;
+.replay-bar.active .replay-controls { display: flex; }
+.replay-reset {
+  width: auto !important;
+  border-radius: 4px !important;
+  padding: 0 0.7rem !important;
+  height: 36px !important;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
 }
 .replay-play, .replay-reset {
   background: var(--accent);
@@ -964,17 +1033,25 @@ td.team-name {
   </div>
 
   <!-- ============================================================
-       REPLAY CONTROL BAR (archived race replay)
+       REPLAY CONTROL BAR — clearer entry point + spotlight/filter mode
        ============================================================ -->
   <div class="replay-bar" id="replayBar">
+    <div class="replay-cta" id="replayCta">
+      <div class="cta-icon">▶</div>
+      <div class="cta-text">
+        <div class="cta-title">WATCH THE RACE REPLAY</div>
+        <div class="cta-sub">Click play to animate every runner moving along the course at their actual pace · Use 🎯 Follow Runner above to spotlight specific runners</div>
+      </div>
+      <button class="cta-button" id="replayToggle">START REPLAY</button>
+    </div>
     <div class="replay-top">
-      <button class="replay-toggle" id="replayToggle" title="Enter replay mode">
-        <span class="replay-icon">⟲</span>
-        <span class="replay-toggle-label">RACE REPLAY</span>
-      </button>
       <div class="replay-info" id="replayInfo">
-        <div class="replay-clock" id="replayClock">--:--:--</div>
-        <div class="replay-elapsed" id="replayElapsed">Race elapsed: 00:00:00</div>
+        <div class="replay-clock" id="replayClock">00:00:00</div>
+        <div class="replay-elapsed" id="replayElapsed">Time of day: --:--:--</div>
+      </div>
+      <div class="replay-mode-toggle" id="replayModeToggle" title="When you have runners selected, choose to spotlight (dim others) or filter (hide others)">
+        <button class="rmode active" data-mode="spotlight">SPOTLIGHT</button>
+        <button class="rmode" data-mode="filter">FILTER</button>
       </div>
       <div class="replay-speeds" id="replaySpeeds">
         <button class="rspd" data-speed="10">10×</button>
@@ -982,15 +1059,16 @@ td.team-name {
         <button class="rspd" data-speed="300">300×</button>
         <button class="rspd" data-speed="1200">1200×</button>
       </div>
+      <button class="replay-exit" id="replayExit" title="Exit replay">✕ EXIT</button>
     </div>
     <div class="replay-controls" id="replayControls">
-      <button class="replay-play" id="replayPlay" title="Play">▶</button>
+      <button class="replay-play" id="replayPlay" title="Play/Pause">▶</button>
       <div class="replay-scrub" id="replayScrub">
         <div class="rscrub-track"></div>
         <div class="rscrub-progress" id="rscrubProgress"></div>
         <div class="rscrub-handle" id="rscrubHandle"></div>
       </div>
-      <button class="replay-reset" id="replayReset" title="Jump to start">⇤</button>
+      <button class="replay-reset" id="replayReset" title="Jump to start">⇤ RESET</button>
     </div>
   </div>
   <div class="map-legend" id="mapLegend">
@@ -2536,6 +2614,7 @@ function renderFollowTags() {
 }
 
 function applyFollowDimming() {
+  const isFilter = replayMode && (window.__followMode === 'filter');
   Object.entries(runnerMarkers).forEach(([key, marker]) => {
     const el = marker.getElement();
     if (!el) return;
@@ -2543,14 +2622,21 @@ function applyFollowDimming() {
       el.style.opacity = '1';
       el.style.filter = '';
       el.style.zIndex = '';
+      el.style.display = '';
     } else if (followedKeys.has(key)) {
       el.style.opacity = '1';
       el.style.filter = 'drop-shadow(0 0 6px var(--accent))';
       el.style.zIndex = '10';
+      el.style.display = '';
+    } else if (isFilter) {
+      // FILTER mode: completely hide non-followed runners
+      el.style.display = 'none';
     } else {
+      // SPOTLIGHT mode: dim non-followed runners
       el.style.opacity = '0.15';
       el.style.filter = '';
       el.style.zIndex = '';
+      el.style.display = '';
     }
   });
 }
@@ -3127,8 +3213,236 @@ function calcObservedPace(fromMs, toMs, segName) {
   return elapsedSec / distKm;
 }
 
+// ============================================================
+// REPLAY POSITION ENGINE v2
+// Uses each runner's actual scan timestamps to build a waypoint timeline
+// over the course's full route sequence. Missing scans are bridged with
+// distance-weighted interpolation across whatever segments span the gap,
+// so a runner missing an intermediate scan still moves correctly along the
+// route at an average pace derived from the surrounding known scans.
+// ============================================================
+const FINISH_LOC = { lat: 47.527708, lng: -122.034216 };
+const ASCENT_FINISH = { lat: 47.508742, lng: -121.985226 };
+
+// Each waypoint = { route, progress, t, _bridged? }
+// `route` is a GPX route key, `progress` is 0..1 along that route, `t` is ms.
+// Building waypoints: first build the COMPLETE expected sequence of route
+// transition points (start/end of each segment) with t=null for unknown ones,
+// then fill in known timestamps from scans, then linearly interpolate the
+// unknown t values based on distance along the route.
+function buildExpectedSequence(type, r, raceStart) {
+  // Each entry has { route, progress, t (or null), key (for debugging) }
+  const seq = [];
+  if (type === 'ascent') {
+    seq.push({ route: 'ascent', progress: 0,     t: raceStart, key: 'start' });
+    // CP at 22.8% of the ascent
+    const bibStr = String(r.BIB || '').trim();
+    const cpRaw = data.ascent_cp && data.ascent_cp[bibStr];
+    const cpMs = cpRaw ? (parseTS(cpRaw)?.getTime() || null) : null;
+    seq.push({ route: 'ascent', progress: 0.228, t: cpMs, key: 'cp' });
+    const fin = (r['FINISH TIME (SCAN)'] && parseTS(r['FINISH TIME (SCAN)'])?.getTime()) || null;
+    seq.push({ route: 'ascent', progress: 1.0,   t: fin, key: 'finish' });
+    return seq;
+  }
+  if (type === 'ambush') {
+    const lc = (r['Loop Color'] || '').toLowerCase();
+    const loop = ['pink','white','yellow'].includes(lc) ? lc : 'pink';
+    const ts = c => (r[c] && parseTS(r[c])?.getTime()) || null;
+    seq.push({ route: 'green_start', progress: 0,   t: raceStart, key: 'start' });
+    seq.push({ route: 'green_start', progress: 1.0, t: ts('Green Checkpoint'), key: 'green' });
+    seq.push({ route: loop,           progress: 1.0, t: ts('Loop Bottom'), key: 'l_bot' });
+    seq.push({ route: 'blue_descent', progress: 1.0, t: ts('Loop Top'), key: 'l_top' });
+    seq.push({ route: 'red_finish',   progress: 0.05, t: ts('Red Checkpoint In'), key: 'red' });
+    seq.push({ route: 'red_finish',   progress: 1.0, t: ts('FINISH TIME (Scan)'), key: 'finish' });
+    return seq;
+  }
+  if (type === '50k') {
+    const ts = c => (r[c] && parseTS(r[c])?.getTime()) || null;
+    const colorOf = v => { const lc = (v||'').toLowerCase(); return ['pink','white','yellow'].includes(lc) ? lc : null; };
+    const c1 = colorOf(r['First Loop Color']);
+    const c2 = colorOf(r['Second Loop']);
+    const c3 = colorOf(r['Third Loop']);
+    seq.push({ route: 'green_start', progress: 0,   t: raceStart, key: 'start' });
+    seq.push({ route: 'green_start', progress: 1.0, t: ts('Green Checkpoint'), key: 'green' });
+    if (c1) {
+      seq.push({ route: c1,            progress: 1.0, t: ts('First Loop Bottom'), key: 'l1_bot' });
+      seq.push({ route: 'blue_descent', progress: 1.0, t: ts('First Loop Top'), key: 'l1_top' });
+    }
+    if (c2) {
+      seq.push({ route: c2,            progress: 1.0, t: ts('Second Loop Bottom'), key: 'l2_bot' });
+      seq.push({ route: 'blue_descent', progress: 1.0, t: ts('Second Loop Top'), key: 'l2_top' });
+    }
+    if (c3) {
+      seq.push({ route: c3,            progress: 1.0, t: ts('Third Loop Bottom'), key: 'l3_bot' });
+      seq.push({ route: 'blue_descent', progress: 1.0, t: ts('Third Loop Top'), key: 'l3_top' });
+    }
+    seq.push({ route: 'red_finish',   progress: 0.05, t: ts('Red Checkpoint In'), key: 'red' });
+    seq.push({ route: 'red_finish',   progress: 1.0, t: ts('FINISH TIME (Scan)'), key: 'finish' });
+    return seq;
+  }
+  return [];
+}
+
+// Compute the distance (km) traveled FROM waypoint i TO waypoint i+1 on the
+// expected sequence. Two cases:
+//   - Same route: segDistKm * (progress[i+1] - progress[i])
+//   - Different routes: remaining of route[i] + full route[i+1] partial
+function distanceBetween(a, b) {
+  if (a.route === b.route) {
+    return segDistKm(a.route) * Math.max(0, b.progress - a.progress);
+  }
+  // Cross-route: finish a, then start b
+  return segDistKm(a.route) * (1.0 - a.progress) + segDistKm(b.route) * b.progress;
+}
+
+// Fill in missing timestamps by distributing time across distance.
+// For each gap between two KNOWN timestamps (with one or more NULL timestamps
+// between), distribute the elapsed time proportional to distance segments.
+function fillMissingTimes(seq) {
+  // Find runs of unknown between knowns
+  let i = 0;
+  while (i < seq.length) {
+    if (seq[i].t !== null) { i++; continue; }
+    // find the nearest known on the left
+    let leftIdx = i - 1;
+    while (leftIdx >= 0 && seq[leftIdx].t === null) leftIdx--;
+    // find the nearest known on the right
+    let rightIdx = i + 1;
+    while (rightIdx < seq.length && seq[rightIdx].t === null) rightIdx++;
+    if (leftIdx < 0 || rightIdx >= seq.length) {
+      // Can't bridge — leave unknown for now (will be ignored)
+      // Advance i past this gap
+      i = rightIdx;
+      continue;
+    }
+    const tL = seq[leftIdx].t;
+    const tR = seq[rightIdx].t;
+    const totalElapsed = tR - tL;
+    // Sum up distances between leftIdx and rightIdx
+    let totalDist = 0;
+    const dists = [];
+    for (let j = leftIdx; j < rightIdx; j++) {
+      const d = distanceBetween(seq[j], seq[j+1]);
+      dists.push(d);
+      totalDist += d;
+    }
+    if (totalDist <= 0) {
+      // Degenerate — assign all unknowns to tL
+      for (let j = leftIdx + 1; j < rightIdx; j++) {
+        seq[j].t = tL;
+        seq[j]._bridged = true;
+      }
+    } else {
+      let cum = 0;
+      for (let j = leftIdx; j < rightIdx - 1; j++) {
+        cum += dists[j - leftIdx];
+        // Assign time at boundary j+1 proportionally
+        const frac = cum / totalDist;
+        seq[j+1].t = tL + frac * totalElapsed;
+        if (seq[j+1].key !== undefined) seq[j+1]._bridged = true;
+      }
+    }
+    i = rightIdx;
+  }
+  return seq;
+}
+
+function getReplayPosition(r, type, now) {
+  if (type === 'ascent') {
+    const status = (r.STATUS||'').toUpperCase();
+    if (status === 'DNS') return null;
+    const raceStart = new Date('2026-05-08T18:00:00-07:00').getTime();
+    if (now < raceStart) return { route: GPX_ROUTES.ascent, progress: 0, segment: 'Pre-start' };
+    let seq = buildExpectedSequence('ascent', r, raceStart);
+    seq = fillMissingTimes(seq);
+    return interpolateSequence(seq, now, status, ASCENT_FINISH);
+  }
+  if (type === 'ambush') {
+    const status = (r.Status||'').toUpperCase();
+    if (status === 'DNS') return null;
+    const raceStart = new Date('2026-05-09T10:00:00-07:00').getTime();
+    if (now < raceStart) return { route: GPX_ROUTES.green_start, progress: 0, segment: 'Pre-start' };
+    let seq = buildExpectedSequence('ambush', r, raceStart);
+    seq = fillMissingTimes(seq);
+    return interpolateSequence(seq, now, status, FINISH_LOC);
+  }
+  if (type === '50k') {
+    const status = (r.Status||'').toUpperCase();
+    if (status === 'DNS') return null;
+    const raceStart = new Date('2026-05-09T07:00:00-07:00').getTime();
+    if (now < raceStart) return { route: GPX_ROUTES.green_start, progress: 0, segment: 'Pre-start' };
+    let seq = buildExpectedSequence('50k', r, raceStart);
+    seq = fillMissingTimes(seq);
+    return interpolateSequence(seq, now, status, FINISH_LOC);
+  }
+  return null;
+}
+
+// Given a sequence with timestamps filled in (some may still be null at the
+// tail end for DNFs), find where the runner is at virtual now.
+// CROSS-ROUTE INTERPOLATION uses DISTANCE not time — so a connector segment
+// (e.g. 0.05 progress on red_finish) doesn't get a fake 50/50 time split.
+function interpolateSequence(seq, now, status, finishLoc) {
+  // Strip any leading nulls (shouldn't happen — raceStart is always known)
+  const known = seq.filter(s => s.t !== null);
+  if (!known.length) return null;
+
+  // Past last known: if finished → snap; if DNF → freeze at last known
+  const last = known[known.length-1];
+  // Find the "finish" key index
+  const hasFinish = known.some(s => s.key === 'finish');
+  if (hasFinish && now >= last.t) {
+    return { fixed: true, lat: finishLoc.lat, lng: finishLoc.lng, segment: 'Finished' };
+  }
+  if (!hasFinish && now > last.t) {
+    return { route: GPX_ROUTES[last.route], progress: last.progress, segment: status === 'DNF' ? 'DNF — last known' : last.route };
+  }
+  if (now <= known[0].t) {
+    return { route: GPX_ROUTES[known[0].route], progress: known[0].progress, segment: known[0].route };
+  }
+
+  // Walk known waypoints, find the pair bracketing `now`
+  for (let i = 0; i < known.length - 1; i++) {
+    const a = known[i], b = known[i+1];
+    if (now >= a.t && now <= b.t) {
+      const dur = b.t - a.t;
+      if (dur <= 0) return { route: GPX_ROUTES[a.route], progress: a.progress, segment: a.route };
+      const f = (now - a.t) / dur;  // 0..1 time fraction
+      if (a.route === b.route) {
+        const p = a.progress + (b.progress - a.progress) * f;
+        return { route: GPX_ROUTES[a.route], progress: clamp01(p), segment: a.route };
+      }
+      // Different routes: split by distance, not time.
+      const distA = segDistKm(a.route) * (1.0 - a.progress);
+      const distB = segDistKm(b.route) * b.progress;
+      const totalD = distA + distB;
+      if (totalD <= 0) return { route: GPX_ROUTES[a.route], progress: a.progress, segment: a.route };
+      const distSwitch = distA / totalD;  // 0..1 fraction of the time bucket at which we switch routes
+      if (f < distSwitch) {
+        // On route a, progress from a.progress → 1.0 over (0..distSwitch) of time
+        const sub = distSwitch === 0 ? 1 : (f / distSwitch);
+        const p = a.progress + (1.0 - a.progress) * sub;
+        return { route: GPX_ROUTES[a.route], progress: clamp01(p), segment: a.route };
+      } else {
+        // On route b, progress from 0 → b.progress over (distSwitch..1) of time
+        const sub = distSwitch === 1 ? 1 : ((f - distSwitch) / (1.0 - distSwitch));
+        const p = 0 + b.progress * sub;
+        return { route: GPX_ROUTES[b.route], progress: clamp01(p), segment: b.route };
+      }
+    }
+  }
+  return { route: GPX_ROUTES[last.route], progress: last.progress, segment: last.route };
+}
+
+function clamp01(x) { return Math.min(0.999, Math.max(0, x)); }
+
 function getRunnerRouteAndProgress(r, type) {
   const now = getReplayNow();
+  // In replay mode, use the proper waypoint-based engine.
+  if (replayMode) {
+    return getReplayPosition(r, type, now);
+  }
+
   const parseTime = s => {
     if (!s || s === '') return null;
     const d = parseTS(s);
@@ -4056,12 +4370,16 @@ function enterReplayMode() {
     for (const k of Object.keys(PROGRESS_MEMORY)) delete PROGRESS_MEMORY[k];
   }
   document.getElementById('replayBar').classList.add('active');
-  document.getElementById('replayToggle').classList.add('active');
-  document.querySelector('.replay-toggle-label').textContent = 'EXIT REPLAY';
   const range = replayRange();
   replayTime = range.start;
   replayUpdateUi();
-  animateStep();  // re-render markers at the new virtual time
+  updateRunnerTargets();
+  // Snap positions immediately so dots appear at start
+  Object.keys(targetPositions).forEach(k => {
+    currentPositions[k] = { ...targetPositions[k] };
+    if (runnerMarkers[k]) runnerMarkers[k].setLngLat([targetPositions[k].lng, targetPositions[k].lat]);
+  });
+  applyFollowDimming();
 }
 
 function exitReplayMode() {
@@ -4073,11 +4391,10 @@ function exitReplayMode() {
   }
   if (replayRaf) { cancelAnimationFrame(replayRaf); replayRaf = null; }
   document.getElementById('replayBar').classList.remove('active');
-  document.getElementById('replayToggle').classList.remove('active');
-  document.querySelector('.replay-toggle-label').textContent = 'RACE REPLAY';
   document.getElementById('replayPlay').textContent = '▶';
   replayUpdateUi();
-  animateStep();
+  updateRunnerTargets();
+  applyFollowDimming();
 }
 
 function replayUpdateUi() {
@@ -4141,10 +4458,24 @@ function replayPause() {
   document.getElementById('replayPlay').textContent = '▶';
 }
 
+// Default follow mode
+window.__followMode = 'spotlight';
+
 // Bind UI events
 document.getElementById('replayToggle').addEventListener('click', () => {
   if (replayMode) exitReplayMode();
   else enterReplayMode();
+});
+document.getElementById('replayExit').addEventListener('click', () => {
+  exitReplayMode();
+});
+document.querySelectorAll('.rmode').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.rmode').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    window.__followMode = btn.dataset.mode;
+    applyFollowDimming();
+  });
 });
 document.getElementById('replayPlay').addEventListener('click', () => {
   if (!replayMode) enterReplayMode();
