@@ -1229,27 +1229,6 @@ td.team-name {
 // ============================================================
 if (new URLSearchParams(location.search).get('embed') === '1') {
   document.body.classList.add('embed');
-
-  // Broadcast our content height to the parent (Squarespace page).
-  // The parent page listens for these messages and resizes the iframe
-  // to fit. This eliminates internal scrolling on both desktop and mobile.
-  function broadcastHeight() {
-    const h = Math.max(
-      document.body.scrollHeight,
-      document.documentElement.scrollHeight,
-      document.body.offsetHeight,
-      document.documentElement.offsetHeight
-    );
-    try {
-      window.parent.postMessage({ type: 'tiger-claw-height', height: h }, '*');
-    } catch (e) { /* cross-origin parent — ignored */ }
-  }
-  // Send on load, on resize, and any time the DOM changes (table sort/filter,
-  // tab switches, replay UI expanding, etc.)
-  window.addEventListener('load', broadcastHeight);
-  window.addEventListener('resize', broadcastHeight);
-  new MutationObserver(broadcastHeight).observe(document.body, { childList: true, subtree: true, attributes: true });
-  setInterval(broadcastHeight, 1000);  // safety net
 }
 
 // ============================================================
