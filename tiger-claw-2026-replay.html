@@ -1039,10 +1039,10 @@ td.team-name {
     <div class="replay-cta" id="replayCta">
       <div class="cta-icon">▶</div>
       <div class="cta-text">
-        <div class="cta-title">WATCH THE RACE REPLAY</div>
-        <div class="cta-sub">Click play to animate every runner moving along the course at their actual pace · Use 🎯 Follow Runner above to spotlight specific runners</div>
+        <div class="cta-title">ENTER REPLAY MODE</div>
+        <div class="cta-sub">Animate every runner along the course at their actual pace · Use 🎯 Follow Runner above to spotlight specific runners</div>
       </div>
-      <button class="cta-button" id="replayToggle">START REPLAY</button>
+      <button class="cta-button" id="replayToggle">ENTER REPLAY</button>
     </div>
     <div class="replay-top">
       <div class="replay-info" id="replayInfo">
@@ -1306,9 +1306,12 @@ function replayRange() {
                 : (tab === '50k')    ? (data.fiftyk || [])
                 : (tab === 'ambush') ? (data.ambush || [])
                 : [...(data.ascent || []), ...(data.fiftyk || [])];
-  let latest = startMs + 6 * 3600 * 1000;  // sensible default 6h
+  // Minimum range default — uses race duration, not 6h blanket
+  const defaultDurations = { ascent: 90, fiftyk: 540, ambush: 420 };  // minutes
+  let latest = startMs + (defaultDurations[startKey] || 360) * 60 * 1000;
+  // All column-case variants used across the sheets
+  const fields = ['Finish Time (Scan)', 'FINISH TIME (Scan)', 'FINISH TIME (SCAN)', 'Finish Time', 'FINISH TIME'];
   allRows.forEach(r => {
-    const fields = ['Finish Time (Scan)', 'FINISH TIME (Scan)', 'Finish Time', 'FINISH TIME'];
     for (const f of fields) {
       if (r[f]) {
         const d = parseTS(r[f]);
@@ -1316,8 +1319,8 @@ function replayRange() {
       }
     }
   });
-  // Add 15 minutes padding
-  return { start: startMs, end: latest + 15 * 60 * 1000 };
+  // Add 5 minutes padding (was 15 — too much for short races)
+  return { start: startMs, end: latest + 5 * 60 * 1000 };
 }
 
 const CHECKPOINTS = [
@@ -3006,12 +3009,40 @@ function updateRunnerTargets() {
   const tab = activeTab;
 
   // Only show runners relevant to current tab
+  // Cluster offset for finished runners so they don't stack on one point.
+  // Deterministic radial layout: each bib gets a unique angle + radius.
+  // 1° latitude ≈ 111km, so 0.0003° ≈ 33m — tight cluster, distinct dots.
+  const clusterOffset = (bib, idx, totalAtPoint) => {
+    // Deterministic angle from bib value; radius ramps with index to fan outward
+    const seed = parseInt(String(bib).replace(/[^0-9]/g, ''), 10) || idx;
+    const ring = Math.floor(idx / 8);                // 8 dots per ring
+    const slot = idx % 8;
+    const baseAngle = (seed * 137.508) % 360;        // golden-angle scatter
+    const angle = ((baseAngle + slot * 45) * Math.PI) / 180;
+    const radius = 0.00015 + ring * 0.00025;         // ~17m + ~28m per ring
+    return { dLat: Math.sin(angle) * radius, dLng: Math.cos(angle) * radius };
+  };
+
+  // Counters per finish location so we can assign cluster indices
+  const finishCounts = new Map();  // "lat,lng" -> running count
+  const getClusterIdx = (lat, lng) => {
+    const k = lat.toFixed(5) + ',' + lng.toFixed(5);
+    const n = finishCounts.get(k) || 0;
+    finishCounts.set(k, n + 1);
+    return n;
+  };
+
   if (tab === '50k' || tab === 'bigcat') {
     data.fiftyk.forEach(r => {
       if (!r.Bib) return;
       const pos = getRunnerRouteAndProgress(r, '50k');
       if (!pos) return;
-      const p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
+      let p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
+      if (pos.fixed) {
+        const idx = getClusterIdx(p.lat, p.lng);
+        const off = clusterOffset(r.Bib, idx);
+        p = { lat: p.lat + off.dLat, lng: p.lng + off.dLng };
+      }
       const segKey = pos.route ? Object.keys(GPX_ROUTES).find(k => GPX_ROUTES[k] === pos.route) : null;
       const dotColor = pos.fixed ? '#e8c14a' : (ROUTE_COLORS[segKey] || '#e8c14a');
       all.push({...p, bib:r.Bib, name:r.Name||'', seg:pos.segment||'', color:dotColor, key:'f_'+r.Bib});
@@ -3023,7 +3054,12 @@ function updateRunnerTargets() {
       if (!r.BIB) return;
       const pos = getRunnerRouteAndProgress(r, 'ascent');
       if (!pos) return;
-      const p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
+      let p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
+      if (pos.fixed) {
+        const idx = getClusterIdx(p.lat, p.lng);
+        const off = clusterOffset(r.BIB, idx);
+        p = { lat: p.lat + off.dLat, lng: p.lng + off.dLng };
+      }
       const segKey = pos.route ? Object.keys(GPX_ROUTES).find(k => GPX_ROUTES[k] === pos.route) : null;
       const dotColor = pos.fixed ? '#a78bfa' : (ROUTE_COLORS[segKey] || '#a78bfa');
       all.push({...p, bib:r.BIB, name:r.NAME||'', seg:pos.segment||'', color:dotColor, key:'a_'+r.BIB});
@@ -3035,7 +3071,12 @@ function updateRunnerTargets() {
       if (!r.Bib) return;
       const pos = getRunnerRouteAndProgress(r, 'ambush');
       if (!pos) return;
-      const p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
+      let p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
+      if (pos.fixed) {
+        const idx = getClusterIdx(p.lat, p.lng);
+        const off = clusterOffset(r.Bib, idx);
+        p = { lat: p.lat + off.dLat, lng: p.lng + off.dLng };
+      }
       const segKey = pos.route ? Object.keys(GPX_ROUTES).find(k => GPX_ROUTES[k] === pos.route) : null;
       const dotColor = pos.fixed ? '#fb923c' : (ROUTE_COLORS[segKey] || '#fb923c');
       all.push({...p, bib:r.Bib, name:r.Name||'', seg:pos.segment||'', color:dotColor, key:'b_'+r.Bib});
