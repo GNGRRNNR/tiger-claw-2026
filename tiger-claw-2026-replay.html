@@ -1,0 +1,4107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tiger Claw 2026 — Live Results</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --black: #0a0a0a;
+  --surface: #111111;
+  --surface2: #1a1a1a;
+  --surface3: #222222;
+  --border: #2a2a2a;
+  --border2: #333333;
+  --text: #f0f0f0;
+  --text-muted: #aaa;
+  --text-dim: #777;
+  --accent: #e8c14a;
+  --accent2: #c9a93a;
+  --pink: #f472b6;
+  --white-loop: #e2e8f0;
+  --yellow: #fbbf24;
+  --blue: #60a5fa;
+  --green: #4ade80;
+  --red: #f87171;
+  --orange: #fb923c;
+  --orange: #fb923c;
+  --finished: #4ade80;
+  --dnf: #f87171;
+  --dns: #fb923c;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--black);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* HEADER */
+.header {
+  position: relative;
+  padding: 2rem 2rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header-left { display: flex; align-items: baseline; gap: 1rem; }
+
+.header h1 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.header .year {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(1.2rem, 3vw, 2rem);
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+}
+
+.header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+}
+
+.live-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #1a0000;
+  border: 1px solid #7f1d1d;
+  border-radius: 2rem;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--red);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.live-dot {
+  width: 7px; height: 7px;
+  background: var(--red);
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.last-updated {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+/* STATS BAR */
+.stats-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  background: var(--surface);
+}
+
+.stat-item {
+  padding: 0.8rem 1.5rem;
+  border-right: 1px solid var(--border);
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+.stat-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  margin-bottom: 0.2rem;
+}
+
+.stat-value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.6rem;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
+.stat-value.green { color: var(--green); }
+.stat-value.red-col { color: var(--red); }
+
+/* SEARCH + TABS */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  flex-wrap: wrap;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.7rem 1.2rem;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  min-height: 44px;
+}
+
+.tab-btn:hover { border-color: var(--accent); background: var(--surface3); }
+.tab-btn.active { background: var(--accent); color: var(--black); border-color: var(--accent); }
+
+.search-wrap {
+  margin-left: auto;
+  position: relative;
+}
+
+.search-input {
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.8rem;
+  padding: 0.5rem 1rem 0.5rem 2rem;
+  width: 220px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.search-input:focus { border-color: var(--accent); }
+.search-input::placeholder { color: var(--text-dim); }
+
+.search-icon {
+  position: absolute;
+  left: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+/* MAP */
+.map-section {
+  padding: 1rem 1.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+
+.map-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  color: var(--text);
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.map-resize-hint {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  margin-left: auto;
+}
+
+.map-container {
+  position: relative;
+  width: 100%;
+  height: 620px;
+  background: #0d1117;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  resize: vertical;
+  min-height: 400px;
+  max-height: 90vh;
+}
+
+#courseMap { width: 100%; height: 100%; }
+.mapboxgl-popup-content { background:transparent!important; padding:0!important; box-shadow:none!important; border-radius:0!important; }
+.mapboxgl-popup-tip { display:none!important; }
+
+/* ============================================================
+   REPLAY CONTROL BAR
+   ============================================================ */
+.replay-bar {
+  margin-top: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.replay-top {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.replay-toggle {
+  background: var(--surface3);
+  color: var(--text-muted);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.1em;
+  padding: 0.45rem 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.15s;
+}
+.replay-toggle:hover {
+  background: var(--surface2);
+  color: var(--text);
+  border-color: var(--accent);
+}
+.replay-toggle.active {
+  background: var(--accent);
+  color: var(--black);
+  border-color: var(--accent);
+  box-shadow: 0 0 14px rgba(232,193,74,0.35);
+}
+.replay-icon { font-size: 1.1rem; line-height: 1; }
+.replay-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+.replay-bar.active .replay-info { opacity: 1; }
+.replay-clock {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.45rem;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  line-height: 1;
+}
+.replay-elapsed {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.replay-speeds {
+  display: flex;
+  gap: 3px;
+  margin-left: auto;
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+.replay-bar.active .replay-speeds { opacity: 1; }
+.rspd {
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  color: var(--text-muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.rspd.active {
+  background: var(--accent);
+  color: var(--black);
+  border-color: var(--accent);
+}
+.replay-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  opacity: 0.35;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.replay-bar.active .replay-controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+.replay-play, .replay-reset {
+  background: var(--accent);
+  color: var(--black);
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.1s;
+  box-shadow: 0 0 14px rgba(232,193,74,0.35);
+}
+.replay-reset { background: var(--surface3); color: var(--text-muted); box-shadow: none; }
+.replay-play:hover, .replay-reset:hover { transform: scale(1.08); }
+.replay-scrub {
+  flex: 1;
+  position: relative;
+  height: 28px;
+  cursor: pointer;
+}
+.rscrub-track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 4px;
+  transform: translateY(-50%);
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  border-radius: 100px;
+}
+.rscrub-progress {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  height: 4px;
+  width: 0%;
+  transform: translateY(-50%);
+  background: linear-gradient(90deg, var(--accent), var(--orange));
+  border-radius: 100px;
+  box-shadow: 0 0 8px rgba(232,193,74,0.55);
+  pointer-events: none;
+}
+.rscrub-handle {
+  position: absolute;
+  top: 50%;
+  left: 0%;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 3px var(--accent), 0 2px 6px rgba(0,0,0,0.6);
+  pointer-events: none;
+}
+@media (max-width: 720px) {
+  .replay-info { order: 3; width: 100%; }
+  .replay-speeds { order: 2; }
+}
+
+/* ============================================================
+   EMBED MODE — query string ?embed=1 hides chrome for Squarespace
+   ============================================================ */
+body.embed { background: transparent; }
+body.embed .header { display: none; }
+body.embed .controls { padding-top: 0.5rem; }
+body.embed .map-section { padding: 0.5rem !important; }
+body.embed { font-size: 14px; }
+
+.map-legend {
+  display: flex;
+  gap: 0.5rem 1rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.legend-route {
+  cursor: pointer;
+  padding: 0.3rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+
+.legend-route:hover {
+  border-color: var(--border2);
+  background: var(--surface3);
+}
+
+.legend-route.active-route {
+  border-color: var(--accent);
+  background: var(--surface3);
+}
+
+.legend-line {
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.legend-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border2);
+  margin: 0 0.25rem;
+  flex-shrink: 0;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* CHARTS ROW */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+@media (max-width: 700px) {
+  .charts-row { grid-template-columns: 1fr; }
+}
+
+.chart-panel {
+  padding: 1.5rem;
+  border-right: 1px solid var(--border);
+}
+
+.chart-panel:last-child { border-right: none; }
+
+.chart-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+
+.chart-canvas-wrap {
+  position: relative;
+  height: 200px;
+}
+
+/* TABLE SECTION */
+.table-section { padding: 0; }
+
+.table-wrap { overflow-x: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+thead th {
+  background: var(--surface);
+  color: var(--text-dim);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+thead th:hover { color: var(--accent); }
+thead th.sort-asc::after { content: ' ▲'; color: var(--accent); }
+thead th.sort-desc::after { content: ' ▼'; color: var(--accent); }
+
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+
+tbody tr:hover { background: var(--surface2); }
+
+tbody td {
+  padding: 0.55rem 0.8rem;
+  white-space: nowrap;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+td.bib {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.1rem;
+  color: var(--text);
+  letter-spacing: 0.05em;
+}
+
+td.name {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+td.team-name {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.status-finished { background: #052e16; color: var(--finished); border: 1px solid #166534; }
+.status-dnf { background: #1f0000; color: var(--dnf); border: 1px solid #7f1d1d; }
+.status-dns { background: #1c1000; color: var(--dns); border: 1px solid #78350f; }
+.status-active { background: #052e16; color: #86efac; border: 1px solid #166534; }
+.status-blank { background: var(--surface3); color: var(--text-dim); border: 1px solid var(--border2); }
+
+.loop-tag {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.loop-pink { background: #500724; color: #f9a8d4; border: 1px solid #9d174d; }
+.loop-white { background: #1e293b; color: #e2e8f0; border: 1px solid #475569; }
+.loop-yellow { background: #422006; color: #fde68a; border: 1px solid #92400e; }
+
+.time-val { color: var(--text); }
+.elapsed-val { color: var(--accent); }
+.highlight-row td { background: #1a1500 !important; }
+
+.bigcat-icon { font-size: 0.9rem; }
+
+/* EMPTY STATE */
+.empty-state {
+  padding: 3rem;
+  text-align: center;
+  color: var(--text-dim);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.8rem;
+}
+
+/* LOADING */
+.loading-bar {
+  height: 2px;
+  background: var(--surface3);
+  position: relative;
+  overflow: hidden;
+}
+
+.loading-bar.active::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -40%;
+  width: 40%; height: 100%;
+  background: var(--accent);
+  animation: loading 1s infinite linear;
+}
+
+@keyframes loading {
+  to { left: 100%; }
+}
+
+  padding: 0.5rem 1rem;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  font-family: 'DM Mono', monospace;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* RUNNER MODAL */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.88);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.modal-overlay.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  width: 100%;
+  max-width: 580px;
+  max-height: 88vh;
+  overflow-y: auto;
+  transform: translateY(24px) scale(0.97);
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  opacity: 0;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.8);
+}
+
+.modal-overlay.open .modal {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 2;
+}
+
+.modal-runner-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.8rem;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.modal-bib {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.modal-close {
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 700;
+  transition: all 0.15s;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.modal-close:hover { background: var(--border2); border-color: var(--accent); color: var(--accent); }
+
+.modal-body { padding: 1.5rem; }
+
+.modal-section-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.timeline-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--surface2);
+  border-radius: 4px;
+  border-left: 3px solid var(--border2);
+}
+
+.timeline-item.done { border-left-color: var(--green); }
+.timeline-item.current { border-left-color: var(--accent); }
+.timeline-item.pending { opacity: 0.5; }
+
+.timeline-checkpoint {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 130px;
+}
+
+.timeline-time {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--accent);
+}
+
+.timeline-elapsed {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+/* RESPONSIVE */
+@media (max-width: 600px) {
+  .header { padding: 0.75rem 1rem; flex-wrap: wrap; gap: 0.5rem; }
+  .header h1 { font-size: 2rem; }
+  .controls { padding: 0.75rem 0.75rem; gap: 0.5rem; flex-wrap: wrap; }
+  .controls > div:last-child { margin-left: 0; width: 100%; justify-content: space-between; }
+  .search-input { width: 140px; }
+  .tabs { gap: 0.2rem; flex-wrap: wrap; }
+  .tab-btn { padding: 0.6rem 0.8rem; font-size: 0.75rem; min-height: 44px; }
+  .stat-item { padding: 0.5rem 0.75rem; min-width: 80px; }
+  .stat-value { font-size: 1.2rem; }
+  .stat-label { font-size: 0.6rem; }
+  .map-section { padding: 0.75rem; }
+  .map-container { height: 400px; min-height: 300px; }
+  .map-legend { gap: 0.3rem 0.6rem; }
+  .legend-item { font-size: 0.7rem; }
+  .legend-route { padding: 0.25rem 0.4rem; }
+  .charts-row { grid-template-columns: 1fr; }
+  .chart-panel { border-right: none; border-bottom: 1px solid var(--border); }
+  thead th { font-size: 0.6rem; padding: 0.4rem 0.5rem; }
+  tbody td { font-size: 0.68rem; padding: 0.4rem 0.5rem; }
+  td.name { font-size: 0.75rem; }
+  td.bib { font-size: 0.95rem; }
+  #segmentFocus > div:last-child { grid-template-columns: 1fr; }
+  .modal { max-width: 100%; margin: 0; border-radius: 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <h1>Tiger Claw</h1>
+    <span class="year">2026</span>
+  </div>
+  <div class="header-right">
+    <div class="live-badge" id="eventStatusBadge"><div class="live-dot" id="liveDot"></div> <span id="eventStatusText">Live</span></div>
+    <div class="last-updated">Updated: <span id="lastUpdated">--</span></div>
+  </div>
+</div>
+
+<div class="loading-bar" id="loadingBar"></div>
+
+<!-- CONTROLS — event tabs first, then stats -->
+<div class="controls">
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="ascent">Ascent</button>
+    <button class="tab-btn" data-tab="50k">50k</button>
+    <button class="tab-btn" data-tab="ambush">Ambush</button>
+    <button class="tab-btn" data-tab="bigcat">🐅 Big Cat</button>
+  </div>
+  <div style="display:flex;gap:0.5rem;align-items:center;margin-left:auto;flex-wrap:wrap;">
+    <select id="genderFilter" style="
+      background:var(--surface3);border:1px solid var(--border2);border-radius:4px;
+      color:var(--text);font-family:'DM Mono',monospace;font-size:0.8rem;
+      padding:0.5rem 0.75rem;outline:none;cursor:pointer;">
+      <option value="all">All Genders</option>
+      <option value="M">Men</option>
+      <option value="F">Women</option>
+      <option value="NB">Non-Binary</option>
+    </select>
+    <div style="display:flex;border:1px solid var(--border2);border-radius:4px;overflow:hidden;">
+      <button id="unitsMiles" onclick="setUnits('imperial')" style="
+        background:var(--accent);color:var(--black);border:none;padding:0.5rem 0.75rem;
+        font-family:'DM Mono',monospace;font-size:0.75rem;font-weight:700;cursor:pointer;">mi/ft</button>
+      <button id="unitsKm" onclick="setUnits('metric')" style="
+        background:var(--surface3);color:var(--text-muted);border:none;padding:0.5rem 0.75rem;
+        font-family:'DM Mono',monospace;font-size:0.75rem;cursor:pointer;">km/m</button>
+    </div>
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input type="text" class="search-input" id="searchInput" placeholder="Search bib or name…">
+    </div>
+  </div>
+</div>
+
+<!-- STATS BAR — shows stats for active event only -->
+<div class="stats-bar" id="statsBar">
+  <div class="stat-item" id="statCol1">
+    <div class="stat-label" id="statLabel1">Runners</div>
+    <div class="stat-value" id="statVal1">--</div>
+  </div>
+  <div class="stat-item" id="statCol2">
+    <div class="stat-label" id="statLabel2">Finished</div>
+    <div class="stat-value green" id="statVal2">--</div>
+  </div>
+  <div class="stat-item" id="statCol3">
+    <div class="stat-label" id="statLabel3">On Course</div>
+    <div class="stat-value green" id="statVal3">--</div>
+  </div>
+  <div class="stat-item" id="statCol4">
+    <div class="stat-label" id="statLabel4">DNF</div>
+    <div class="stat-value red-col" id="statVal4">--</div>
+  </div>
+  <div class="stat-item" id="statCol5" style="display:none">
+    <div class="stat-label" id="statLabel5">DNS</div>
+    <div class="stat-value" id="statVal5">--</div>
+  </div>
+</div>
+
+<!-- PODIUM — only shown when there are finishers -->
+<div id="podiumSection" style="border-bottom:1px solid var(--border);background:var(--surface2);padding:1.25rem 1.5rem;display:none;">
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:0.9rem;letter-spacing:0.12em;color:var(--text);margin-bottom:1rem;">Podium</div>
+  <div id="podiumGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;"></div>
+</div>
+
+<!-- POSITION DISCLAIMER -->
+<div style="background:#1a1200;border-bottom:1px solid #78350f;padding:0.4rem 1.5rem;display:flex;align-items:center;gap:0.6rem;">
+  <span style="font-size:0.85rem;">&#128205;</span>
+  <span style="font-family:'DM Mono',monospace;font-size:0.68rem;color:#d97706;">
+    <b style="color:#fbbf24;">ESTIMATED POSITIONS</b> — Runner locations are projected using checkpoint scan times and historical pace data. Actual positions may vary.
+  </span>
+</div>
+
+<!-- MAP -->
+<div class="map-section">
+  <!-- FOLLOW RUNNER BAR -->
+  <div id="followBar" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+    <div style="position:relative;flex:1;max-width:280px;">
+      <span style="position:absolute;left:0.6rem;top:50%;transform:translateY(-50%);color:var(--text-dim);font-size:0.75rem;pointer-events:none;">🔍</span>
+      <input type="text" id="followInput" placeholder="Follow a runner (name or bib)…" autocomplete="off" style="
+        width:100%;background:var(--surface3);border:1px solid var(--border2);border-radius:4px;
+        color:var(--text);font-family:'DM Mono',monospace;font-size:0.78rem;
+        padding:0.45rem 0.75rem 0.45rem 2rem;outline:none;transition:border-color 0.15s;"
+        oninput="onFollowInput(this.value)" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border2)'">
+      <!-- Autocomplete dropdown -->
+      <div id="followDropdown" style="display:none;position:absolute;top:calc(100% + 3px);left:0;right:0;
+        background:var(--surface);border:1px solid var(--border2);border-radius:4px;z-index:100;
+        box-shadow:0 8px 24px rgba(0,0,0,0.6);max-height:200px;overflow-y:auto;"></div>
+    </div>
+    <div id="followTags" style="display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;"></div>
+    <button id="followClearBtn" onclick="clearFollowing()" style="display:none;
+      background:var(--surface3);border:1px solid var(--border2);border-radius:4px;
+      color:var(--text-muted);font-family:'DM Mono',monospace;font-size:0.72rem;
+      padding:0.4rem 0.7rem;cursor:pointer;white-space:nowrap;">Clear all</button>
+    <span style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--text-dim);white-space:nowrap;">
+      Up to 5 runners
+    </span>
+  </div>
+
+  <div class="map-title">
+    Course Map — Live Positions
+    <div style="display:flex;border:1px solid var(--border2);border-radius:4px;overflow:hidden;margin-left:0.75rem;flex-shrink:0;">
+      <button id="btn3d" onclick="setMapDimension('3d')" style="background:var(--accent);color:var(--black);border:none;padding:0.3rem 0.6rem;font-family:'DM Mono',monospace;font-size:0.72rem;font-weight:700;cursor:pointer;">3D</button>
+      <button id="btn2d" onclick="setMapDimension('2d')" style="background:var(--surface3);color:var(--text-muted);border:none;padding:0.3rem 0.6rem;font-family:'DM Mono',monospace;font-size:0.72rem;cursor:pointer;">2D</button>
+    </div>
+    <span class="map-resize-hint" style="margin-left:auto;">↕ drag bottom edge to resize</span>
+  </div>
+  <div class="map-container">
+    <div id="courseMap" style="width:100%;height:100%;"></div>
+  </div>
+
+  <!-- ============================================================
+       REPLAY CONTROL BAR (archived race replay)
+       ============================================================ -->
+  <div class="replay-bar" id="replayBar">
+    <div class="replay-top">
+      <button class="replay-toggle" id="replayToggle" title="Enter replay mode">
+        <span class="replay-icon">⟲</span>
+        <span class="replay-toggle-label">RACE REPLAY</span>
+      </button>
+      <div class="replay-info" id="replayInfo">
+        <div class="replay-clock" id="replayClock">--:--:--</div>
+        <div class="replay-elapsed" id="replayElapsed">Race elapsed: 00:00:00</div>
+      </div>
+      <div class="replay-speeds" id="replaySpeeds">
+        <button class="rspd" data-speed="10">10×</button>
+        <button class="rspd active" data-speed="60">60×</button>
+        <button class="rspd" data-speed="300">300×</button>
+        <button class="rspd" data-speed="1200">1200×</button>
+      </div>
+    </div>
+    <div class="replay-controls" id="replayControls">
+      <button class="replay-play" id="replayPlay" title="Play">▶</button>
+      <div class="replay-scrub" id="replayScrub">
+        <div class="rscrub-track"></div>
+        <div class="rscrub-progress" id="rscrubProgress"></div>
+        <div class="rscrub-handle" id="rscrubHandle"></div>
+      </div>
+      <button class="replay-reset" id="replayReset" title="Jump to start">⇤</button>
+    </div>
+  </div>
+  <div class="map-legend" id="mapLegend">
+    <!-- Route clickable items -->
+    <div class="legend-item legend-route" data-route="ascent" title="Click to focus Ascent Course">
+      <div class="legend-line" style="background:#a78bfa"></div>Ascent Course
+    </div>
+    <div class="legend-item legend-route" data-route="green_start" title="Click to focus Green Route">
+      <div class="legend-line" style="background:#4ade80"></div>Green Route
+    </div>
+    <div class="legend-item legend-route" data-route="pink" title="Click to focus Pink Route">
+      <div class="legend-line" style="background:#f472b6"></div>Pink Route
+    </div>
+    <div class="legend-item legend-route" data-route="white" title="Click to focus White Route">
+      <div class="legend-line" style="background:#e2e8f0"></div>White Route
+    </div>
+    <div class="legend-item legend-route" data-route="yellow" title="Click to focus Yellow Route">
+      <div class="legend-line" style="background:#fbbf24"></div>Yellow Route
+    </div>
+    <div class="legend-item legend-route" data-route="blue_descent" title="Click to focus Blue Descent">
+      <div class="legend-line" style="background:#60a5fa"></div>Blue Descent
+    </div>
+    <div class="legend-item legend-route" data-route="red_finish" title="Click to focus Red Finish">
+      <div class="legend-line" style="background:#f87171"></div>Red Finish
+    </div>
+    <!-- Checkpoints / Aid Stations -->
+    <div class="legend-sep"></div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#4ade80;border:2px solid #0a0a0a"></div>
+      <span>Start / Finish</span>
+    </div>
+    <div class="legend-item" id="legendBaseCamp">
+      <div class="legend-dot" style="background:#fbbf24;border:2px solid #0a0a0a"></div>
+      <span>Base Camp Aid Station</span>
+    </div>
+    <div class="legend-item" id="legendHighCamp">
+      <div class="legend-dot" style="background:#60a5fa;border:2px solid #0a0a0a"></div>
+      <span>High Camp Aid Station</span>
+    </div>
+    <div class="legend-item" id="legendAscentCP" style="display:none">
+      <div class="legend-dot" style="background:#fb923c;border:2px solid #0a0a0a"></div>
+      <span>⚡ Ascent Checkpoint</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#e8c14a;width:8px;height:8px;border-radius:2px"></div>
+      <span>Runner</span>
+    </div>
+    <div class="legend-item" style="margin-left:auto;color:var(--text-muted);font-size:0.65rem;font-style:italic">
+      Click route or legend to focus
+    </div>
+  </div>
+</div>
+
+<!-- SEGMENT FOCUS PANEL -->
+<div id="segmentFocus" style="display:none;border-bottom:1px solid var(--border);background:var(--surface2);">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem 0.5rem;">
+    <div>
+      <span id="segFocusTitle" style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:0.08em;color:var(--accent)"></span>
+      <span id="segFocusStats" style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--text-dim);margin-left:1rem"></span>
+    </div>
+    <button id="segFocusClose" style="background:none;border:1px solid var(--border2);color:var(--text-muted);border-radius:4px;padding:0.3rem 0.6rem;cursor:pointer;font-size:0.8rem;">✕ Close</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--border);margin-top:0.5rem;">
+    <!-- Runners on segment -->
+    <div style="padding:1rem 1.5rem;border-right:1px solid var(--border);">
+      <div style="font-family:'DM Mono',monospace;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);margin-bottom:0.75rem;">Runners on Segment</div>
+      <div id="segRunnerList" style="display:flex;flex-direction:column;gap:0.4rem;max-height:160px;overflow-y:auto;"></div>
+    </div>
+    <!-- Elevation profile -->
+    <div style="padding:1rem 1.5rem;">
+      <div style="font-family:'DM Mono',monospace;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-dim);margin-bottom:0.75rem;">
+        Elevation Profile
+        <span id="elevLoadingMsg" style="color:var(--accent);margin-left:0.5rem;"></span>
+      </div>
+      <div style="position:relative;height:160px;">
+        <canvas id="elevChart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ASCENT ELEVATION PANEL — shown only on ascent tab -->
+<div id="ascentElevPanel" style="display:none;border-bottom:1px solid var(--border);background:var(--surface2);padding:1rem 1.5rem;">
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:0.1em;color:#a78bfa;margin-bottom:0.75rem;">
+    Ascent Course — Elevation Profile
+    <span id="ascentElevStats" style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--text-dim);margin-left:1rem;font-weight:400;"></span>
+  </div>
+  <div style="position:relative;height:220px;">
+    <canvas id="ascentElevChart"></canvas>
+  </div>
+  <div style="margin-top:0.75rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+    <span id="ascentRunnerCount" style="font-family:'DM Mono',monospace;font-size:0.68rem;color:var(--text-dim)"></span>
+    <button id="ascentRunnerToggle" onclick="toggleAscentRunnerList()" style="
+      background:var(--surface3);border:1px solid var(--border2);border-radius:4px;color:var(--text-muted);
+      font-family:'DM Mono',monospace;font-size:0.68rem;padding:0.25rem 0.6rem;cursor:pointer;">
+      Show runners ▾
+    </button>
+  </div>
+  <div id="ascentRunnerList" style="display:none;margin-top:0.5rem;max-height:160px;overflow-y:auto;
+    border:1px solid var(--border);border-radius:4px;background:var(--surface);">
+    <table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
+      <thead><tr style="background:var(--surface2);">
+        <th style="padding:0.35rem 0.6rem;text-align:left;font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--text-dim);border-bottom:1px solid var(--border);font-weight:400;letter-spacing:0.08em;text-transform:uppercase;">Bib</th>
+        <th style="padding:0.35rem 0.6rem;text-align:left;font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--text-dim);border-bottom:1px solid var(--border);font-weight:400;letter-spacing:0.08em;text-transform:uppercase;">Name</th>
+        <th style="padding:0.35rem 0.6rem;text-align:right;font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--text-dim);border-bottom:1px solid var(--border);font-weight:400;letter-spacing:0.08em;text-transform:uppercase;">Progress</th>
+        <th style="padding:0.35rem 0.6rem;text-align:center;font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--text-dim);border-bottom:1px solid var(--border);font-weight:400;letter-spacing:0.08em;text-transform:uppercase;">Follow</th>
+      </tr></thead>
+      <tbody id="ascentRunnerListBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CHARTS — 50k/ambush only -->
+<div class="charts-row" id="chartsRow" style="display:none">
+  <div class="chart-panel">
+    <div class="chart-title">Loop Order Distribution</div>
+    <div class="chart-canvas-wrap"><canvas id="loopChart"></canvas></div>
+  </div>
+  <div class="chart-panel">
+    <div class="chart-title">Avg Segment Times</div>
+    <div class="chart-canvas-wrap"><canvas id="segChart"></canvas></div>
+  </div>
+</div>
+
+<!-- TABLE -->
+<div class="table-section">
+  <div class="table-wrap" id="tableWrap">
+    <div class="empty-state" id="emptyState">Loading race data…</div>
+  </div>
+  <div class="row-count" id="rowCount"></div>
+  <div id="lastUpdated" style="font-family:'DM Mono',monospace;font-size:0.75rem;color:#888;margin-top:0.25rem;"></div>
+</div>
+
+<!-- DEBUG PANEL — remove before race day -->
+<div id="debugPanel" style="position:fixed;bottom:1rem;left:1rem;background:rgba(0,0,0,0.92);border:1px solid #333;border-radius:6px;padding:0.75rem 1rem;font-family:'DM Mono',monospace;font-size:0.7rem;color:#4ade80;z-index:9998;max-width:340px;max-height:200px;overflow-y:auto;display:none;">
+  <div style="color:#888;margin-bottom:0.3rem">DEBUG — <button onclick="document.getElementById('debugPanel').style.display='none'" style="background:none;border:none;color:#888;cursor:pointer;font-size:0.7rem">hide</button></div>
+  <div id="debugLog"></div>
+</div>
+
+<!-- RUNNER MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-runner-name" id="modalName">--</div>
+        <div class="modal-bib" id="modalBib">--</div>
+      </div>
+      <button class="modal-close" id="modalClose">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// EMBED MODE — load via ?embed=1 to hide header for Squarespace iframe
+// ============================================================
+if (new URLSearchParams(location.search).get('embed') === '1') {
+  document.body.classList.add('embed');
+}
+
+// ============================================================
+// CONFIG
+// ============================================================
+const FINAL_RESULTS_ID = '1_7iVj9ELWGJFjCfs0lqN7mheJnlmO3L03IwmVAvJDAI';
+const SHEETS_API_KEY = 'AIzaSyBJbSNFryaZsfiYstixiHshalDyp76r0rA';
+
+// Sheets API v4 — reads directly from the sheet with no caching, no gviz 429s.
+// Returns rows as a 2D array via the values endpoint.
+const sheetApiUrl = (sheetName) =>
+  `https://sheets.googleapis.com/v4/spreadsheets/${FINAL_RESULTS_ID}/values/${encodeURIComponent(sheetName)}?key=${SHEETS_API_KEY}`;
+
+const CSV = {
+  ascent:    sheetApiUrl('ASCENT RESULTS'),
+  fiftyk:    sheetApiUrl('50K RESULTS'),
+  ambush:    sheetApiUrl('AMBUSH RESULTS'),
+  ascent_cp: sheetApiUrl('DB_ASCENT_CP'),
+};
+
+const REFRESH_MS = 90000;
+
+const RACE_STARTS = {
+  ascent: new Date('2026-05-08T18:00:00-07:00'),
+  fiftyk: new Date('2026-05-09T07:00:00-07:00'),
+  ambush: new Date('2026-05-09T10:00:00-07:00'),
+};
+
+// ============================================================
+// REPLAY CLOCK — virtual time-of-day controller
+// ============================================================
+// When replayMode is OFF, getReplayNow() returns Date.now() (live behavior).
+// When ON, it returns a scrubbed timestamp so all position math runs as if
+// "now" were that point during the race. The Replay UI sets replayTime.
+let replayMode = false;
+let replayTime = Date.now();    // virtual "now"
+let replayPlaying = false;
+let replayLastTick = null;
+let replaySpeed = 60;           // 60x by default
+let replayRaf = null;
+let followBib = null;           // when set, only this runner is highlighted
+
+function getReplayNow() {
+  return replayMode ? replayTime : Date.now();
+}
+
+// Auto-detect the race day window so the scrubber bar covers the right range
+// for the currently active tab. End-of-day defaults to 14h after start.
+function replayRange() {
+  const tab = activeTab;
+  const startKey = (tab === 'ascent') ? 'ascent'
+                 : (tab === '50k' || tab === 'bigcat') ? 'fiftyk'
+                 : 'ambush';
+  const startMs = RACE_STARTS[startKey].getTime();
+  // Find latest finish across all loaded runners for this tab
+  const allRows = (tab === 'ascent') ? (data.ascent || [])
+                : (tab === '50k')    ? (data.fiftyk || [])
+                : (tab === 'ambush') ? (data.ambush || [])
+                : [...(data.ascent || []), ...(data.fiftyk || [])];
+  let latest = startMs + 6 * 3600 * 1000;  // sensible default 6h
+  allRows.forEach(r => {
+    const fields = ['Finish Time (Scan)', 'FINISH TIME (Scan)', 'Finish Time', 'FINISH TIME'];
+    for (const f of fields) {
+      if (r[f]) {
+        const d = parseTS(r[f]);
+        if (d && d.getTime() > latest) latest = d.getTime();
+      }
+    }
+  });
+  // Add 15 minutes padding
+  return { start: startMs, end: latest + 15 * 60 * 1000 };
+}
+
+const CHECKPOINTS = [
+  { id: 'start',         label: 'Start / Finish',         lat: 47.527708, lng: -122.034216, color: '#4ade80', tabs: ['50k','ambush','bigcat'] },
+  { id: 'basecamp',      label: 'Base Camp Aid Station',  lat: 47.529832, lng: -121.996694, color: '#fb923c', tabs: ['50k','ambush','bigcat'] },
+  { id: 'pink',          label: 'Pink Loop Checkpoint',   lat: 47.526687, lng: -121.997090, color: '#f472b6', tabs: ['50k','ambush','bigcat'] },
+  { id: 'white',         label: 'White Loop Checkpoint',  lat: 47.527259, lng: -121.998629, color: '#e2e8f0', tabs: ['50k','ambush','bigcat'] },
+  { id: 'yellow',        label: 'Yellow Loop Checkpoint', lat: 47.527324, lng: -121.998865, color: '#fbbf24', tabs: ['50k','ambush','bigcat'] },
+  { id: 'highcamp',      label: 'High Camp Aid Station',  lat: 47.508742, lng: -121.985226, color: '#fb923c', tabs: ['50k','ambush','bigcat'] },
+  { id: 'red',           label: 'Red Checkpoint',         lat: 47.529776, lng: -121.996875, color: '#f87171', tabs: ['50k','ambush','bigcat'] },
+  { id: 'ascent_start',  label: 'Start',                  lat: 47.52975637733785, lng: -121.99551343917848, color: '#4ade80', tabs: ['ascent','bigcat'] },
+  { id: 'ascent_cp',     label: 'Ascent Checkpoint',      lat: 47.52966446161007, lng: -121.98757466460309, color: '#fb923c', tabs: ['ascent','bigcat'] },
+  { id: 'ascent_finish', label: 'Finish',                 lat: 47.508742, lng: -121.985226, color: '#f87171', tabs: ['ascent','bigcat'] },
+];
+
+// ============================================================
+// HISTORICAL PACE ENGINE
+// ============================================================
+// Baked-in pace estimates (seconds per km) per segment.
+// Source: typical Tiger Claw finishing times / course knowledge.
+// When we have real UltraSignup data we can refine these per-runner.
+// To add a runner's historical pace: add their bib to RUNNER_PACE_OVERRIDES.
+// Format: { bibNumber: paceSec } where paceSec = seconds per flat km.
+// Per-runner pace overrides derived from May 8, 2026 ascent results.
+// Calculation: actual_ascent_pace_sec_per_km × (400/520) — converts the
+// ascent-segment pace (where SEGMENT_BASE_PACE.ascent = 520) into the
+// flat-equivalent scalar that getRunnerPace() expects (reference = 400 s/km).
+// Field stats: n=40, median=560 s/km, range=347–967 s/km.
+const RUNNER_PACE_OVERRIDES = {
+  11: 465, 12: 602, 13: 378, 14: 672, 15: 560, 18: 445, 19: 481, 20: 515,
+  22: 580, 26: 681, 28: 688, 30: 347, 31: 655, 33: 645, 34: 558, 35: 538,
+  37: 440, 38: 620, 39: 571, 41: 560, 42: 583, 43: 967, 44: 757, 46: 852,
+  47: 508, 48: 356, 51: 475, 53: 464, 54: 382, 56: 474, 58: 754, 60: 645,
+  62: 429, 63: 505, 64: 537, 67: 675, 68: 574, 70: 608, 71: 754, 74: 522,
+};
+
+// Variance buffer: tomorrow's race is longer than the ascent, so per-runner
+// pace from a 30–80 min effort over-predicts speed on a multi-hour course.
+// A flat fatigue multiplier widens predicted segment durations a bit, and
+// scales further as race elapsed time grows. 1.0 = exact, 1.15 = +15% slower.
+const PACE_VARIANCE_BASE = 1.10;            // baseline slowdown vs ascent pace
+const PACE_VARIANCE_PER_HOUR = 0.03;        // additional 3% slower per race hour
+const PACE_VARIANCE_MAX = 1.35;             // cap at +35%
+function paceVarianceMultiplier(raceStartMs) {
+  if (!raceStartMs) return PACE_VARIANCE_BASE;
+  const hoursIn = Math.max(0, (getReplayNow() - raceStartMs) / 3600000);
+  return Math.min(PACE_VARIANCE_MAX, PACE_VARIANCE_BASE + hoursIn * PACE_VARIANCE_PER_HOUR);
+}
+
+// ============================================================
+// SEGMENT BASE PACES — calibrated from 2025 Tiger Claw results
+// ============================================================
+// 2025 field data: winner 4:47, median ~8:30, back of pack ~12hr
+// green_start (7km, ~570ft gain): median runner hits green in ~68min → 583 s/km
+// But green is mixed terrain — first 5mi starts flat then climbs. Using 480 s/km flat equiv.
+// All paces in seconds per km (flat equivalent before grade adjustment).
+// Grade-adjusted pace via avgGradeAdjustedPace() is applied on top of these.
+const SEGMENT_BASE_PACE = {
+  green_start:  390,  // 7km, modest gain — ~6:30/km median. Fast runners ~300, slow ~550
+  ascent:       520,  // pure sustained climb — slower than green
+  pink:         460,  // technical loop with big climb
+  white:        420,  // slightly less climbing than pink
+  yellow:       440,  // long loop, rolling
+  blue_descent: 400,  // fast descent — but technical, with tired legs from preceding climb
+  red_finish:   380,  // tired legs, rolling terrain back to finish
+};
+
+// Pace bands from 2025 results (seconds per km, total course):
+// Elite (top 10): ~344-397 s/km
+// Competitive (top 25%): ~420-480 s/km
+// Mid-field (50%): ~520-600 s/km
+// Back of pack (75-100%): ~650-900 s/km
+// Average field: ~576 s/km
+// The SEGMENT_BASE_PACE above represents ~mid-field pace
+// Individual runners scale via their observed scan-to-scan pace
+
+// Estimated total course times at base pace (for reference):
+// green_start 7km × 390 × grade_avg: ~53min
+// full 50k at avg: ~8.5hr — matches 2025 median finish time
+
+// Average finishing times for each event (used for position estimation)
+// in seconds. From prior Tiger Claw editions / similar races.
+const AVG_FINISH_TIMES = {
+  ascent: 4 * 3600,         // ~4 hours
+  fiftyk: 10.5 * 3600,      // ~10.5 hours
+  ambush: 8 * 3600,         // ~8 hours
+};
+
+// Get pace for a specific runner on a specific segment
+// Eventually: look up runner's historical UltraSignup pace
+function getRunnerPace(bib, segmentName) {
+  const basePace = SEGMENT_BASE_PACE[segmentName] || 400;
+  // If we have a personal pace override for this runner, scale proportionally
+  const personalPace = RUNNER_PACE_OVERRIDES[String(bib)];
+  if (personalPace) {
+    // Scale segment pace by runner's personal pace ratio vs "average" 400 s/km
+    const ratio = personalPace / 400;
+    return basePace * ratio;
+  }
+  return basePace;
+}
+
+// ============================================================
+// HOW TO ADD ULTRASIGNUP DATA
+// ============================================================
+// 1. Go to ultrasignup.com → find Tiger Claw or any past race your runners did
+// 2. Export results CSV (usually available on race results page)
+// 3. Calculate each runner's pace: (finish_time_seconds / distance_km)
+// 4. Add to RUNNER_PACE_OVERRIDES above: { bib: pace_seconds_per_km }
+// Example from UltraSignup 50k result: finished in 9h 30min = 34200s / 50km = 684 s/km
+// That's their total pace — we use it as a scalar against segment base paces
+// ============================================================
+let data = { ascent: [], fiftyk: [], ambush: [], ascent_cp: {} }; // ascent_cp: { bib -> timestamp }
+let activeTab = 'ascent';
+let previousTab = 'ascent';
+let units = 'imperial';
+let genderFilter = 'all';
+let filterText = '';
+let sortCol = null;
+let sortDir = 'asc';
+let elevChartInst = null;
+let loopChartInst = null;
+let segChartInst = null;
+let ascentElevChartInst = null;
+
+// Draw the full ascent elevation profile with animated runner dots
+// Called whenever ascent tab is active or data refreshes
+let hoverCrosshairMarker = null;
+
+function showHoverCrosshair(routeName, fraction) {
+  if (!mapReady) return;
+  var pos = interpolateAlongRoute(GPX_ROUTES[routeName], fraction);
+  if (!pos) return;
+  if (hoverCrosshairMarker) {
+    hoverCrosshairMarker.setLngLat([pos.lng, pos.lat]);
+    hoverCrosshairMarker.getElement().style.display = 'flex';
+    return;
+  }
+  var el = document.createElement('div');
+  el.style.cssText = 'display:flex;flex-direction:column;align-items:center;pointer-events:none;';
+  el.innerHTML = '<div style="width:14px;height:14px;background:#fff;border:2.5px solid #0a0a0a;border-radius:50%;box-shadow:0 0 8px rgba(255,255,255,0.8);"></div>';
+  hoverCrosshairMarker = new mapboxgl.Marker({ element: el, anchor: 'center' }).setLngLat([pos.lng, pos.lat]).addTo(mbMap);
+}
+
+function clearHoverCrosshair() {
+  if (hoverCrosshairMarker) hoverCrosshairMarker.getElement().style.display = 'none';
+}
+
+function drawAscentElevProfile() {
+  const elevs = ELEVATION_DATA['ascent'];
+  const pts   = GPX_ROUTES['ascent'];
+  if (!elevs || !pts) return;
+
+  // Build cumulative distance axis
+  const distKm = [0];
+  for (let i = 1; i < pts.length; i++) {
+    distKm.push(distKm[distKm.length-1] + haversineM(pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1])/1000);
+  }
+  const totalKm = distKm[distKm.length-1];
+
+  const elevDisplay = elevs.map(e => units === 'imperial' ? Math.round(e*3.281) : Math.round(e));
+  const elevUnit = units === 'imperial' ? 'ft' : 'm';
+  const distUnit = units === 'imperial' ? 'mi' : 'km';
+  const xLabels  = distKm.map(d => units === 'imperial' ? (d*0.621371).toFixed(2) : d.toFixed(2));
+
+  // Checkpoint marker at 22.8% through
+  const cpIdx = Math.round(0.228 * (elevDisplay.length - 1));
+  const cpDist = xLabels[cpIdx];
+  const cpElev = elevDisplay[cpIdx];
+
+  // Runner dots
+  const runnerDots = [];
+  data.ascent.forEach(r => {
+    if (!r.BIB) return;
+    const pos = getRunnerRouteAndProgress(r, 'ascent');
+    if (!pos || pos.fixed) return;
+    const idx = Math.min(Math.round(pos.progress * (elevDisplay.length-1)), elevDisplay.length-1);
+    runnerDots.push({
+      x: xLabels[idx],
+      y: elevDisplay[idx],
+      bib: r.BIB,
+      name: r.NAME||'',
+      progress: pos.progress
+    });
+  });
+
+  // Stats line
+  let gain = 0;
+  for (let i = 1; i < elevs.length; i++) { const d = elevs[i]-elevs[i-1]; if(d>0) gain+=d; }
+  const minE = Math.min(...elevs), maxE = Math.max(...elevs);
+  document.getElementById('ascentElevStats').textContent =
+    `${fmtDist(GPX_DISTANCES['ascent'])} · +${fmtElev(gain)} gain · ${fmtElev(minE)}–${fmtElev(maxE)}`;
+
+  // Runner chips below chart — delegated to renderAscentRunnerList
+  renderAscentRunnerList(runnerDots);
+
+  // Checkpoint annotation dataset
+  const cpDataset = {
+    label: '⚡ Ascent CP',
+    data: [{ x: cpDist, y: cpElev }],
+    borderColor: '#fb923c',
+    backgroundColor: '#fb923c',
+    pointRadius: 10,
+    pointStyle: 'triangle',
+    showLine: false,
+    pointBorderColor: '#0a0a0a',
+    pointBorderWidth: 1.5,
+  };
+
+  const runnerDataset = {
+    label: 'Runners',
+    data: runnerDots.map(rd => ({ x: rd.x, y: rd.y })),
+    borderColor: '#0a0a0a',
+    backgroundColor: '#a78bfa',
+    pointRadius: 8,
+    pointStyle: 'circle',
+    showLine: false,
+    pointBorderColor: '#0a0a0a',
+    pointBorderWidth: 1.5,
+  };
+
+  if (ascentElevChartInst) {
+    // Update runner positions without full redraw for smooth animation feel
+    ascentElevChartInst.data.datasets[1].data = cpDataset.data;
+    ascentElevChartInst.data.datasets[2].data = runnerDataset.data;
+    ascentElevChartInst.update('none'); // no animation on data update (position already animated on map)
+    return;
+  }
+
+  const canvas = document.getElementById('ascentElevChart');
+  const ctx = canvas.getContext('2d');
+
+  // Wire hover crosshair on canvas — map cursor X position to a route fraction
+  if (!canvas._hoverWired) {
+    canvas._hoverWired = true;
+    canvas.addEventListener('mousemove', function(e) {
+      if (!ascentElevChartInst) return;
+      const area = ascentElevChartInst.chartArea;
+      if (!area) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      if (x < area.left || x > area.right) { clearHoverCrosshair(); return; }
+      const fraction = Math.max(0, Math.min(1, (x - area.left) / (area.right - area.left)));
+      showHoverCrosshair('ascent', fraction);
+    });
+    canvas.addEventListener('mouseleave', function() { clearHoverCrosshair(); });
+  }
+
+  ascentElevChartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: xLabels,
+      datasets: [
+        {
+          label: `Elevation (${elevUnit})`,
+          data: elevDisplay,
+          borderColor: '#a78bfa',
+          backgroundColor: '#a78bfa22',
+          borderWidth: 2.5,
+          pointRadius: 0,
+          fill: true,
+          tension: 0.4,
+        },
+        cpDataset,
+        runnerDataset,
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 600 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: ctx => `${ctx[0].label} ${distUnit}`,
+            label: ctx => {
+              if (ctx.datasetIndex === 1) return `⚡ Ascent Checkpoint · ${ctx.parsed.y}${elevUnit}`;
+              if (ctx.datasetIndex === 2) {
+                const rd = runnerDots[ctx.dataIndex];
+                return rd ? `#${rd.bib} ${rd.name} · ${ctx.parsed.y}${elevUnit}` : '';
+              }
+              return `${ctx.parsed.y}${elevUnit}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'category',
+          ticks: {
+            color: '#555',
+            font: { family: 'DM Mono', size: 9 },
+            maxTicksLimit: 7,
+            callback: (val, i) => {
+              const step = Math.ceil(xLabels.length / 6);
+              return i % step === 0 ? `${xLabels[i]}${distUnit}` : '';
+            }
+          },
+          grid: { color: '#1a1a1a' }
+        },
+        y: {
+          ticks: { color: '#555', font: { family: 'DM Mono', size: 9 }, callback: v => `${v}${elevUnit}` },
+          grid: { color: '#1a1a1a' }
+        }
+      }
+    }
+  });
+}
+// Forward-progress memory: runners can't go backward on a segment between refreshes
+const PROGRESS_MEMORY = {}; // key: "type_bib_segName" → max progress seen
+const lastCheckpointSeen = {};
+let STATE_lastUpdate = null; // runner key -> last checkpoint field seen
+
+// ============================================================
+// EVENT STATUS — Live / Countdown / Ended
+// ============================================================
+function updateEventStatus() {
+  const now = Date.now();
+  const ascentStart = new Date('2026-05-08T18:00:00-07:00').getTime();
+  const fiftyStart  = new Date('2026-05-09T07:00:00-07:00').getTime();
+  const eventEnd    = new Date('2026-05-09T20:00:00-07:00').getTime(); // estimate 8pm finish
+  const badge = document.getElementById('eventStatusBadge');
+  const dot   = document.getElementById('liveDot');
+  const text  = document.getElementById('eventStatusText');
+
+  if (now < ascentStart) {
+    // Before race
+    const days = Math.floor((ascentStart - now) / 86400000);
+    const hrs  = Math.floor((ascentStart - now) / 3600000) % 24;
+    badge.style.background = '#1a1a0a';
+    badge.style.border = '1px solid #78350f';
+    badge.style.color = '#fbbf24';
+    dot.style.background = '#fbbf24';
+    dot.style.animation = 'none';
+    text.textContent = days > 0 ? `Starting May 8 · ${days}d ${hrs}h` : `Starting May 8 · ${hrs}h`;
+  } else if (now > eventEnd) {
+    // After race
+    badge.style.background = '#0a0a1a';
+    badge.style.border = '1px solid #1e3a5f';
+    badge.style.color = '#60a5fa';
+    dot.style.background = '#60a5fa';
+    dot.style.animation = 'none';
+    text.textContent = 'Event Ended';
+  } else {
+    // Live!
+    badge.style.background = '#1a0000';
+    badge.style.border = '1px solid #7f1d1d';
+    badge.style.color = '#f87171';
+    dot.style.background = '#f87171';
+    dot.style.animation = 'pulse 1.5s infinite';
+    text.textContent = 'Live';
+  }
+}
+
+function setUnits(u) {
+  units = u;
+  document.getElementById('unitsMiles').style.background = u === 'imperial' ? 'var(--accent)' : 'var(--surface3)';
+  document.getElementById('unitsMiles').style.color = u === 'imperial' ? 'var(--black)' : 'var(--text-muted)';
+  document.getElementById('unitsKm').style.background = u === 'metric' ? 'var(--accent)' : 'var(--surface3)';
+  document.getElementById('unitsKm').style.color = u === 'metric' ? 'var(--black)' : 'var(--text-muted)';
+  // Refresh segment focus if open
+  if (activeSegment) openSegmentFocus(activeSegment);
+}
+
+function fmtDist(meters) {
+  if (units === 'imperial') return (meters * 0.000621371).toFixed(1) + ' mi';
+  return (meters / 1000).toFixed(1) + ' km';
+}
+
+function fmtElev(meters) {
+  if (units === 'imperial') return Math.round(meters * 3.281) + ' ft';
+  return Math.round(meters) + ' m';
+}
+
+function fmtElevAxis(meters) {
+  if (units === 'imperial') return Math.round(meters * 3.281) + 'ft';
+  return Math.round(meters) + 'm';
+}
+
+function fmtDistAxis(km) {
+  if (units === 'imperial') return (km * 0.621371).toFixed(1) + 'mi';
+  return km.toFixed(1) + 'km';
+}
+let mapCanvas, mapCtx;
+
+// ============================================================
+// CSV PARSING — robust quoted-field parser (handles commas in names)
+// ============================================================
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i+1] === '"') { current += '"'; i++; } // escaped quote
+      else inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current.trim()); current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  if (lines.length < 2) return [];
+  const headers = parseCSVLine(lines[0]);
+  const headerLen = headers.length;
+  return lines.slice(1).map(line => {
+    const vals = parseCSVLine(line);
+    const obj = {};
+    for (let i = 0; i < headerLen; i++) obj[headers[i]] = vals[i] || '';
+    return obj;
+  });
+}
+
+// ============================================================
+// TIME HELPERS
+// ============================================================
+function parseTS(str) {
+  if (!str || str === '') return null;
+  str = String(str).trim();
+
+  // Google Sheets sometimes exports time-formatted cells as decimals (fraction of a day)
+  // e.g. "0.427777..." for 10:15 AM. Range 0-1 with no other format = serial time
+  if (/^0?\.\d+$/.test(str)) {
+    const frac = parseFloat(str);
+    if (frac >= 0 && frac < 1) {
+      const totalSec = Math.round(frac * 86400);
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      const now = new Date();
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, s);
+      return isNaN(d) ? null : d;
+    }
+  }
+
+  // Bare time strings like "10:15:00 AM" or "3:27:51 PM" or "14:30:00"
+  const timeOnly = str.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+  if (timeOnly) {
+    const now = new Date();
+    let h = parseInt(timeOnly[1]);
+    const m = parseInt(timeOnly[2]);
+    const s = parseInt(timeOnly[3] || '0');
+    const ampm = (timeOnly[4]||'').toUpperCase();
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, s);
+    return isNaN(d) ? null : d;
+  }
+
+  // Full datetime strings like "5/9/2026 10:15:00 AM" or ISO
+  const d = new Date(str);
+  return isNaN(d) ? null : d;
+}
+
+function fmtTime(str) {
+  const d = parseTS(str);
+  if (!d) return '';
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+}
+
+function fmtElapsed(str) {
+  if (!str || str === '' || str.startsWith('-')) return '';
+  // Handle HH:MM:SS format from sheets
+  if (/^\d+:\d{2}:\d{2}/.test(str)) {
+    const parts = str.split(':');
+    const h = parseInt(parts[0]);
+    const m = parseInt(parts[1]);
+    const s = parseInt(parts[2]);
+    if (h === 0) return `${m}:${String(s).padStart(2,'0')}`;
+    return `${h}h ${m}m`;
+  }
+  // Handle decimal fraction (Google Sheets serial time)
+  const n = parseFloat(str);
+  if (!isNaN(n) && n > 0 && n < 5) {
+    const totalSec = Math.round(n * 86400);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    if (h === 0) return `${m}:${String(s).padStart(2,'0')}`;
+    return `${h}h ${m}m`;
+  }
+  return '';
+}
+
+function elapsedMs(str) {
+  if (!str || str === '' || str.startsWith('-')) return null;
+  if (/^\d+:\d{2}:\d{2}/.test(str)) {
+    const parts = str.split(':');
+    return (parseInt(parts[0])*3600 + parseInt(parts[1])*60 + parseInt(parts[2])) * 1000;
+  }
+  const n = parseFloat(str);
+  if (!isNaN(n) && n > 0 && n < 5) return Math.round(n * 86400 * 1000);
+  return null;
+}
+
+// ============================================================
+// STATUS
+// ============================================================
+function statusBadge(status) {
+  const s = String(status || '').trim().toUpperCase();
+  if (s === 'FINISHED') return `<span class="status-badge status-finished">Finished</span>`;
+  if (s === 'DNF') return `<span class="status-badge status-dnf">DNF</span>`;
+  if (s === 'DNS') return `<span class="status-badge status-dns">DNS</span>`;
+  if (s !== '') return `<span class="status-badge status-active">${s}</span>`;
+  return `<span class="status-badge status-blank">On Course</span>`;
+}
+
+function loopTag(color) {
+  if (!color) return '';
+  const c = color.toLowerCase();
+  if (c === 'pink') return `<span class="loop-tag loop-pink">P</span>`;
+  if (c === 'white') return `<span class="loop-tag loop-white">W</span>`;
+  if (c === 'yellow') return `<span class="loop-tag loop-yellow">Y</span>`;
+  return `<span class="loop-tag loop-white">${color.charAt(0)}</span>`;
+}
+
+// ============================================================
+// FETCH DATA
+// ============================================================
+// Fetches a CSV up to 3 times and returns the version that at least 2 of 3 agree on.
+// Google's edge servers cache CSVs inconsistently — single fetches can flip between
+// fresh and stale. Voting across multiple fetches converges on the true current state
+// regardless of whether rows were added, edited, or deleted.
+// Count CSV rows quickly without full parse (excludes header).
+function countRows(text) {
+  if (!text) return 0;
+  // Strip trailing empty lines, count remaining minus 1 for header
+  const trimmed = text.replace(/\n+$/, '');
+  if (!trimmed) return 0;
+  return Math.max(0, trimmed.split('\n').length - 1);
+}
+
+// Returns { text, confident } where confident=true means we trust this result.
+// Trust rule: at least 2 of 3 fetches agree on the SAME row count
+// (allows for sheet re-orderings that change content but not structure).
+// Fast single-fetch for initial page load — consensus voting is expensive
+// (3x sequential fetches per source × 4 sources = ~12 round trips before anything renders)
+// On first load we just want SOMETHING on screen; the next interval tick brings consensus.
+// Fetches data via Sheets API v4 (JSON) and converts to CSV-compatible format.
+// No caching, no rate limiting, no gviz 429s.
+async function fetchWithConsensus(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) {
+      console.warn('[TC] Sheets API error:', res.status, url);
+      return { text: null, confident: false };
+    }
+    const json = await res.json();
+    // Convert Sheets API v4 response to CSV text for compatibility
+    const rows = json.values || [];
+    if (rows.length === 0) return { text: '', confident: true };
+    const csv = rows.map(row =>
+      row.map(cell => {
+        const s = String(cell ?? '');
+        return s.includes(',') || s.includes('"') || s.includes('\n')
+          ? '"' + s.replace(/"/g, '""') + '"'
+          : s;
+      }).join(',')
+    ).join('\n');
+    return { text: csv, confident: true };
+  } catch(e) {
+    console.warn('[TC] Sheets API fetch failed:', e.message);
+    return { text: null, confident: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const confirmedText = { ascent: null, fiftyk: null, ambush: null, ascent_cp: null };
+// High-water marks: never accept fewer rows than we've previously confirmed,
+// UNLESS the new fetch is confidently smaller (meaning a real deletion).
+const highWaterRows = { ascent: 0, fiftyk: 0, ambush: 0, ascent_cp: 0 };
+let lastConfidentFetch = null;
+
+// CELL-LEVEL HIGH-WATER MARK
+// Once we've seen a non-empty value for a runner's timestamp/status/elapsed field,
+// we never let a later fetch blank it out. This guards against stale Google CSV
+// cache hits that pass row-count consensus but contain blank cells for cells we
+// previously had populated (the "scan time appears, then disappears" bug).
+const STICKY_FIELDS = {
+  ascent: ['STATUS','START TIME (SCAN)','FINISH TIME (SCAN)','ELAPSED TIME','GENDER'],
+  fiftyk: ['Status','Start Time','Green Checkpoint','Loop Color','First Loop Color',
+           'Loop Bottom','Red Checkpoint Out','Red Checkpoint In','FINISH TIME (Scan)',
+           'Total Elapsed Time'],
+  ambush: ['Status','Green Checkpoint','Loop Color','Loop Bottom',
+           'Red Checkpoint Out','Red Checkpoint In','FINISH TIME (Scan)','Total Elapsed Time'],
+};
+const BIB_KEY = { ascent: 'BIB', fiftyk: 'Bib', ambush: 'Bib' };
+
+// Merge new rows into prior rows: for each runner, if the new row has a blank
+// value in a sticky field but the prior row had a value, keep the prior value.
+// Returns the merged array (preserves new row order/structure otherwise).
+function mergeRows(key, prevRows, newRows) {
+  if (!Array.isArray(prevRows) || prevRows.length === 0) return newRows;
+  if (!Array.isArray(newRows)) return prevRows;
+  const bibKey = BIB_KEY[key];
+  const fields = STICKY_FIELDS[key] || [];
+  const prevByBib = new Map();
+  prevRows.forEach(r => {
+    const bib = r && r[bibKey] ? String(r[bibKey]).trim() : '';
+    if (bib) prevByBib.set(bib, r);
+  });
+  return newRows.map(r => {
+    const bib = r && r[bibKey] ? String(r[bibKey]).trim() : '';
+    if (!bib) return r;
+    const prev = prevByBib.get(bib);
+    if (!prev) return r;
+    let patched = null;
+    for (const f of fields) {
+      const newVal = r[f];
+      const prevVal = prev[f];
+      const newBlank = (newVal === undefined || newVal === null || String(newVal).trim() === '');
+      const prevHas  = (prevVal !== undefined && prevVal !== null && String(prevVal).trim() !== '');
+      if (newBlank && prevHas) {
+        if (!patched) patched = { ...r };
+        patched[f] = prevVal;
+      }
+    }
+    return patched || r;
+  });
+}
+
+// Same idea for the ascent_cp scan map (bib -> earliest timestamp).
+// Once we have a timestamp for a bib, never let it be erased; only allow
+// the timestamp to move EARLIER (per the "earliest scan wins" rule).
+function mergeAscentCp(prevMap, newMap) {
+  if (!prevMap) return newMap || {};
+  if (!newMap) return prevMap;
+  const merged = { ...newMap };
+  for (const bib in prevMap) {
+    const prevTs = prevMap[bib];
+    const newTs  = merged[bib];
+    if (!newTs && prevTs) {
+      merged[bib] = prevTs; // restore lost timestamp
+    } else if (prevTs && newTs && prevTs < newTs) {
+      merged[bib] = prevTs; // keep earliest
+    }
+  }
+  return merged;
+}
+
+// Decides whether to accept new data for a given key.
+// Accepts if: confident AND (more rows OR same rows with new content) — OR no prior data.
+function shouldAccept(key, result) {
+  if (result.text === null) return false;
+  if (confirmedText[key] === null) return true; // first data ever, take it
+  if (!result.confident) return false; // not confident, keep old
+  const newRows = countRows(result.text);
+  // Accept if rows grew, or rows match high-water mark (likely just content updates)
+  if (newRows >= highWaterRows[key]) return true;
+  // New data has FEWER rows than we've seen before. Only accept if confident
+  // AND we've seen this smaller count multiple times (real deletion, not flicker).
+  // For now, reject smaller results — race day, deletions are extremely rare.
+  return false;
+}
+
+async function fetchAll() {
+  document.getElementById('loadingBar').classList.add('active');
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+  try {
+    // Fetch sheets sequentially with 3s gaps to avoid quota burst
+    const ascentResult = await fetchWithConsensus(CSV.ascent);
+    if (shouldAccept('ascent', ascentResult)) {
+      confirmedText.ascent = ascentResult.text;
+      highWaterRows.ascent = Math.max(highWaterRows.ascent, countRows(ascentResult.text));
+      if (ascentResult.confident) lastConfidentFetch = Date.now();
+    }
+    await delay(3000);
+
+    const fiftyResult = await fetchWithConsensus(CSV.fiftyk);
+    if (shouldAccept('fiftyk', fiftyResult)) {
+      confirmedText.fiftyk = fiftyResult.text;
+      highWaterRows.fiftyk = Math.max(highWaterRows.fiftyk, countRows(fiftyResult.text));
+      if (fiftyResult.confident) lastConfidentFetch = Date.now();
+    }
+    await delay(3000);
+
+    const ambushResult = await fetchWithConsensus(CSV.ambush);
+    if (shouldAccept('ambush', ambushResult)) {
+      confirmedText.ambush = ambushResult.text;
+      highWaterRows.ambush = Math.max(highWaterRows.ambush, countRows(ambushResult.text));
+      if (ambushResult.confident) lastConfidentFetch = Date.now();
+    }
+
+    if (confirmedText.ascent !== null) data.ascent = mergeRows('ascent', data.ascent, parseCSV(confirmedText.ascent));
+    if (confirmedText.fiftyk !== null) data.fiftyk = mergeRows('fiftyk', data.fiftyk, parseCSV(confirmedText.fiftyk));
+    if (confirmedText.ambush !== null) data.ambush = mergeRows('ambush', data.ambush, parseCSV(confirmedText.ambush));
+
+    // Render after main 3 sheets so the table updates before ascent_cp slow fetch
+    updateStats(); renderTable(); updateLoopChart(); updateSegChart();
+    updatePanelVisibility(); drawMap();
+    document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+    STATE_lastUpdate = Date.now();
+
+    // Ascent checkpoint scans — fetch last
+    if (CSV.ascent_cp) {
+      await delay(3000);
+      try {
+        const cpResult = await fetchWithConsensus(CSV.ascent_cp);
+        if (shouldAccept('ascent_cp', cpResult)) {
+          confirmedText.ascent_cp = cpResult.text;
+          highWaterRows.ascent_cp = Math.max(highWaterRows.ascent_cp, countRows(cpResult.text));
+        }
+        if (confirmedText.ascent_cp !== null) {
+          const cpRows = parseCSV(confirmedText.ascent_cp);
+          const cpMap = {};
+          cpRows.forEach(row => {
+            const bib = (row['BIB'] || row['Bib'] || '').trim();
+            const ts  = (row['TIMESTAMP'] || row['Timestamp'] || '').trim();
+            if (!bib || !ts) return;
+            if (!cpMap[bib] || ts < cpMap[bib]) cpMap[bib] = ts;
+          });
+          data.ascent_cp = mergeAscentCp(data.ascent_cp, cpMap);
+        }
+      } catch(e) { console.warn('ascent_cp fetch failed', e); }
+    }
+
+  } catch(e) {
+    console.error('Fetch error:', e);
+  }
+  document.getElementById('loadingBar').classList.remove('active');
+}
+
+// ============================================================
+// PANEL VISIBILITY — ascent elevation vs 50k charts
+// ============================================================
+function updatePanelVisibility() {
+  const isAscent = activeTab === 'ascent';
+  const hasLoopData = data.fiftyk.some(r => r['First Loop Color']);
+
+  document.getElementById('ascentElevPanel').style.display = isAscent ? 'block' : 'none';
+  document.getElementById('chartsRow').style.display = (!isAscent && hasLoopData) ? 'grid' : 'none';
+
+  if (isAscent) drawAscentElevProfile();
+  updateMapLegend(activeTab);
+  updateCheckpointMarkers(activeTab);
+}
+
+// ============================================================
+// STATS — shows stats for currently active tab only
+// ============================================================
+function updateStats() {
+  const tab = activeTab;
+  const set = (l1,v1,l2,v2,l3,v3,l4,v4,show5=false,l5='',v5='') => {
+    document.getElementById('statLabel1').textContent = l1; document.getElementById('statVal1').textContent = v1;
+    document.getElementById('statLabel2').textContent = l2; document.getElementById('statVal2').textContent = v2;
+    document.getElementById('statLabel3').textContent = l3; document.getElementById('statVal3').textContent = v3;
+    document.getElementById('statLabel4').textContent = l4; document.getElementById('statVal4').textContent = v4;
+    document.getElementById('statCol5').style.display = show5 ? '' : 'none';
+    if (show5) { document.getElementById('statLabel5').textContent = l5; document.getElementById('statVal5').textContent = v5; }
+  };
+
+  if (tab === 'ascent') {
+    const rows = data.ascent.filter(r => r.BIB);
+    const fin = rows.filter(r => (r.STATUS||'').toUpperCase()==='FINISHED').length;
+    const dnf = rows.filter(r => (r.STATUS||'').toUpperCase()==='DNF').length;
+    const dns = rows.filter(r => (r.STATUS||'').toUpperCase()==='DNS').length;
+    const onc = rows.length - fin - dnf - dns;
+    set('Ascent Runners', rows.length||'--', 'Finished', fin, 'On Course', onc, 'DNF', dnf, true, 'DNS', dns);
+  } else if (tab === '50k') {
+    const rows = data.fiftyk.filter(r => r.Bib);
+    const fin = rows.filter(r => (r.Status||'').toUpperCase()==='FINISHED').length;
+    const dnf = rows.filter(r => (r.Status||'').toUpperCase()==='DNF').length;
+    const dns = rows.filter(r => (r.Status||'').toUpperCase()==='DNS').length;
+    const onc = rows.length - fin - dnf - dns;
+    set('50k Runners', rows.length||'--', 'Finished', fin, 'On Course', onc, 'DNF', dnf, true, 'DNS', dns);
+  } else if (tab === 'ambush') {
+    const rows = data.ambush.filter(r => r.Bib);
+    const teams = new Set(rows.map(r => r['Team Name']).filter(Boolean));
+    const fin = rows.filter(r => (r.Status||'').toUpperCase()==='FINISHED').length;
+    const dnf = rows.filter(r => (r.Status||'').toUpperCase()==='DNF').length;
+    const onc = rows.length - fin - dnf;
+    set('Teams', teams.size||'--', 'Members', rows.length||'--', 'Finished Members', fin, 'DNF', dnf);
+  } else if (tab === 'bigcat') {
+    const ascentMap = new Map(data.ascent.filter(r=>r.NAME).map(r => [r.NAME.trim().toUpperCase(), r]));
+    const bcRows = data.fiftyk.filter(r => r.Name && ascentMap.has(r.Name.trim().toUpperCase()));
+    const finBoth = bcRows.filter(r => {
+      const ra = ascentMap.get(r.Name.trim().toUpperCase());
+      return (r.Status||'').toUpperCase()==='FINISHED' && (ra.STATUS||'').toUpperCase()==='FINISHED';
+    }).length;
+    const inProgress = bcRows.length - finBoth;
+    set('Big Cat Athletes', bcRows.length||'--', 'Completed Both', finBoth, 'In Progress', inProgress, 'DNF', 0);
+  }
+}
+
+// ============================================================
+// LOOP CHART
+// ============================================================
+function updateLoopChart() {
+  const orders = {};
+  data.fiftyk.forEach(r => {
+    const l1 = r['First Loop Color'] || '';
+    const l2 = r['Second Loop'] || '';
+    const l3 = r['Third Loop'] || '';
+    if (l1 && l2 && l3) {
+      const key = `${l1.charAt(0)}-${l2.charAt(0)}-${l3.charAt(0)}`;
+      orders[key] = (orders[key]||0)+1;
+    }
+  });
+
+  const labels = Object.keys(orders);
+  const vals = Object.values(orders);
+  const colors = ['#f472b6','#fbbf24','#60a5fa','#4ade80','#e2e8f0','#fb923c'];
+
+  if (!labels.length) return;
+
+  if (loopChartInst) {
+    loopChartInst.data.labels = labels;
+    loopChartInst.data.datasets[0].data = vals;
+    loopChartInst.update();
+    return;
+  }
+
+  loopChartInst = new Chart(document.getElementById('loopChart'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: vals, backgroundColor: colors, borderColor: '#111', borderWidth: 2 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#888', font: { family: 'DM Mono', size: 11 }, padding: 10 } }
+      }
+    }
+  });
+}
+
+// ============================================================
+// SEGMENT CHART
+// ============================================================
+function updateSegChart() {
+  const loops = { Pink: [], White: [], Yellow: [] };
+  const descents = { D1: [], D2: [], D3: [] };
+
+  data.fiftyk.forEach(r => {
+    [['First Loop Color','First Loop Elapsed'],['Second Loop','Second Loop Elapsed'],['Third Loop','Third Loop Elapsed']].forEach(([colorCol, elapsedCol]) => {
+      const color = r[colorCol] || '';
+      const ms = elapsedMs(r[elapsedCol]);
+      if (color && ms && ms > 0 && loops[color]) loops[color].push(ms);
+    });
+    const d1 = elapsedMs(r['First Blue Descent Elapsed']);
+    const d2 = elapsedMs(r['Second Blue Descent Elapsed']);
+    const d3 = elapsedMs(r['Third Blue Descent Elapsed']);
+    if (d1 && d1>0) descents.D1.push(d1);
+    if (d2 && d2>0) descents.D2.push(d2);
+    if (d3 && d3>0) descents.D3.push(d3);
+  });
+
+  const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
+  const toMin = ms => Math.round(ms/60000);
+
+  const labels = ['Pink Loop','White Loop','Yellow Loop','Descent 1','Descent 2','Descent 3'];
+  const vals = [
+    toMin(avg(loops.Pink)), toMin(avg(loops.White)), toMin(avg(loops.Yellow)),
+    toMin(avg(descents.D1)), toMin(avg(descents.D2)), toMin(avg(descents.D3))
+  ];
+  const bgs = ['#f472b6','#cbd5e1','#fbbf24','#60a5fa','#818cf8','#a5b4fc'];
+
+  if (segChartInst) {
+    segChartInst.data.datasets[0].data = vals;
+    segChartInst.update();
+    return;
+  }
+
+  segChartInst = new Chart(document.getElementById('segChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: vals,
+        backgroundColor: bgs,
+        borderRadius: 3,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#666', font: { family: 'DM Mono', size: 10 } }, grid: { color: '#1a1a1a' } },
+        y: {
+          beginAtZero: true,
+          ticks: { color: '#666', font: { family: 'DM Mono', size: 10 }, callback: v => v + 'm' },
+          grid: { color: '#1a1a1a' }
+        }
+      }
+    }
+  });
+}
+
+// ============================================================
+// GPX ROUTE DATA (embedded from CalTopo exports)
+// ============================================================
+const GPX_ROUTES = {"green_start":[[47.5276048095183,-122.03408360481262],[47.52727,-122.03379000000001],[47.52648,-122.03358000000003],[47.52494190406192,-122.03274138377276],[47.52357008441423,-122.03227941797434],[47.5195835499094,-122.03037313559776],[47.51946,-122.02998000000002],[47.51967,-122.02749],[47.52071,-122.02627000000001],[47.5212661911484,-122.02611571186912],[47.52192,-122.02537999999998],[47.52275,-122.02494000000002],[47.52363,-122.02503999999999],[47.52386,-122.02501000000001],[47.52419,-122.02386999999999],[47.52478,-122.02305999999999],[47.52498,-122.02206999999999],[47.526149264794256,-122.02183668482598],[47.52568,-122.02161999999998],[47.52424287421683,-122.02078426343542],[47.52278,-122.02106000000003],[47.52119,-122.02103999999997],[47.52055237202265,-122.02140780283582],[47.52113,-122.02391],[47.51988,-122.02114],[47.519980054774294,-122.02003183019968],[47.51973,-122.01785000000001],[47.51986,-122.01611000000003],[47.5207,-122.01474000000002],[47.5207,-122.01474000000002],[47.52302,-122.01524],[47.52445,-122.01574],[47.52672,-122.01755000000003],[47.52760294868675,-122.01803941737131],[47.52855,-122.01859000000002],[47.52924,-122.01877999999999],[47.53069,-122.01814000000002],[47.53147,-122.01715999999999],[47.53204,-122.01556],[47.53232,-122.01485000000002],[47.53292,-122.01411999999999],[47.53377,-122.01336000000003],[47.53489,-122.01287000000002],[47.53458,-122.01029],[47.53473,-122.00752],[47.53363,-122.00772999999998],[47.53267,-122.00603000000001],[47.53215,-122.00477999999998],[47.53174268255701,-122.00306799133375],[47.53138,-121.99865999999997],[47.529769286202956,-121.99666642890975]],"pink":[[47.52974913314984,-121.9966506958008],[47.52843,-121.99694],[47.52728,-121.99672],[47.52774,-121.9951],[47.52741,-121.99457],[47.52732,-121.99341],[47.5279,-121.99207],[47.52802,-121.9904],[47.52814,-121.98855],[47.52793,-121.98775],[47.52711,-121.98728],[47.52666,-121.98599],[47.52685,-121.98425],[47.52645,-121.98456],[47.526077251356696,-121.9844884103135],[47.52555,-121.98494],[47.52497,-121.98489],[47.52432,-121.98456],[47.52392,-121.9834],[47.52392,-121.98239],[47.52231,-121.98127],[47.52099,-121.9811],[47.51987,-121.9813],[47.51882,-121.98156],[47.51823,-121.98121],[47.51839,-121.98063],[47.51886,-121.98036],[47.520247236898605,-121.9779653414714],[47.51946,-121.97618],[47.51911,-121.97433],[47.51945,-121.97291],[47.51912,-121.97203],[47.51609,-121.97021],[47.51463,-121.97036],[47.51337,-121.97305],[47.51274,-121.97227],[47.51138,-121.9718],[47.50987,-121.97499],[47.50995,-121.97688],[47.50974,-121.97705],[47.50868,-121.97915],[47.50886,-121.98044],[47.51084,-121.98083],[47.51307,-121.98085],[47.51235,-121.98124],[47.51213,-121.98165],[47.51145,-121.98214],[47.51045,-121.9832],[47.50981,-121.98401],[47.50928,-121.98515],[47.50857922739789,-121.98535931324257]],"white":[[47.52976724361798,-121.99665606021883],[47.52919062713426,-121.99666484321642],[47.52784,-121.99709],[47.52742,-121.99847],[47.52738,-121.99862],[47.5265,-121.99887],[47.52515,-121.9996],[47.52403,-121.99909],[47.52335,-121.99865],[47.52251,-121.99883],[47.52205,-121.99824],[47.52108,-121.99863],[47.52081,-121.99839],[47.52016,-121.99735],[47.51958,-121.99736],[47.51885,-121.99794],[47.5185,-121.9978],[47.51777,-121.99996],[47.51786,-121.99948],[47.51755,-121.99807],[47.51743,-121.99846],[47.51707,-121.99917],[47.51645,-121.99926],[47.51581,-121.99892],[47.5154,-121.99805],[47.51504,-121.9975],[47.51482,-121.99619],[47.51455,-121.9954],[47.51419,-121.99488],[47.51323,-121.99554],[47.51208,-121.99523],[47.51128,-121.99494],[47.51024,-121.99466],[47.50971,-121.99394],[47.50978,-121.99324],[47.5096,-121.9925],[47.50956,-121.99219],[47.50938,-121.9918],[47.50965,-121.99108],[47.50971,-121.99014],[47.51017,-121.98919],[47.51002,-121.9889],[47.5094,-121.98872],[47.50945707426866,-121.9883590259397],[47.50957,-121.98751],[47.50911,-121.98761],[47.50925,-121.98688],[47.50877,-121.98628],[47.50839,-121.98569],[47.5084,-121.9852],[47.508751069171204,-121.98536288784534]],"yellow":[[47.529763621524864,-121.99662923812868],[47.52843,-121.99694],[47.52739,-121.99857],[47.52682,-122.00046],[47.52610987232616,-122.00394955314155],[47.52563,-122.00715],[47.524431413948534,-122.01036583010364],[47.52283,-122.01131],[47.52056,-122.01225],[47.51941709141196,-122.01126885933283],[47.5172,-122.01141],[47.51461,-122.00975],[47.51252,-122.00811],[47.51065,-122.00486],[47.50886,-122.00397],[47.5081,-122.00366],[47.50729,-122.00523],[47.5056,-122.00552],[47.50602,-122.00352],[47.50535,-122.00349],[47.50469,-122.00188],[47.50402,-122.0013],[47.50304,-122.00068],[47.50265,-121.99962],[47.50223,-121.99952],[47.50104,-121.99852],[47.50014,-121.99773],[47.49918,-121.99684],[47.49856,-121.99532],[47.49773,-121.99436],[47.49724,-121.99303],[47.49776,-121.99185],[47.4975,-121.98996],[47.49744,-121.98883],[47.4968,-121.98693],[47.49787,-121.98647],[47.49883,-121.98501],[47.49872,-121.98351],[47.49897,-121.98157],[47.49956,-121.98011],[47.50029,-121.97804],[47.50125,-121.97648],[47.50249,-121.97522],[47.50311,-121.97495],[47.50355,-121.97736],[47.50358,-121.97875],[47.50524,-121.98179],[47.50585,-121.98255],[47.50637,-121.98353],[47.50782,-121.98481],[47.50868685217657,-121.98531143082883]],"blue_descent":[[47.50868967279579,-121.9853049516678],[47.50858,-121.98536],[47.50821,-121.9851],[47.50839,-121.98569],[47.50929,-121.98616],[47.50884,-121.98752],[47.50941,-121.98751],[47.50958,-121.98828],[47.50953,-121.98881],[47.51017,-121.98909],[47.51027,-121.98951],[47.5107,-121.98995],[47.51141,-121.98994],[47.51176,-121.99066],[47.51191,-121.99015],[47.51261,-121.98974],[47.51344,-121.98914],[47.51389542194745,-121.98859869829984],[47.5145,-121.988],[47.51479,-121.98759],[47.5152,-121.98721],[47.51521,-121.98781],[47.5157,-121.98731],[47.51538,-121.98843],[47.51691,-121.98659],[47.5172,-121.98634],[47.51941,-121.98546],[47.51992,-121.98573],[47.51868,-121.9868],[47.51815,-121.98757],[47.5182,-121.98889],[47.51881,-121.98987],[47.51939,-121.9898],[47.52048,-121.98858],[47.52131,-121.98782],[47.52273,-121.98826],[47.52367,-121.98888],[47.52246,-121.98897],[47.52161,-121.9903],[47.52223,-121.99066],[47.52327,-121.99127],[47.52388,-121.99219],[47.52534,-121.99158],[47.52672,-121.9918],[47.52573,-121.9931],[47.52589,-121.99446],[47.526463246579404,-121.99670579348366],[47.52727,-121.99746],[47.52784,-121.99709],[47.52919062713426,-121.99666484321642],[47.52976729547362,-121.99660893168466]],"red_finish":[[47.52973464477083,-121.99662923812868],[47.52974,-121.99954],[47.52994387929472,-122.00052713976103],[47.53007,-122.00487],[47.529868853502414,-122.00823639061987],[47.52988,-122.00879],[47.529825867813784,-122.00906710728741],[47.52975,-122.00932],[47.52958,-122.00974],[47.52953265077937,-122.01075988818951],[47.52996,-122.01303],[47.53002,-122.01556],[47.52992,-122.01691],[47.52966410118832,-122.01846427767094],[47.52962,-122.01873],[47.52917,-122.01873],[47.528951566622126,-122.01885444631213],[47.52819,-122.01835],[47.5275,-122.01796],[47.52704,-122.01773],[47.52653,-122.01739],[47.52547,-122.01707],[47.52387,-122.01531],[47.52348,-122.01524],[47.52234,-122.01565],[47.5207,-122.01474],[47.52034,-122.01552],[47.51986,-122.01611],[47.5197,-122.01672],[47.51974,-122.01837],[47.51981,-122.019],[47.5199,-122.02028],[47.51957,-122.0212],[47.52006,-122.02329],[47.5206,-122.02558],[47.52079,-122.02578],[47.52069,-122.02597],[47.52052,-122.02635],[47.51967,-122.02749],[47.51937,-122.0297],[47.51946,-122.02998],[47.51948,-122.03024],[47.52044176503594,-122.03123875835331],[47.52252988890585,-122.03195077649488],[47.52411,-122.03245],[47.52442,-122.03251],[47.52645,-122.03341],[47.52716,-122.03382],[47.52734,-122.03376],[47.527510000231246,-122.03382000180567],[47.52761274194884,-122.0340914199378]],"ascent":[[47.52975637733785,-121.99551343917848],[47.52993,-121.99567],[47.53050238142769,-121.99461306780272],[47.53078744219244,-121.9925419728025],[47.53081,-121.99219],[47.53078,-121.98881],[47.53073969089206,-121.98769644911661],[47.53072,-121.98707],[47.53021,-121.98632],[47.53017,-121.98697],[47.52963605664423,-121.98752663994506],[47.5295,-121.98742],[47.52791,-121.98709],[47.52689,-121.98709],[47.52591,-121.98709],[47.52391,-121.98837],[47.5229,-121.98739],[47.52206,-121.98627],[47.52078,-121.98511],[47.51939,-121.98455],[47.51733,-121.98567],[47.516875278749595,-121.98596664144942],[47.51638,-121.98645],[47.51524,-121.98724],[47.515,-121.98735],[47.51479,-121.98759],[47.51462,-121.98789],[47.51414,-121.98837],[47.51388780195421,-121.98861317630637],[47.51359,-121.98899],[47.51317,-121.98945],[47.51253,-121.98982],[47.51191,-121.99015],[47.51168,-121.99035],[47.5115,-121.99021],[47.511294053822404,-121.9899480403668],[47.51095,-121.98978],[47.51075,-121.98979],[47.51027,-121.98951],[47.51018245254516,-121.98921452545153],[47.50999,-121.98884],[47.5094,-121.98872],[47.50945707426866,-121.9883590259397],[47.50963,-121.98756],[47.50934,-121.98755],[47.50889,-121.98729],[47.50929,-121.98616],[47.5086,-121.98616],[47.50821,-121.9851],[47.50858,-121.98536],[47.5087856722947,-121.98517953777994]]};
+
+const GPX_DISTANCES = {"green_start":7007,"pink":6175,"white":3799,"yellow":7918,"blue_descent":4806,"red_finish":5031,"ascent":3925};
+
+// ============================================================
+// ELEVATION DATA — fetched from USGS 3DEP on demand
+// ============================================================
+const elevationCache = {}; // routeName -> [elevation in meters per point]
+let activeSegment = null;
+
+// ============================================================
+// ELEVATION DATA — baked in (fetched once via elevation-fetcher.html)
+// Replace this constant with output from elevation-fetcher.html
+// ============================================================
+const ELEVATION_DATA = {"green_start":[32,32,39,46,46,46,46,45,42,64,64,112,68,68,91,91,137,151,151,174,142,142,103,112,103,123,141,159,159,159,192,192,166,177,177,134,155,104,157,157,155,137,137,156,144,144,155,155,154,140,174],"pink":[174,179,179,189,189,214,214,252,276,276,274,337,347,347,347,347,438,438,438,467,511,430,509,509,507,507,435,450,420,389,414,414,504,504,503,539,609,638,603,603,625,661,663,660,663,740,740,740,821,821,821],"white":[174,174,179,171,171,197,197,222,222,262,262,262,310,330,330,310,432,399,399,399,399,399,493,493,493,557,557,627,627,627,627,627,634,634,687,687,687,687,738,738,781,781,781,781,781,781,815,815,815,821,821],"yellow":[174,179,171,184,177,183,167,152,181,181,234,314,388,372,398,406,378,403,474,474,478,556,556,581,581,629,647,673,670,665,695,695,673,680,692,692,729,729,774,782,827,843,868,862,834,834,784,784,806,806,821],"blue_descent":[821,821,806,815,815,781,781,781,781,781,781,750,750,750,750,728,723,723,723,662,653,662,653,662,590,590,541,541,590,558,558,472,472,485,415,415,412,415,369,369,374,310,303,250,250,223,204,179,179,174,174],"red_finish":[174,169,163,164,168,159,159,159,159,152,155,161,155,155,155,155,164,177,177,166,166,166,192,192,192,159,159,159,141,141,123,123,103,68,42,42,42,42,45,46,46,46,46,42,46,46,39,32,32,32,32],"ascent":[173,173,173,182,182,172,172,165,165,165,172,165,274,337,337,412,490,490,582,582,590,590,653,653,653,662,662,723,723,723,723,728,750,750,750,750,750,750,781,781,781,781,781,781,781,815,815,815,806,821,821]};
+
+async function fetchRouteElevation(routeName) {
+  if (elevationCache[routeName]) return elevationCache[routeName];
+
+  // Use baked-in data if available
+  if (ELEVATION_DATA[routeName] && ELEVATION_DATA[routeName].length > 0) {
+    elevationCache[routeName] = ELEVATION_DATA[routeName];
+    return ELEVATION_DATA[routeName];
+  }
+
+  // Otherwise fetch live from Open-Elevation
+  const pts = GPX_ROUTES[routeName];
+  if (!pts) return null;
+
+  document.getElementById('elevLoadingMsg').textContent = 'Fetching elevation…';
+
+  try {
+    const locations = pts.map(([lat, lon]) => ({ latitude: lat, longitude: lon }));
+    const response = await fetch('https://api.open-elevation.com/api/v1/lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ locations })
+    });
+    if (!response.ok) throw new Error('API error');
+    const data = await response.json();
+    const elevations = data.results.map(r => r.elevation);
+    elevationCache[routeName] = elevations;
+    document.getElementById('elevLoadingMsg').textContent = '';
+    return elevations;
+  } catch(e) {
+    // Fallback: USGS one at a time
+    console.warn('Open-Elevation failed, trying USGS...', e);
+    document.getElementById('elevLoadingMsg').textContent = 'Fetching (slower)…';
+    const elevations = [];
+    for (const [lat, lon] of pts) {
+      try {
+        const url = `https://epqs.nationalmap.gov/v1/json?x=${lon}&y=${lat}&wkid=4326&units=Meters&includeDate=false`;
+        const r = await fetch(url);
+        const d2 = await r.json();
+        const v = parseFloat(d2.value);
+        elevations.push(isNaN(v) || v < -100 ? null : v);
+      } catch { elevations.push(null); }
+      await new Promise(r => setTimeout(r, 50));
+    }
+    for (let i = 0; i < elevations.length; i++) {
+      if (elevations[i] === null) {
+        const prev = elevations.slice(0,i).reverse().find(e => e !== null);
+        const next = elevations.slice(i+1).find(e => e !== null);
+        elevations[i] = prev ?? next ?? 0;
+      }
+    }
+    elevationCache[routeName] = elevations;
+    document.getElementById('elevLoadingMsg').textContent = '';
+    return elevations;
+  }
+}
+
+function calcRouteStats(routeName, elevations) {
+  const pts = GPX_ROUTES[routeName];
+  if (!pts || !elevations) return null;
+
+  let gain = 0, loss = 0;
+  for (let i = 1; i < elevations.length; i++) {
+    const diff = elevations[i] - elevations[i-1];
+    if (diff > 0) gain += diff;
+    else loss += Math.abs(diff);
+  }
+
+  const distKm = (GPX_DISTANCES[routeName] || 0) / 1000;
+  const minElev = Math.min(...elevations.filter(Boolean));
+  const maxElev = Math.max(...elevations.filter(Boolean));
+
+  return {
+    distKm: distKm.toFixed(1),
+    gainM: Math.round(gain),
+    gainFt: Math.round(gain * 3.281),
+    minM: Math.round(minElev),
+    maxM: Math.round(maxElev),
+  };
+}
+
+function showElevationProfile(routeName, elevations, runnerPositions, routeColor) {
+  const pts = GPX_ROUTES[routeName];
+  if (!pts || !elevations) return;
+
+  // Build distance axis
+  const distKm = [0];
+  for (let i = 1; i < pts.length; i++) {
+    const d = haversineM(pts[i-1][0], pts[i-1][1], pts[i][0], pts[i][1]);
+    distKm.push(distKm[distKm.length-1] + d/1000);
+  }
+  const totalKm = distKm[distKm.length-1];
+
+  // Convert elevation to display units
+  const elevDisplay = elevations.map(e => units === 'imperial' ? Math.round(e * 3.281) : Math.round(e));
+  const elevUnit = units === 'imperial' ? 'ft' : 'm';
+  const distUnit = units === 'imperial' ? 'mi' : 'km';
+
+  // Runner dots on profile — find elevation at their progress position
+  const runnerDots = runnerPositions.map(rp => {
+    const idx = Math.min(Math.round(rp.progress * (elevDisplay.length - 1)), elevDisplay.length - 1);
+    const dist = units === 'imperial' ? distKm[idx] * 0.621371 : distKm[idx];
+    return { x: idx, dist: dist.toFixed(2), elev: elevDisplay[idx], bib: rp.bib, color: rp.color };
+  });
+
+  // X-axis labels in correct units
+  const xLabels = distKm.map((d, i) => {
+    const val = units === 'imperial' ? (d * 0.621371).toFixed(2) : d.toFixed(2);
+    return val;
+  });
+
+  if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
+
+  const elevCanvas = document.getElementById('elevChart');
+  const ctx = elevCanvas.getContext('2d');
+
+  // Wire hover crosshair (re-bind every time since chart is destroyed/recreated)
+  elevCanvas.onmousemove = function(e) {
+    if (!elevChartInst) return;
+    const area = elevChartInst.chartArea;
+    if (!area) return;
+    const rect = elevCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x < area.left || x > area.right) { clearHoverCrosshair(); return; }
+    const fraction = Math.max(0, Math.min(1, (x - area.left) / (area.right - area.left)));
+    showHoverCrosshair(routeName, fraction);
+  };
+  elevCanvas.onmouseleave = function() { clearHoverCrosshair(); };
+
+  elevChartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: xLabels,
+      datasets: [
+        {
+          label: `Elevation (${elevUnit})`,
+          data: elevDisplay,
+          borderColor: routeColor,
+          backgroundColor: routeColor + '33',
+          borderWidth: 2.5,
+          pointRadius: 0,
+          fill: true,
+          tension: 0.4,
+        },
+        // Runner position dots on profile
+        {
+          label: 'Runners',
+          data: runnerDots.map(rd => ({ x: xLabels[rd.x], y: rd.elev })),
+          borderColor: '#0a0a0a',
+          backgroundColor: runnerDots.map(rd => rd.color),
+          pointRadius: 7,
+          pointStyle: 'circle',
+          showLine: false,
+          pointBorderColor: '#0a0a0a',
+          pointBorderWidth: 1.5,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: ctx => `${ctx[0].label} ${distUnit}`,
+            label: ctx => {
+              if (ctx.datasetIndex === 1) {
+                const rd = runnerDots[ctx.dataIndex];
+                return rd ? `#${rd.bib} — ${rd.elev}${elevUnit}` : '';
+              }
+              return `${ctx.parsed.y}${elevUnit}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'category',
+          ticks: {
+            color: '#555',
+            font: { family: 'DM Mono', size: 9 },
+            maxTicksLimit: 7,
+            callback: (val, i) => {
+              // Only show every Nth label
+              const step = Math.ceil(xLabels.length / 6);
+              return i % step === 0 ? `${xLabels[i]}${distUnit}` : '';
+            }
+          },
+          grid: { color: '#1a1a1a' }
+        },
+        y: {
+          ticks: { color: '#555', font: { family: 'DM Mono', size: 9 }, callback: v => `${v}${elevUnit}` },
+          grid: { color: '#1a1a1a' }
+        }
+      }
+    }
+  });
+}
+
+// ============================================================
+// SEGMENT FOCUS
+// ============================================================
+const SEGMENT_INFO = {
+  green_start: { label: 'GREEN SEGMENT',   color: '#4ade80' },
+  ascent:      { label: 'ASCENT COURSE',   color: '#a78bfa' },
+  pink:        { label: 'PINK ROUTE',      color: '#f472b6' },
+  white:       { label: 'WHITE ROUTE',     color: '#e2e8f0' },
+  yellow:      { label: 'YELLOW ROUTE',    color: '#fbbf24' },
+  blue_descent:{ label: 'BLUE DESCENT',    color: '#60a5fa' },
+  red_finish:  { label: 'RED FINISH',      color: '#f87171' },
+};
+
+function openSegmentFocus(routeName) {
+  activeSegment = routeName;
+  const info = SEGMENT_INFO[routeName];
+  if (!info) return;
+
+  // Show panel
+  document.getElementById('segmentFocus').style.display = 'block';
+  document.getElementById('segFocusTitle').textContent = info.label;
+  document.getElementById('segFocusTitle').style.color = info.color;
+  document.getElementById('elevLoadingMsg').textContent = '';
+
+  // Highlight map segment
+  highlightSegment(routeName);
+
+  // Find runners currently on this segment
+  const runnersOnSeg = [];
+  data.fiftyk.forEach(r => {
+    if (!r.Bib) return;
+    const pos = getRunnerRouteAndProgress(r, '50k');
+    if (pos && !pos.fixed && pos.route === GPX_ROUTES[routeName])
+      runnersOnSeg.push({ bib: r.Bib, name: r.Name||'', progress: pos.progress, color: '#e8c14a' });
+  });
+  data.ascent.forEach(r => {
+    if (!r.BIB) return;
+    const pos = getRunnerRouteAndProgress(r, 'ascent');
+    if (pos && !pos.fixed && pos.route === GPX_ROUTES[routeName])
+      runnersOnSeg.push({ bib: r.BIB, name: r.NAME||'', progress: pos.progress, color: '#a78bfa' });
+  });
+  data.ambush.forEach(r => {
+    if (!r.Bib) return;
+    const pos = getRunnerRouteAndProgress(r, 'ambush');
+    if (pos && !pos.fixed && pos.route === GPX_ROUTES[routeName])
+      runnersOnSeg.push({ bib: r.Bib, name: r.Name||'', progress: pos.progress, color: '#fb923c' });
+  });
+
+  // Runner list
+  document.getElementById('segRunnerList').innerHTML = runnersOnSeg.length === 0
+    ? `<div style="color:var(--text-dim);font-size:0.75rem;font-family:'DM Mono',monospace;">No runners on this segment yet</div>`
+    : runnersOnSeg.map(rp => `
+        <div style="display:flex;align-items:center;gap:0.6rem;padding:0.3rem 0.5rem;background:var(--surface3);border-radius:3px;border-left:2px solid ${rp.color}">
+          <span style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:${rp.color}">#${rp.bib}</span>
+          <span style="font-size:0.78rem;color:var(--text)">${rp.name}</span>
+          <span style="font-size:0.65rem;color:var(--text-dim);margin-left:auto">${Math.round(rp.progress*100)}% through</span>
+        </div>`).join('');
+
+  // Stats
+  const distM = GPX_DISTANCES[routeName] || 0;
+  const elevs = ELEVATION_DATA[routeName];
+  let statsText = `${fmtDist(distM)} · ${runnersOnSeg.length} runner${runnersOnSeg.length!==1?'s':''} on segment`;
+  if (elevs && elevs.length > 1) {
+    let gain = 0;
+    for (let i = 1; i < elevs.length; i++) { const d = elevs[i]-elevs[i-1]; if (d>0) gain+=d; }
+    const minE = Math.min(...elevs), maxE = Math.max(...elevs);
+    statsText = `${fmtDist(distM)} · +${fmtElev(gain)} gain · ${fmtElev(minE)}–${fmtElev(maxE)} · ${runnersOnSeg.length} runner${runnersOnSeg.length!==1?'s':''} on segment`;
+    showElevationProfile(routeName, elevs, runnersOnSeg, info.color);
+  }
+  document.getElementById('segFocusStats').textContent = statsText;
+}
+
+
+// ============================================================
+// FOLLOW RUNNER — highlight 1-5 runners, dim the rest
+// ============================================================
+let followedKeys = new Set(); // marker keys like 'a_74', 'f_12'
+
+function getFollowCandidates() {
+  const tab = activeTab;
+  const results = [];
+  if (tab === 'ascent' || tab === 'bigcat') {
+    data.ascent.forEach(r => {
+      if (!r.BIB) return;
+      results.push({ key: 'a_' + r.BIB, bib: r.BIB, name: r.NAME || '', label: `#${r.BIB} ${r.NAME||''}` });
+    });
+  }
+  if (tab === '50k' || tab === 'bigcat') {
+    data.fiftyk.forEach(r => {
+      if (!r.Bib) return;
+      results.push({ key: 'f_' + r.Bib, bib: r.Bib, name: r.Name || '', label: `#${r.Bib} ${r.Name||''}` });
+    });
+  }
+  if (tab === 'ambush') {
+    data.ambush.forEach(r => {
+      if (!r.Bib) return;
+      results.push({ key: 'b_' + r.Bib, bib: r.Bib, name: r.Name || '', label: `#${r.Bib} ${r.Name||''}` });
+    });
+  }
+  return results;
+}
+
+function onFollowInput(val) {
+  const dropdown = document.getElementById('followDropdown');
+  if (!val.trim()) { dropdown.style.display = 'none'; return; }
+  const q = val.toLowerCase();
+  const candidates = getFollowCandidates().filter(c =>
+    c.bib.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
+  ).slice(0, 10);
+  if (!candidates.length) { dropdown.style.display = 'none'; return; }
+  dropdown.innerHTML = candidates.map(c => `
+    <div onclick="addFollow('${c.key}','${c.bib}','${c.name.replace(/'/g,"\\'")}')"
+      style="padding:0.5rem 0.75rem;cursor:pointer;font-family:'DM Mono',monospace;font-size:0.78rem;
+             border-bottom:1px solid var(--border);display:flex;align-items:center;gap:0.5rem;"
+      onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <span style="color:var(--accent);font-family:'Bebas Neue',sans-serif;font-size:1rem;">#${c.bib}</span>
+      <span style="color:var(--text)">${c.name}</span>
+    </div>`).join('');
+  dropdown.style.display = 'block';
+}
+
+function addFollow(key, bib, name) {
+  if (followedKeys.size >= 5) return;
+  followedKeys.add(key);
+  document.getElementById('followInput').value = '';
+  document.getElementById('followDropdown').style.display = 'none';
+  renderFollowTags();
+  applyFollowDimming();
+}
+
+function removeFollow(key) {
+  followedKeys.delete(key);
+  renderFollowTags();
+  applyFollowDimming();
+}
+
+function clearFollowing() {
+  followedKeys.clear();
+  renderFollowTags();
+  applyFollowDimming();
+}
+
+function renderFollowTags() {
+  const tagsEl = document.getElementById('followTags');
+  const clearBtn = document.getElementById('followClearBtn');
+  if (!followedKeys.size) { tagsEl.innerHTML = ''; clearBtn.style.display = 'none'; return; }
+  clearBtn.style.display = '';
+  // Find names for each key
+  const all = getFollowCandidates();
+  const map = Object.fromEntries(all.map(c => [c.key, c]));
+  tagsEl.innerHTML = [...followedKeys].map(k => {
+    const c = map[k] || { bib: k.split('_')[1], name: '' };
+    return `<div style="display:flex;align-items:center;gap:0.3rem;background:#1a1200;
+      border:1px solid var(--accent);border-radius:3px;padding:0.2rem 0.5rem;">
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:0.9rem;color:var(--accent)">#${c.bib}</span>
+      <span style="font-size:0.7rem;color:var(--text)">${c.name}</span>
+      <button onclick="removeFollow('${k}')" style="background:none;border:none;color:var(--text-dim);
+        cursor:pointer;font-size:0.8rem;padding:0 0.1rem;line-height:1;margin-left:0.2rem;">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function applyFollowDimming() {
+  Object.entries(runnerMarkers).forEach(([key, marker]) => {
+    const el = marker.getElement();
+    if (!el) return;
+    if (followedKeys.size === 0) {
+      el.style.opacity = '1';
+      el.style.filter = '';
+      el.style.zIndex = '';
+    } else if (followedKeys.has(key)) {
+      el.style.opacity = '1';
+      el.style.filter = 'drop-shadow(0 0 6px var(--accent))';
+      el.style.zIndex = '10';
+    } else {
+      el.style.opacity = '0.15';
+      el.style.filter = '';
+      el.style.zIndex = '';
+    }
+  });
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('#followBar')) {
+    const dd = document.getElementById('followDropdown');
+    if (dd) dd.style.display = 'none';
+  }
+});
+
+// ============================================================
+// ASCENT RUNNER LIST — collapsible panel
+// ============================================================
+let ascentRunnerListOpen = false;
+
+function toggleAscentRunnerList() {
+  ascentRunnerListOpen = !ascentRunnerListOpen;
+  const list = document.getElementById('ascentRunnerList');
+  const btn = document.getElementById('ascentRunnerToggle');
+  list.style.display = ascentRunnerListOpen ? 'block' : 'none';
+  btn.textContent = ascentRunnerListOpen ? 'Hide runners ▴' : 'Show runners ▾';
+}
+
+function renderAscentRunnerList(runnerDots) {
+  const countEl = document.getElementById('ascentRunnerCount');
+  const bodyEl = document.getElementById('ascentRunnerListBody');
+  if (!countEl || !bodyEl) return;
+
+  const onCourse = runnerDots.filter(rd => !rd.fixed);
+  countEl.textContent = onCourse.length
+    ? `${onCourse.length} runner${onCourse.length !== 1 ? 's' : ''} on course`
+    : 'No runners on course yet';
+
+  if (!onCourse.length) { bodyEl.innerHTML = ''; return; }
+
+  // Sort by progress descending (leader first)
+  const sorted = [...onCourse].sort((a, b) => b.progress - a.progress);
+  bodyEl.innerHTML = sorted.map(rd => {
+    const key = 'a_' + rd.bib;
+    const isFollowed = followedKeys.has(key);
+    return `<tr style="border-bottom:1px solid var(--border);${isFollowed ? 'background:#1a1200;' : ''}">
+      <td style="padding:0.3rem 0.6rem;font-family:'Bebas Neue',sans-serif;font-size:1rem;color:#a78bfa;">#${rd.bib}</td>
+      <td style="padding:0.3rem 0.6rem;font-size:0.78rem;color:var(--text);">${rd.name}</td>
+      <td style="padding:0.3rem 0.6rem;text-align:right;">
+        <div style="display:inline-flex;align-items:center;gap:0.4rem;">
+          <div style="width:60px;height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;">
+            <div style="width:${Math.round(rd.progress*100)}%;height:100%;background:#a78bfa;border-radius:2px;"></div>
+          </div>
+          <span style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--text-dim);">${Math.round(rd.progress*100)}%</span>
+        </div>
+      </td>
+      <td style="padding:0.3rem 0.6rem;text-align:center;">
+        <button onclick="${isFollowed ? `removeFollow('${key}')` : `addFollow('${key}','${rd.bib}','${rd.name.replace(/'/g,"\\'")}')`}"
+          style="background:${isFollowed ? 'var(--accent)' : 'var(--surface3)'};
+            border:1px solid ${isFollowed ? 'var(--accent)' : 'var(--border2)'};border-radius:3px;
+            color:${isFollowed ? 'var(--black)' : 'var(--text-muted)'};
+            font-family:'DM Mono',monospace;font-size:0.65rem;padding:0.2rem 0.45rem;cursor:pointer;">
+          ${isFollowed ? '★ Following' : '☆ Follow'}
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+
+const ROUTE_COLORS = {
+  green_start: '#4ade80', ascent: '#a78bfa', pink: '#f472b6',
+  white: '#e2e8f0', yellow: '#fbbf24', blue_descent: '#60a5fa', red_finish: '#f87171',
+};
+
+const ROUTE_TABS = {
+  ascent:  ['ascent'],
+  '50k':   ['green_start','pink','white','yellow','blue_descent','red_finish'],
+  ambush:  ['green_start','pink','white','yellow','blue_descent','red_finish'],
+  bigcat:  ['ascent','green_start','pink','white','yellow','blue_descent','red_finish'],
+};
+
+// Which legend route items to show per tab
+const LEGEND_TABS = {
+  ascent:  ['ascent'],
+  '50k':   ['green_start','pink','white','yellow','blue_descent','red_finish'],
+  ambush:  ['green_start','pink','white','yellow','blue_descent','red_finish'],
+  bigcat:  ['ascent','green_start','pink','white','yellow','blue_descent','red_finish'],
+};
+
+function updateMapLegend(tab) {
+  const visible = new Set(LEGEND_TABS[tab] || LEGEND_TABS['50k']);
+  document.querySelectorAll('.legend-route').forEach(item => {
+    const route = item.getAttribute('data-route');
+    item.style.display = visible.has(route) ? '' : 'none';
+  });
+  // Ascent-specific checkpoint dot labels
+  const isAscent = tab === 'ascent';
+  document.getElementById('legendBaseCamp').style.display = isAscent ? 'none' : '';
+  document.getElementById('legendHighCamp').style.display = isAscent ? 'none' : '';
+  document.getElementById('legendAscentCP').style.display = isAscent ? '' : 'none';
+}
+
+mapboxgl.accessToken = 'pk.eyJ1IjoiZ25ncnJubnIiLCJhIjoiY21vaGdsaWtqMDFuNTJwcHQ0em83bWltaCJ9.DdC1VfJKIjSpNo3uLDLNLw';
+
+let mbMap = null;
+let mapReady = false;
+let runnerMarkers = {};
+let animationFrame = null;
+let smoothPositions = {};
+
+function initMap() {
+  mbMap = new mapboxgl.Map({
+    container: 'courseMap',
+    style: 'mapbox://styles/mapbox/satellite-streets-v12',
+    center: [-121.987, 47.530],
+    zoom: 13.36,
+    pitch: 71,
+    bearing: 151.4,
+    antialias: true,
+    performanceMetricsCollection: false,
+    collectResourceTiming: false,
+  });
+
+  mbMap.addControl(new mapboxgl.NavigationControl({ visualizePitch: true }), 'top-right');
+
+  mbMap.on('load', () => {
+    // 3D terrain
+    mbMap.addSource('dem', {
+      type: 'raster-dem',
+      url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+      tileSize: 512, maxzoom: 14
+    });
+    mbMap.setTerrain({ source: 'dem', exaggeration: 1.5 });
+
+    // Add all routes as sources + layers
+    Object.entries(GPX_ROUTES).forEach(([name, pts]) => {
+      const color = ROUTE_COLORS[name] || '#fff';
+      mbMap.addSource('r-' + name, {
+        type: 'geojson',
+        data: { type: 'Feature', geometry: { type: 'LineString', coordinates: pts.map(([lat,lon]) => [lon,lat]) } }
+      });
+      // Glow layer
+      mbMap.addLayer({ id: 'g-' + name, type: 'line', source: 'r-' + name,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': color, 'line-width': 8, 'line-opacity': 0.2, 'line-blur': 3 }
+      });
+      // Main visible line
+      mbMap.addLayer({ id: 'l-' + name, type: 'line', source: 'r-' + name,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': color, 'line-width': 3, 'line-opacity': 0.95 }
+      });
+      // Wide invisible hit target — 24px wide for easy mobile tapping
+      mbMap.addLayer({ id: 'h-' + name, type: 'line', source: 'r-' + name,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': color, 'line-width': 24, 'line-opacity': 0 }
+      });
+      if (name !== 'ascent') {
+        ['l-', 'h-'].forEach(prefix => {
+          mbMap.on('click', prefix + name, () => openSegmentFocus(name));
+          mbMap.on('mouseenter', prefix + name, () => mbMap.getCanvas().style.cursor = 'pointer');
+          mbMap.on('mouseleave', prefix + name, () => mbMap.getCanvas().style.cursor = '');
+        });
+      }
+    });
+
+    // Checkpoint markers — tab-aware
+    window._cpMarkers = {};
+    CHECKPOINTS.forEach(function(cp) {
+      var el = document.createElement('div');
+      el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:default;';
+      function badge(emoji, label, color) {
+        return '<div style="font-size:20px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9))">'+emoji+'</div>'
+          +'<div style="background:rgba(10,10,10,0.92);color:'+color+';font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;border:1px solid '+color+'55;white-space:nowrap;margin-top:2px;">'+label+'</div>';
+      }
+      if (cp.id === 'start') {
+        el.innerHTML = '<div style="font-size:20px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.9))">🏁</div>'
+          +'<div style="background:rgba(10,10,10,0.92);font-family:DM Mono,monospace;font-size:8px;font-weight:700;padding:1px 5px;border-radius:2px;border:1px solid #4ade8055;white-space:nowrap;margin-top:2px;">'
+          +'<span style="color:#4ade80">START</span><span style="color:#fb923c"> / </span><span style="color:#f87171">FINISH</span></div>';
+      } else if (cp.id === 'basecamp') { el.innerHTML = badge('⛺','BASE CAMP','#fb923c');
+      } else if (cp.id === 'highcamp') { el.innerHTML = badge('🏔','HIGH CAMP','#fb923c');
+      } else if (cp.id === 'ascent_start') { el.innerHTML = badge('🏁','START','#4ade80');
+      } else if (cp.id === 'ascent_cp') { el.innerHTML = badge('⚡','ASCENT CP','#fb923c');
+      } else if (cp.id === 'ascent_finish') { el.innerHTML = badge('🏆','FINISH','#f87171');
+      } else {
+        el.innerHTML = '<div style="width:14px;height:14px;background:'+cp.color+';border:2px solid rgba(0,0,0,0.8);border-radius:50%;box-shadow:0 0 8px '+cp.color+'aa;"></div>';
+      }
+      var marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([cp.lng, cp.lat])
+        .setPopup(new mapboxgl.Popup({ offset: 8, closeButton: false })
+          .setHTML('<div style="background:#111;color:'+cp.color+';font-family:DM Mono,monospace;font-size:11px;padding:5px 8px;border-radius:4px;border-left:3px solid '+cp.color+'"><b>'+cp.label+'</b></div>'))
+        .addTo(mbMap);
+      window._cpMarkers[cp.id] = { marker: marker, el: el, tabs: cp.tabs };
+    });
+    updateCheckpointMarkers(activeTab);
+
+    mapReady = true;
+    updateRouteVisibility(activeTab);
+    updateCheckpointMarkers(activeTab);
+    startAnimation();
+    // No fly-in — just fit to full course from a good angle
+  });
+
+  new ResizeObserver(() => mbMap && mbMap.resize()).observe(document.getElementById('courseMap'));
+}
+
+function updateCheckpointMarkers(tab) {
+  if (!window._cpMarkers) return;
+  Object.keys(window._cpMarkers).forEach(function(id) {
+    var entry = window._cpMarkers[id];
+    var show = entry.tabs.indexOf(tab) !== -1;
+    var markerEl = entry.marker.getElement();
+    if (markerEl) {
+      markerEl.style.visibility = show ? 'visible' : 'hidden';
+      markerEl.style.pointerEvents = show ? 'auto' : 'none';
+    }
+  });
+}
+
+function updateRouteVisibility(tab) {
+  if (!mapReady) return;
+  const visible = new Set(ROUTE_TABS[tab] || ROUTE_TABS['50k']);
+  const coords = [];
+  Object.keys(GPX_ROUTES).forEach(name => {
+    const show = visible.has(name);
+    ['l-','g-'].forEach(p => {
+      if (mbMap.getLayer(p + name)) mbMap.setLayoutProperty(p + name, 'visibility', show ? 'visible' : 'none');
+    });
+    // Reset paint properties for shown routes (in case they were dimmed by a prior segment focus)
+    if (show) {
+      if (mbMap.getLayer('l-'+name)) {
+        mbMap.setPaintProperty('l-'+name, 'line-opacity', 0.95);
+        mbMap.setPaintProperty('l-'+name, 'line-width', 3);
+      }
+      if (mbMap.getLayer('g-'+name)) mbMap.setPaintProperty('g-'+name, 'line-opacity', 0.2);
+      GPX_ROUTES[name].forEach(([lat,lon]) => coords.push([lon,lat]));
+    }
+  });
+  if (coords.length) {
+    const lngs = coords.map(c=>c[0]), lats = coords.map(c=>c[1]);
+    // Generous padding so the entire course fits comfortably in view
+    const lngSpan = Math.max(...lngs) - Math.min(...lngs);
+    const latSpan = Math.max(...lats) - Math.min(...lats);
+    const lngPad = lngSpan * 0.15;
+    const latPad = latSpan * 0.15;
+    mbMap.fitBounds(
+      [[Math.min(...lngs)-lngPad, Math.min(...lats)-latPad],
+       [Math.max(...lngs)+lngPad, Math.max(...lats)+latPad]],
+      { pitch: is3D ? 71 : 0, bearing: is3D ? 165 : 0, duration: 800, padding: 60 }
+    );
+  }
+}
+
+function highlightSegment(name) {
+  if (!mapReady) return;
+  Object.keys(GPX_ROUTES).forEach(n => {
+    if (mbMap.getLayer('l-'+n)) {
+      mbMap.setPaintProperty('l-'+n, 'line-opacity', n===name ? 1 : 0.15);
+      mbMap.setPaintProperty('l-'+n, 'line-width', n===name ? 5 : 1.5);
+    }
+    if (mbMap.getLayer('g-'+n)) mbMap.setPaintProperty('g-'+n, 'line-opacity', n===name ? 0.5 : 0.03);
+  });
+  const pts = GPX_ROUTES[name];
+  if (pts) {
+    const lngs = pts.map(p=>p[1]), lats = pts.map(p=>p[0]);
+    const lngPad = Math.max((Math.max(...lngs)-Math.min(...lngs))*0.06, 0.003);
+    const latPad = Math.max((Math.max(...lats)-Math.min(...lats))*0.06, 0.003);
+    mbMap.fitBounds(
+      [[Math.min(...lngs)-lngPad, Math.min(...lats)-latPad],
+       [Math.max(...lngs)+lngPad, Math.max(...lats)+latPad]],
+      { pitch: is3D ? 71 : 0, bearing: is3D ? 165 : 0, duration: 700, padding: 30 }
+    );
+  }
+}
+
+function resetSegmentStyles() {
+  if (!mapReady) return;
+  Object.keys(GPX_ROUTES).forEach(n => {
+    if (mbMap.getLayer('l-'+n)) {
+      mbMap.setPaintProperty('l-'+n, 'line-opacity', 0.95);
+      mbMap.setPaintProperty('l-'+n, 'line-width', 3);
+      mbMap.setPaintProperty('g-'+n, 'line-opacity', 0.2);
+    }
+  });
+  updateRouteVisibility(activeTab);
+}
+
+// 2D/3D toggle
+let is3D = true;
+function setMapDimension(mode) {
+  is3D = mode === '3d';
+  document.getElementById('btn3d').style.background = is3D ? 'var(--accent)' : 'var(--surface3)';
+  document.getElementById('btn3d').style.color = is3D ? 'var(--black)' : 'var(--text-muted)';
+  document.getElementById('btn2d').style.background = !is3D ? 'var(--accent)' : 'var(--surface3)';
+  document.getElementById('btn2d').style.color = !is3D ? 'var(--black)' : 'var(--text-muted)';
+  if (is3D) {
+    mbMap.setTerrain({ source: 'dem', exaggeration: 1.5 });
+    mbMap.easeTo({ pitch: 71, bearing: 165, duration: 800 });
+  } else {
+    mbMap.setTerrain(null);
+    mbMap.easeTo({ pitch: 0, bearing: 0, duration: 800 });
+  }
+}
+
+// Cinematic fly-in from I-90 west toward course
+// ============================================================
+// ANIMATION — smooth glide with requestAnimationFrame
+// ============================================================
+let targetPositions = {}; // key -> {lat, lng} — updated every 10s
+let currentPositions = {}; // key -> {lat, lng} — interpolated every frame
+let rafId = null;
+
+function debugLog(msg, warn=false) {
+  console[warn ? 'warn' : 'log']('[TC] ' + msg);
+  const log = document.getElementById('debugLog');
+  if (log) {
+    const line = document.createElement('div');
+    line.style.color = warn ? '#f87171' : '#4ade80';
+    line.textContent = new Date().toLocaleTimeString('en-US',{hour12:false}) + ' ' + msg;
+    log.insertBefore(line, log.firstChild);
+    while (log.children.length > 20) log.removeChild(log.lastChild);
+  }
+}
+
+function startAnimation() {
+  if (animationFrame) clearTimeout(animationFrame);
+  // Calculate targets every 10s
+  animateStep();
+  // Smooth glide every frame
+  function glideFrame() {
+    if (!mapReady) { rafId = requestAnimationFrame(glideFrame); return; }
+    let anyMoved = false;
+    Object.keys(targetPositions).forEach(key => {
+      const target = targetPositions[key];
+      const cur = currentPositions[key] || { ...target };
+      const LERP = 0.15; // increased from 0.04 — more visible movement
+      const newLat = cur.lat + (target.lat - cur.lat) * LERP;
+      const newLng = cur.lng + (target.lng - cur.lng) * LERP;
+      const moved = Math.abs(newLat - cur.lat) > 0.000001 || Math.abs(newLng - cur.lng) > 0.000001;
+      currentPositions[key] = { lat: newLat, lng: newLng };
+      if (moved && runnerMarkers[key]) {
+        runnerMarkers[key].setLngLat([newLng, newLat]);
+        anyMoved = true;
+      }
+    });
+    rafId = requestAnimationFrame(glideFrame);
+  }
+  rafId = requestAnimationFrame(glideFrame);
+}
+
+function animateStep() {
+  updateRunnerTargets();
+  const moving = Object.keys(targetPositions).length;
+  const fixed = Object.keys(runnerMarkers).length - moving;
+  if (moving > 0) {
+    const sample = Object.entries(targetPositions)[0];
+    debugLog(`${moving} moving, ${fixed} finished. ${sample[0]}: ${sample[1].lat.toFixed(5)},${sample[1].lng.toFixed(5)}`);
+  } else if (Object.keys(runnerMarkers).length > 0) {
+    debugLog(`${Object.keys(runnerMarkers).length} runners all at fixed positions (finished/DNS)`);
+  } else {
+    debugLog(`No runners — check data loaded and tab (active: ${activeTab})`, true);
+  }
+  animationFrame = setTimeout(animateStep, 10000);
+}
+
+// Rename updateRunnerPositions to updateRunnerTargets — sets targets, doesn't move markers
+function updateRunnerTargets() {
+  if (!mapReady) return;
+  const all = [];
+  const tab = activeTab;
+
+  // Only show runners relevant to current tab
+  if (tab === '50k' || tab === 'bigcat') {
+    data.fiftyk.forEach(r => {
+      if (!r.Bib) return;
+      const pos = getRunnerRouteAndProgress(r, '50k');
+      if (!pos) return;
+      const p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
+      const segKey = pos.route ? Object.keys(GPX_ROUTES).find(k => GPX_ROUTES[k] === pos.route) : null;
+      const dotColor = pos.fixed ? '#e8c14a' : (ROUTE_COLORS[segKey] || '#e8c14a');
+      all.push({...p, bib:r.Bib, name:r.Name||'', seg:pos.segment||'', color:dotColor, key:'f_'+r.Bib});
+    });
+  }
+
+  if (tab === 'ascent' || tab === 'bigcat') {
+    data.ascent.forEach(r => {
+      if (!r.BIB) return;
+      const pos = getRunnerRouteAndProgress(r, 'ascent');
+      if (!pos) return;
+      const p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
+      const segKey = pos.route ? Object.keys(GPX_ROUTES).find(k => GPX_ROUTES[k] === pos.route) : null;
+      const dotColor = pos.fixed ? '#a78bfa' : (ROUTE_COLORS[segKey] || '#a78bfa');
+      all.push({...p, bib:r.BIB, name:r.NAME||'', seg:pos.segment||'', color:dotColor, key:'a_'+r.BIB});
+    });
+  }
+
+  if (tab === 'ambush') {
+    data.ambush.forEach(r => {
+      if (!r.Bib) return;
+      const pos = getRunnerRouteAndProgress(r, 'ambush');
+      if (!pos) return;
+      const p = pos.fixed ? {lat:pos.lat,lng:pos.lng} : interpolateAlongRoute(pos.route, pos.progress);
+      const segKey = pos.route ? Object.keys(GPX_ROUTES).find(k => GPX_ROUTES[k] === pos.route) : null;
+      const dotColor = pos.fixed ? '#fb923c' : (ROUTE_COLORS[segKey] || '#fb923c');
+      all.push({...p, bib:r.Bib, name:r.Name||'', seg:pos.segment||'', color:dotColor, key:'b_'+r.Bib});
+    });
+  }
+
+  const seen = new Set();
+  all.forEach(rp => {
+    seen.add(rp.key);
+    targetPositions[rp.key] = { lat: rp.lat, lng: rp.lng };
+    if (!currentPositions[rp.key]) currentPositions[rp.key] = { lat: rp.lat, lng: rp.lng };
+
+    const buildMarkerHTML = (color, bib) =>
+      '<div style="background:rgba(10,10,10,0.9);color:'+color+';font-family:DM Mono,monospace;font-size:9px;font-weight:700;padding:1px 3px;border-radius:2px;border:1px solid '+color+'44;white-space:nowrap">#'+bib+'</div>'
+      +'<div style="width:9px;height:9px;background:'+color+';border:1.5px solid #0a0a0a;border-radius:50%;box-shadow:0 0 5px '+color+'99;margin-top:1px"></div>';
+
+    if (!runnerMarkers[rp.key]) {
+      const el = document.createElement('div');
+      el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer';
+      el._segColor = rp.color;
+      el.innerHTML = buildMarkerHTML(rp.color, rp.bib);
+      const popup = new mapboxgl.Popup({ offset: 20, closeButton: false })
+        .setHTML('<div style="background:#111;color:#f0f0f0;font-family:DM Mono,monospace;font-size:11px;padding:5px 8px;border-radius:4px;border-left:3px solid '+rp.color+'"><b style="color:'+rp.color+'">#'+rp.bib+'</b> '+rp.name+'<br><span style="color:#888;font-size:10px">'+rp.seg+'</span></div>');
+      runnerMarkers[rp.key] = new mapboxgl.Marker(el)
+        .setLngLat([rp.lng, rp.lat])
+        .setPopup(popup)
+        .addTo(mbMap);
+    } else {
+      // Update dot color if runner moved to a new segment
+      const el = runnerMarkers[rp.key].getElement();
+      if (el._segColor !== rp.color) {
+        el._segColor = rp.color;
+        el.innerHTML = buildMarkerHTML(rp.color, rp.bib);
+      }
+    }
+  });
+
+  // Remove gone runners
+  Object.keys(runnerMarkers).forEach(k => {
+    if (!seen.has(k)) {
+      runnerMarkers[k].remove();
+      delete runnerMarkers[k];
+      delete targetPositions[k];
+      delete currentPositions[k];
+    }
+  });
+
+  // Apply follow dimming every time markers update
+  applyFollowDimming();
+}
+
+function updateRunnerPositions() { updateRunnerTargets(); }
+function drawMap() { updateRunnerTargets(); }
+
+// ============================================================
+// ROUTE HELPERS — interpolation + grade-adjusted pace
+// ============================================================
+function haversineM(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const p1 = lat1*Math.PI/180, p2 = lat2*Math.PI/180;
+  const dp = (lat2-lat1)*Math.PI/180, dl = (lon2-lon1)*Math.PI/180;
+  const a = Math.sin(dp/2)**2 + Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+function interpolateAlongRoute(route, fraction) {
+  if (!route || !route.length) return { lat: 47.52, lng: -122.0 };
+  if (fraction <= 0) return { lat: route[0][0], lng: route[0][1] };
+  if (fraction >= 1) return { lat: route[route.length-1][0], lng: route[route.length-1][1] };
+  const dists = [0];
+  for (let i = 1; i < route.length; i++)
+    dists.push(dists[i-1] + haversineM(route[i-1][0], route[i-1][1], route[i][0], route[i][1]));
+  const target = fraction * dists[dists.length-1];
+  for (let i = 1; i < route.length; i++) {
+    if (dists[i] >= target) {
+      const f = (target - dists[i-1]) / (dists[i] - dists[i-1]);
+      return { lat: route[i-1][0] + f*(route[i][0]-route[i-1][0]), lng: route[i-1][1] + f*(route[i][1]-route[i-1][1]) };
+    }
+  }
+  return { lat: route[route.length-1][0], lng: route[route.length-1][1] };
+}
+
+// Average grade-adjusted pace across a whole route (samples multiple points)
+function avgGradeAdjustedPace(basePace, routeName) {
+  const elevs = ELEVATION_DATA[routeName];
+  const pts = GPX_ROUTES[routeName];
+  if (!elevs || !pts || elevs.length < 2) return basePace;
+  
+  let totalPace = 0, totalDist = 0;
+  for (let i = 0; i < elevs.length - 1; i++) {
+    const rise = elevs[i+1] - elevs[i];
+    const run = haversineM(pts[i][0], pts[i][1], pts[i+1][0], pts[i+1][1]);
+    if (run < 1) continue;
+    const grade = rise / run;
+    let mult;
+    if (grade > 0.25) mult = 3.5;
+    else if (grade > 0.15) mult = 2.5;
+    else if (grade > 0.08) mult = 1.8;
+    else if (grade > 0.03) mult = 1.3;
+    else if (grade > -0.03) mult = 1.0;
+    else if (grade > -0.08) mult = 0.85;
+    else if (grade > -0.15) mult = 0.9;
+    else mult = 1.1;
+    totalPace += basePace * mult * run;
+    totalDist += run;
+  }
+  return totalDist > 0 ? totalPace / totalDist : basePace;
+}
+
+// Estimated total time for a segment in seconds (no observed pace)
+function estimateSegmentDuration(segName) {
+  const distKm = segDistKm(segName);
+  const base = SEGMENT_BASE_PACE[segName] || 480;
+  const avgPace = avgGradeAdjustedPace(base, segName);
+  return distKm * avgPace;
+}
+
+// Precompute segment durations once (avoids repeated calculation)
+const SEGMENT_DURATIONS = {}; // populated after GPX_ROUTES defined
+
+// Called once after page loads to pre-warm segment duration calculations
+function initSegmentDurations() {
+  ['green_start','pink','white','yellow','blue_descent','red_finish','ascent'].forEach(seg => {
+    SEGMENT_DURATIONS[seg] = estimateSegmentDuration(seg);
+  });
+  debugLog(`Segment durations (min): green=${Math.round(SEGMENT_DURATIONS.green_start/60)} pink=${Math.round(SEGMENT_DURATIONS.pink/60)} blue=${Math.round(SEGMENT_DURATIONS.blue_descent/60)} red=${Math.round(SEGMENT_DURATIONS.red_finish/60)}`);
+}
+
+// ============================================================
+// RUNNER POSITION ENGINE — direct, transparent, observable
+// ============================================================
+// Strategy:
+// 1. Find the runner's most recent timestamped checkpoint (the "from" point)
+// 2. Determine which segment they are currently traveling (the "current" segment)
+// 3. Calculate observed pace from a previous segment if possible (best signal)
+// 4. Estimate how long the current segment takes at that pace
+// 5. progress = (now - lastScanTime) / estimatedSegmentDuration
+//
+// Default fallback paces if no observed data: SEGMENT_BASE_PACE (sec/km, flat)
+// adjusted using grade from baked elevation data.
+// ============================================================
+
+// Distance helpers (treat GPX_DISTANCES as meters)
+function segDistKm(seg) { return (GPX_DISTANCES[seg] || 1000) / 1000; }
+
+// Get a runner's pace in seconds/km for a specific segment.
+// If we observed them on a PREVIOUS segment, scale that observed pace
+// to fit the CURRENT segment's relative difficulty.
+function getEstimatedSegmentPace(observedPaceSecPerKm, observedSegName, currentSegName) {
+  if (!observedPaceSecPerKm) {
+    // No observed pace — use pre-computed average grade-adjusted pace for segment
+    const base = SEGMENT_BASE_PACE[currentSegName] || 480;
+    return avgGradeAdjustedPace(base, currentSegName);
+  }
+  // Scale observed pace by relative difficulty between segments
+  const obsBase = SEGMENT_BASE_PACE[observedSegName] || 480;
+  const curBase = SEGMENT_BASE_PACE[currentSegName] || 480;
+  const ratio = curBase / obsBase;
+  let predicted = observedPaceSecPerKm * ratio;
+  // Fatigue floor: a slow runner doesn't suddenly become fast on the next segment.
+  // Even on a "faster" segment, predicted pace shouldn't drop below 60% of observed pace.
+  // (Captures: tired legs, technical terrain, conservative downhill running.)
+  const fatigueFloor = observedPaceSecPerKm * 0.6;
+  if (predicted < fatigueFloor) predicted = fatigueFloor;
+  // Clamp: pace shouldn't imply < 2 min/km or > 25 min/km on current segment
+  return Math.min(Math.max(predicted, 120), 1500);
+}
+
+// Calculate observed pace from two scan timestamps over a known segment
+function calcObservedPace(fromMs, toMs, segName) {
+  if (!fromMs || !toMs || toMs <= fromMs) return null;
+  const elapsedSec = (toMs - fromMs) / 1000;
+  const distKm = segDistKm(segName);
+  if (distKm <= 0) return null;
+  return elapsedSec / distKm;
+}
+
+function getRunnerRouteAndProgress(r, type) {
+  const now = getReplayNow();
+  const parseTime = s => {
+    if (!s || s === '') return null;
+    const d = parseTS(s);
+    return d ? d.getTime() : null;
+  };
+
+  const bib = r.Bib || r.BIB || 'unknown';
+
+  // Build position result with progress in [0, 0.99]
+  const buildPos = (segName, lastScanMs, observedPaceSecPerKm, observedSegName, segLabel) => {
+    if (!lastScanMs) {
+      debugLog(`no scan time for ${segLabel}`, true);
+      return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
+    }
+    const elapsedSec = (now - lastScanMs) / 1000;
+    if (elapsedSec < 0) return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
+    let segDurSec;
+    if (observedPaceSecPerKm) {
+      const pace = getEstimatedSegmentPace(observedPaceSecPerKm, observedSegName, segName);
+      segDurSec = segDistKm(segName) * pace;
+    } else {
+      // No real-time scan-to-scan pace yet. If we have a per-runner pace override
+      // (e.g. seeded from yesterday's ascent), use it as a synthetic observed pace
+      // so the runner's dot moves at their actual fitness — not the field average.
+      const personalScalar = RUNNER_PACE_OVERRIDES[String(bib)];
+      if (personalScalar) {
+        // Scale base pace by personal ratio (matches getRunnerPace() math)
+        const basePace = SEGMENT_BASE_PACE[segName] || 480;
+        const personalSegPace = basePace * (personalScalar / 400);
+        // Apply variance buffer so longer races don't over-predict speed.
+        const variance = paceVarianceMultiplier(lastScanMs);
+        segDurSec = segDistKm(segName) * personalSegPace * variance;
+      } else {
+        segDurSec = SEGMENT_DURATIONS[segName] || estimateSegmentDuration(segName);
+      }
+    }
+    if (!segDurSec || segDurSec <= 0) return { route: GPX_ROUTES[segName], progress: 0, segment: segLabel };
+    let progress = Math.min(Math.max(elapsedSec / segDurSec, 0), 0.99);
+    // Forward-progress lock: a runner can never go backward on a segment between refreshes
+    const memKey = `${type}_${bib}_${segName}`;
+    if (PROGRESS_MEMORY[memKey] !== undefined && progress < PROGRESS_MEMORY[memKey]) {
+      progress = PROGRESS_MEMORY[memKey];
+    }
+    PROGRESS_MEMORY[memKey] = progress;
+    debugLog(`${segLabel}: ${Math.round(elapsedSec/60)}min / ${Math.round(segDurSec/60)}min = ${(progress*100).toFixed(0)}%`);
+    return { route: GPX_ROUTES[segName], progress, segment: segLabel };
+  };
+
+  // Validate sequence — drop any out-of-order scans
+  // Also handles accidental scans: if a later valid scan exists, earlier ones that
+  // create impossible timelines are dropped
+  const validateSequence = (times, seqType) => {
+    const result = {...times};
+    const order = seqType === 'ambush'
+      ? ['raceStart','green','lbot','ltop','red']
+      : ['raceStart','green','l1bot','l1top','l2bot','l2top','l3bot','l3top','red'];
+    let prev = result.raceStart;
+    const MIN_BETWEEN_SCANS = 60;
+    for (const key of order) {
+      if (key === 'raceStart') continue;
+      if (result[key]) {
+        if (result[key] <= prev || (result[key] - prev) < MIN_BETWEEN_SCANS * 1000) {
+          debugLog(`Dropping out-of-sequence scan: ${key} (${new Date(result[key]).toLocaleTimeString()})`, true);
+          result[key] = null;
+        } else {
+          prev = result[key];
+        }
+      }
+    }
+    return result;
+  };
+
+  if (type === '50k') {
+    const status = (r.Status||'').toUpperCase();
+    if (status === 'DNS') return null;
+    if (r['FINISH TIME (Scan)'] || status === 'FINISHED')
+      return { fixed: true, lat: 47.527708, lng: -122.034216, segment: 'Finished' };
+
+    let t = {
+      raceStart: new Date('2026-05-09T07:00:00-07:00').getTime(),
+      green:    parseTime(r['Green Checkpoint']),
+      l1bot:    parseTime(r['First Loop Bottom']),
+      l1top:    parseTime(r['First Loop Top']),
+      l2bot:    parseTime(r['Second Loop Bottom']),
+      l2top:    parseTime(r['Second Loop Top']),
+      l3bot:    parseTime(r['Third Loop Bottom']),
+      l3top:    parseTime(r['Third Loop Top']),
+      red:      parseTime(r['Red Checkpoint In']),
+    };
+
+    // TESTING SUPPORT: shift race start to match scan dates
+    const allScans = [t.green, t.l1bot, t.l1top, t.l2bot, t.l2top, t.l3bot, t.l3top, t.red].filter(x => x);
+    if (allScans.length > 0) {
+      const earliestScan = Math.min(...allScans);
+      const scanDate = new Date(earliestScan);
+      const configDate = new Date(t.raceStart);
+      if (scanDate.toDateString() !== configDate.toDateString()) {
+        const adjusted = new Date(scanDate.getFullYear(), scanDate.getMonth(), scanDate.getDate(), 7, 0, 0);
+        t.raceStart = adjusted.getTime();
+      }
+      // Normalize ALL scan timestamps to the raceStart date so mismatched dates
+      // (e.g. a Pink scan from a different test day) don't inflate elapsed time.
+      const raceDay = new Date(t.raceStart);
+      const normToRaceDay = ms => {
+        if (!ms) return ms;
+        const d = new Date(ms);
+        return new Date(raceDay.getFullYear(), raceDay.getMonth(), raceDay.getDate(),
+                        d.getHours(), d.getMinutes(), d.getSeconds()).getTime();
+      };
+      t.green  = normToRaceDay(t.green);
+      t.l1bot  = normToRaceDay(t.l1bot);
+      t.l1top  = normToRaceDay(t.l1top);
+      t.l2bot  = normToRaceDay(t.l2bot);
+      t.l2top  = normToRaceDay(t.l2top);
+      t.l3bot  = normToRaceDay(t.l3bot);
+      t.l3top  = normToRaceDay(t.l3top);
+      t.red    = normToRaceDay(t.red);
+    }
+
+    // Validate sequence — drop any out-of-order scans
+    t = validateSequence(t, '50k');
+
+    const validColor = c => ['pink','white','yellow'].includes((c||'').toLowerCase()) ? c.toLowerCase() : 'pink';
+    const rk1 = validColor(r['First Loop Color']);
+    const rk2 = validColor(r['Second Loop']);
+    const rk3 = validColor(r['Third Loop']);
+
+    // Build a list of ALL completed segments with their observed pace
+    // Most recent segment's pace is the BEST predictor of current pace
+    const completedSegments = [];
+    if (t.green) completedSegments.push({ from: t.raceStart, to: t.green, segName: 'green_start' });
+    if (t.l1bot && t.green) completedSegments.push({ from: t.green, to: t.l1bot, segName: 'green_start', short: true });
+    if (t.l1top && t.l1bot) completedSegments.push({ from: t.l1bot, to: t.l1top, segName: rk1 });
+    if (t.l2bot && t.l1top) completedSegments.push({ from: t.l1top, to: t.l2bot, segName: 'blue_descent' });
+    if (t.l2top && t.l2bot) completedSegments.push({ from: t.l2bot, to: t.l2top, segName: rk2 });
+    if (t.l3bot && t.l2top) completedSegments.push({ from: t.l2top, to: t.l3bot, segName: 'blue_descent' });
+    if (t.l3top && t.l3bot) completedSegments.push({ from: t.l3bot, to: t.l3top, segName: rk3 });
+    if (t.red && t.l3top) completedSegments.push({ from: t.l3top, to: t.red, segName: 'blue_descent' });
+
+    // Most recent segment's observed pace — this is what we use for "current pace"
+    // Skip the short connector segments
+    const mostRecentRealSeg = [...completedSegments].reverse().find(s => !s.short);
+    const recentObservedPace = mostRecentRealSeg
+      ? calcObservedPace(mostRecentRealSeg.from, mostRecentRealSeg.to, mostRecentRealSeg.segName)
+      : null;
+    const recentObservedSeg = mostRecentRealSeg ? mostRecentRealSeg.segName : null;
+
+    // Determine current segment based on most recent checkpoint
+    if (t.red) return buildPos('red_finish', t.red, recentObservedPace, recentObservedSeg, 'Red → Finish');
+    if (t.l3top) return buildPos('blue_descent', t.l3top, recentObservedPace, recentObservedSeg, 'Blue Descent (3)');
+    if (t.l3bot) return buildPos(rk3, t.l3bot, recentObservedPace, recentObservedSeg, `Loop 3 (${rk3})`);
+    if (t.l2top) return buildPos('blue_descent', t.l2top, recentObservedPace, recentObservedSeg, 'Blue Descent (2)');
+    if (t.l2bot) return buildPos(rk2, t.l2bot, recentObservedPace, recentObservedSeg, `Loop 2 (${rk2})`);
+    if (t.l1top) return buildPos('blue_descent', t.l1top, recentObservedPace, recentObservedSeg, 'Blue Descent (1)');
+    if (t.l1bot) return buildPos(rk1, t.l1bot, recentObservedPace, recentObservedSeg, `Loop 1 (${rk1})`);
+    if (t.green) return { route: GPX_ROUTES.green_start, progress: 0.95, segment: 'Green → Loop' };
+    return buildPos('green_start', t.raceStart, null, null, 'Start → Green CP');
+  }
+
+  if (type === 'ascent') {
+    const status = (r.STATUS||'').toUpperCase();
+    if (status === 'DNS') return null;
+    if (r['FINISH TIME (SCAN)'] || status === 'FINISHED')
+      return { fixed: true, lat: 47.508742, lng: -121.985226, segment: 'Finished' };
+
+    const raceStart = new Date('2026-05-08T18:00:00-07:00').getTime();
+    const bibStr = String(r.BIB || '').trim();
+
+    // Ascent checkpoint scan — 22.8% through the route (0.5mi mark)
+    const CP_PROGRESS = 0.228;
+    const cpTs = data.ascent_cp && data.ascent_cp[bibStr] ? parseTime(data.ascent_cp[bibStr]) : null;
+
+    if (cpTs && cpTs > raceStart) {
+      // Runner has been scanned at the checkpoint — we know their pace to that point
+      const distToCheckpointKm = segDistKm('ascent') * CP_PROGRESS; // km to checkpoint
+      const elapsedToCheckpointSec = (cpTs - raceStart) / 1000;
+      const observedPaceSecPerKm = elapsedToCheckpointSec / distToCheckpointKm;
+
+      // How far past the checkpoint are they now?
+      const elapsedSinceCpSec = (now - cpTs) / 1000;
+      // Remaining distance on ascent from checkpoint to summit
+      const remainingKm = segDistKm('ascent') * (1 - CP_PROGRESS);
+      // Adjusted pace for the steeper upper section (upper ascent is harder — multiply by 1.2)
+      const upperPaceSec = observedPaceSecPerKm * 1.2;
+      const estRemainingTimeSec = remainingKm * upperPaceSec;
+
+      // Progress from checkpoint position forward
+      const progressFromCp = Math.min(elapsedSinceCpSec / estRemainingTimeSec, 0.99);
+      const totalProgress = Math.min(CP_PROGRESS + progressFromCp * (1 - CP_PROGRESS), 0.99);
+
+      const memKey = type + '_' + bib + '_ascent';
+      const memProgress = PROGRESS_MEMORY[memKey] || 0;
+      const finalProgress = Math.max(totalProgress, memProgress);
+      PROGRESS_MEMORY[memKey] = finalProgress;
+
+      const paceMin = Math.round(observedPaceSecPerKm / 60 * 10) / 10;
+      debugLog(`Ascent #${bibStr}: CP scan at ${new Date(cpTs).toLocaleTimeString()} · pace ${paceMin}min/km · ${(finalProgress*100).toFixed(0)}% through`);
+      return { route: GPX_ROUTES['ascent'], progress: finalProgress, segment: `Ascent · ${paceMin}min/km` };
+    }
+
+    // No checkpoint scan yet — estimate from race start
+    return buildPos('ascent', raceStart, null, null, 'Ascent Course');
+  }
+
+  if (type === 'ambush') {
+    const status = (r.Status||'').toUpperCase();
+    if (status === 'DNS') return null;
+    if (r['FINISH TIME (Scan)'])
+      return { fixed: true, lat: 47.527708, lng: -122.034216, segment: 'Finished' };
+
+    let t = {
+      raceStart: new Date('2026-05-09T10:00:00-07:00').getTime(),
+      green:  parseTime(r['Green Checkpoint']),
+      lbot:   parseTime(r['Loop Bottom']),
+      ltop:   parseTime(r['Loop Top']),
+      red:    parseTime(r['Red Checkpoint In']),
+    };
+
+    const allScans = [t.green, t.lbot, t.ltop, t.red].filter(x => x);
+    if (allScans.length > 0) {
+      const earliestScan = Math.min(...allScans);
+      const scanDate = new Date(earliestScan);
+      const configDate = new Date(t.raceStart);
+      if (scanDate.toDateString() !== configDate.toDateString()) {
+        const adjusted = new Date(scanDate.getFullYear(), scanDate.getMonth(), scanDate.getDate(), 10, 0, 0);
+        t.raceStart = adjusted.getTime();
+      }
+      const raceDay = new Date(t.raceStart);
+      const normToRaceDay = ms => {
+        if (!ms) return ms;
+        const d = new Date(ms);
+        return new Date(raceDay.getFullYear(), raceDay.getMonth(), raceDay.getDate(),
+                        d.getHours(), d.getMinutes(), d.getSeconds()).getTime();
+      };
+      t.green = normToRaceDay(t.green);
+      t.lbot  = normToRaceDay(t.lbot);
+      t.ltop  = normToRaceDay(t.ltop);
+      t.red   = normToRaceDay(t.red);
+    }
+    t = validateSequence(t, 'ambush');
+
+    const validColor = c => ['pink','white','yellow'].includes((c||'').toLowerCase()) ? c.toLowerCase() : 'pink';
+    const rk = validColor(r['Loop Color']);
+
+    const completedSegments = [];
+    if (t.green) completedSegments.push({ from: t.raceStart, to: t.green, segName: 'green_start' });
+    if (t.lbot && t.green) completedSegments.push({ from: t.green, to: t.lbot, segName: 'green_start', short: true });
+    if (t.ltop && t.lbot) completedSegments.push({ from: t.lbot, to: t.ltop, segName: rk });
+    if (t.red && t.ltop) completedSegments.push({ from: t.ltop, to: t.red, segName: 'blue_descent' });
+
+    const mostRecentRealSeg = [...completedSegments].reverse().find(s => !s.short);
+    const recentObservedPace = mostRecentRealSeg
+      ? calcObservedPace(mostRecentRealSeg.from, mostRecentRealSeg.to, mostRecentRealSeg.segName)
+      : null;
+    const recentObservedSeg = mostRecentRealSeg ? mostRecentRealSeg.segName : null;
+
+    if (t.red) return buildPos('red_finish', t.red, recentObservedPace, recentObservedSeg, 'Red → Finish');
+    if (t.ltop) return buildPos('blue_descent', t.ltop, recentObservedPace, recentObservedSeg, 'Blue Descent');
+    if (t.lbot) return buildPos(rk, t.lbot, recentObservedPace, recentObservedSeg, `Loop (${rk})`);
+    if (t.green) return { route: GPX_ROUTES.green_start, progress: 0.95, segment: 'Green → Loop' };
+    return buildPos('green_start', t.raceStart, null, null, 'Start → Green CP');
+  }
+  return null;
+}
+// ============================================================
+function getGender(row, tab) {
+  // Try every possible key — column name varies by tab and sheet export
+  for (const key of Object.keys(row)) {
+    if (key.trim().toUpperCase() === 'GENDER') {
+      const v = (row[key]||'').trim().toUpperCase();
+      if (v) return v;
+    }
+  }
+  return '';
+}
+
+// Fix BIB text/number mismatch in gender filter
+function bibMatch(rowBib, filterBib) {
+  return String(rowBib).trim() === String(filterBib).trim();
+}
+
+function getElapsedMsForRanking(row, tab) {
+  if (tab === 'ascent') return elapsedMs(row['ELAPSED TIME']);
+  if (tab === '50k') return elapsedMs(row['Total Elapsed Time']);
+  if (tab === 'bigcat') return row._totalMs || null;
+  return null;
+}
+
+function renderPodium(allRows, tab) {
+  const section = document.getElementById('podiumSection');
+  const grid = document.getElementById('podiumGrid');
+
+  // Ambush — team-based podium
+  if (tab === 'ambush') {
+    // Group by team, find last member to finish per team
+    const teamTimes = {};
+    data.ambush.forEach(r => {
+      const team = r['Team Name'] || '';
+      if (!team) return;
+      const ms = elapsedMs(r['Team Elapsed Time']);
+      if (!ms || ms <= 0) return;
+      if (!teamTimes[team] || ms > teamTimes[team].ms) {
+        teamTimes[team] = { ms, teamName: team };
+      }
+    });
+    const sorted = Object.values(teamTimes).sort((a,b) => a.ms - b.ms);
+    if (!sorted.length) { section.style.display = 'none'; return; }
+
+    const medals = ['🥇','🥈','🥉'];
+    let html = `<div style="background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:1rem;border-top:2px solid var(--orange);grid-column:1/-1">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:0.1em;color:var(--orange);margin-bottom:0.75rem">Team Standings</div>`;
+    sorted.slice(0,3).forEach((t,i) => {
+      const timeStr = fmtElapsed(String(t.ms/86400000));
+      html += `<div style="display:flex;align-items:center;gap:0.6rem;padding:0.4rem 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:1.1rem;min-width:1.5rem">${medals[i]}</span>
+        <div style="flex:1"><div style="font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;color:var(--text)">${t.teamName}</div></div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:var(--orange);letter-spacing:0.05em">${timeStr}</div>
+      </div>`;
+    });
+    html += `</div>`;
+    grid.innerHTML = html;
+    section.style.display = 'block';
+    return;
+  }
+
+  const genders = [
+    { key: 'M', label: 'Men', color: '#60a5fa' },
+    { key: 'F', label: 'Women', color: '#f472b6' },
+    { key: 'NB', label: 'Non-Binary', color: '#a78bfa' },
+  ];
+
+  const medals = ['🥇','🥈','🥉'];
+  let html = '';
+  let anyPodium = false;
+
+  genders.forEach(g => {
+    const finished = allRows.filter(r => {
+      const gender = getGender(r, tab);
+      // Check all possible status field names — TRIM and uppercase to handle whitespace
+      const status = String(r.Status || r.STATUS || r.status || '').trim().toUpperCase();
+      return gender === g.key && status === 'FINISHED';
+    })
+    .map(r => ({ ...r, _rankMs: getElapsedMsForRanking(r, tab) }))
+    .filter(r => r._rankMs && r._rankMs > 0)
+    .sort((a, b) => a._rankMs - b._rankMs);
+
+    if (!finished.length) return;
+    anyPodium = true;
+
+    html += `<div style="background:var(--surface);border:1px solid var(--border2);border-radius:6px;padding:1rem;border-top:2px solid ${g.color}">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:0.1em;color:${g.color};margin-bottom:0.75rem">${g.label}</div>`;
+
+    finished.slice(0, 3).forEach((r, i) => {
+      const name = r.Name || r.NAME || '';
+      const bib = r.Bib || r.BIB || r.ascentBib || '';
+      let timeStr = '';
+      if (tab === 'ascent') timeStr = fmtElapsed(r['ELAPSED TIME']);
+      else if (tab === '50k') timeStr = fmtElapsed(r['Total Elapsed Time']);
+      else if (tab === 'bigcat') timeStr = r._totalMs ? fmtElapsed(String(r._totalMs/86400000)) : '';
+      html += `<div style="display:flex;align-items:center;gap:0.6rem;padding:0.4rem 0;border-bottom:1px solid var(--border);margin-bottom:0.2rem">
+        <span style="font-size:1.1rem;min-width:1.5rem">${medals[i]}</span>
+        <div style="flex:1">
+          <div style="font-family:'DM Sans',sans-serif;font-size:0.82rem;font-weight:600;color:var(--text)">${name}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--text-dim)">#${bib}</div>
+        </div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1rem;color:${g.color};letter-spacing:0.05em">${timeStr}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+
+  if (anyPodium) { grid.innerHTML = html; section.style.display = 'block'; }
+  else { section.style.display = 'none'; }
+}
+
+function getTableData() {
+  const tab = activeTab;
+  let rows = [];
+
+  if (tab === '50k') {
+    rows = data.fiftyk.filter(r => r.Bib && r.Bib !== '');
+  } else if (tab === 'ascent') {
+    rows = data.ascent.filter(r => r.BIB && r.BIB !== '');
+  } else if (tab === 'ambush') {
+    rows = data.ambush.filter(r => r.Bib && r.Bib !== '');
+  } else if (tab === 'bigcat') {
+    // Include runners registered in EITHER event — Big Cat is cross-event
+    const ascentLookup = new Map();
+    data.ascent.forEach(r => { if (r.NAME) ascentLookup.set(r.NAME.trim().toUpperCase(), r); });
+    const fiftyLookup = new Map();
+    data.fiftyk.forEach(r => { if (r.Name) fiftyLookup.set(r.Name.trim().toUpperCase(), r); });
+
+    // Union of names appearing in both lists
+    const bcNames = new Set([
+      ...data.ascent.filter(r=>r.NAME).map(r=>r.NAME.trim().toUpperCase()),
+    ].filter(name => fiftyLookup.has(name)));
+
+    rows = [...bcNames].map(name => {
+      const ra = ascentLookup.get(name);
+      const r50 = fiftyLookup.get(name);
+      const ascentFinished = ra && (ra.STATUS||'').toUpperCase() === 'FINISHED';
+      const fiftyFinished = r50 && (r50.Status||'').toUpperCase() === 'FINISHED';
+      const ascentDNF = ra && (ra.STATUS||'').toUpperCase() === 'DNF';
+      const fiftyDNF = r50 && (r50.Status||'').toUpperCase() === 'DNF';
+      const ascentMs = ra ? elapsedMs(ra['ELAPSED TIME']) : null;
+      const fiftyMs = r50 ? elapsedMs(r50['Total Elapsed Time']) : null;
+      const totalMs = (ascentMs && fiftyMs) ? ascentMs + fiftyMs : null;
+
+      // Big Cat status: FINISHED only if both done; DNF if either DNF
+      let status = 'In Progress';
+      if (ascentFinished && fiftyFinished) status = 'FINISHED';
+      else if (ascentDNF || fiftyDNF) status = 'DNF';
+      else if (ascentFinished && !r50) status = 'Ascent Done';
+      else if (ascentFinished) status = 'Ascent Done · 50k In Progress';
+
+      return {
+        Name: ra ? ra.NAME : (r50 ? r50.Name : name),
+        ascentBib: ra ? ra.BIB||'' : '—',
+        fiftyBib: r50 ? r50.Bib||'' : '—',
+        'Ascent Time': ra ? ra['ELAPSED TIME'] : '',
+        '50k Time': r50 ? r50['Total Elapsed Time'] : '',
+        ascentMs, fiftyMs, _totalMs: totalMs,
+        gender: ra ? getGender(ra, 'ascent') : (r50 ? getGender(r50, '50k') : ''),
+        Status: status
+      };
+    }).sort((a, b) => (a._totalMs||Infinity) - (b._totalMs||Infinity));
+  }
+
+  // Render podium from full unfiltered data (before gender/text filter)
+  renderPodium(rows, tab);
+
+  // Gender filter (skip for ambush)
+  if (genderFilter !== 'all' && tab !== 'ambush') {
+    rows = rows.filter(r => getGender(r, tab) === genderFilter);
+  }
+
+  // Text filter
+  if (filterText) {
+    const f = filterText.toLowerCase();
+    rows = rows.filter(r => {
+      const bib = (r.Bib || r.BIB || '').toLowerCase();
+      const name = (r.Name || r.NAME || '').toLowerCase();
+      const team = (r['Team Name'] || '').toLowerCase();
+      return bib.includes(f) || name.includes(f) || team.includes(f);
+    });
+  }
+
+  return rows;
+}
+
+function renderTable() {
+  const wrap = document.getElementById('tableWrap');
+  const rows = getTableData();
+  const tab = activeTab;
+
+  if (!rows.length) {
+    wrap.innerHTML = `<div class="empty-state">${filterText ? 'No runners match your search.' : 'No data yet — waiting for race day!'}</div>`;
+    document.getElementById('rowCount').textContent = '';
+    return;
+  }
+
+  let html = '<table><thead><tr>';
+
+  if (tab === '50k') {
+    html += `<th data-col="Bib">Bib</th><th data-col="Name">Name</th><th data-col="Gender">Gender</th><th data-col="Status">Status</th>
+      <th data-col="Green Checkpoint">Green CP</th>
+      <th>Lp1</th><th>L1 Bot</th><th>L1 Top</th><th data-col="First Loop Elapsed">L1 Time</th>
+      <th data-col="First Blue Descent Elapsed">D1</th>
+      <th>Lp2</th><th>L2 Bot</th><th>L2 Top</th><th data-col="Second Loop Elapsed">L2 Time</th>
+      <th data-col="Second Blue Descent Elapsed">D2</th>
+      <th>Lp3</th><th>L3 Bot</th><th>L3 Top</th><th data-col="Third Loop Elapsed">L3 Time</th>
+      <th data-col="Third Blue Descent Elapsed">D3</th>
+      <th data-col="Red Checkpoint In">Red CP</th>
+      <th data-col="FINISH TIME (Scan)">Finish</th>
+      <th data-col="Total Elapsed Time">Total Time</th>`;
+  } else if (tab === 'ascent') {
+    html += `<th data-col="BIB">Bib</th><th data-col="NAME">Name</th><th data-col="GENDER">Gender</th><th data-col="STATUS">Status</th>
+      <th data-col="ASCENT CHECKPOINT">CP Scan</th><th data-col="FINISH TIME (SCAN)">Finish Scan</th><th data-col="ELAPSED TIME">Elapsed</th>`;
+  } else if (tab === 'ambush') {
+    html += `<th data-col="Bib">Bib</th><th data-col="Team Name">Team</th><th data-col="Name">Name</th>
+      <th data-col="Status">Status</th>
+      <th data-col="Green Checkpoint">Green CP</th>
+      <th>Loop</th><th>Bot</th><th>Top</th>
+      <th data-col="Loop Elapsed">Loop Time</th>
+      <th data-col="Blue Descent Elapsed">Descent</th>
+      <th data-col="Red Checkpoint In">Red In</th>
+      <th data-col="Red Checkpoint Out">Red Out</th>
+      <th data-col="FINISH TIME (Scan)">Finish</th>
+      <th data-col="Team Elapsed Time">Team Time</th>`;
+  } else if (tab === 'bigcat') {
+    html += `
+      <th data-col="Name">Name 🐅</th>
+      <th data-col="gender">Gender</th>
+      <th>Ascent Bib</th>
+      <th data-col="ascentMs">Ascent Time<br><span style="font-weight:400;font-size:0.6rem;opacity:0.5">May 8 · 6pm</span></th>
+      <th>50k Bib</th>
+      <th data-col="fiftyMs">50k Time<br><span style="font-weight:400;font-size:0.6rem;opacity:0.5">May 9 · 7am</span></th>
+      <th data-col="_totalMs">⏱ Combined</th>
+      <th>Status</th>`;
+  }
+
+  html += '</tr></thead><tbody>';
+
+  // Sort
+  if (sortCol) {
+    rows.sort((a, b) => {
+      let va = a[sortCol] || '', vb = b[sortCol] || '';
+      if (sortCol === '_totalMs' || sortCol === 'ascentMs' || sortCol === 'fiftyMs') {
+        va = a[sortCol]||Infinity; vb = b[sortCol]||Infinity;
+        return sortDir==='asc'?va-vb:vb-va;
+      }
+      const na = parseFloat(va), nb = parseFloat(vb);
+      if (!isNaN(na) && !isNaN(nb)) return sortDir==='asc'?na-nb:nb-na;
+      return sortDir==='asc'?va.localeCompare(vb):vb.localeCompare(va);
+    });
+  }
+
+  rows.forEach((r, idx) => {
+    const isHighlight = filterText && (
+      (r.Bib||r.BIB||'').toLowerCase().includes(filterText.toLowerCase()) ||
+      (r.Name||r.NAME||'').toLowerCase().includes(filterText.toLowerCase())
+    );
+
+    html += `<tr class="${isHighlight?'highlight-row':''}" data-bib="${r.Bib||r.BIB||''}" data-tab="${tab}">`;
+
+    if (tab === '50k') {
+      const isBigCat = data.ascent.some(a => (a.NAME||'').trim().toUpperCase() === (r.Name||'').trim().toUpperCase());
+      html += `<td class="bib">${r.Bib||''}</td>
+        <td class="name">${r.Name||''}${isBigCat?' <span class="bigcat-icon">🐅</span>':''}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--text-muted)">${r.Gender||r.GENDER||''}</td>
+        <td>${statusBadge(r.Status)}</td>
+        <td class="time-val">${fmtTime(r['Green Checkpoint'])}</td>
+        <td>${loopTag(r['First Loop Color'])}</td>
+        <td class="time-val">${fmtTime(r['First Loop Bottom'])}</td>
+        <td class="time-val">${fmtTime(r['First Loop Top'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['First Loop Elapsed'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['First Blue Descent Elapsed'])}</td>
+        <td>${loopTag(r['Second Loop'])}</td>
+        <td class="time-val">${fmtTime(r['Second Loop Bottom'])}</td>
+        <td class="time-val">${fmtTime(r['Second Loop Top'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['Second Loop Elapsed'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['Second Blue Descent Elapsed'])}</td>
+        <td>${loopTag(r['Third Loop'])}</td>
+        <td class="time-val">${fmtTime(r['Third Loop Bottom'])}</td>
+        <td class="time-val">${fmtTime(r['Third Loop Top'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['Third Loop Elapsed'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['Third Blue Descent Elapsed'])}</td>
+        <td class="time-val">${fmtTime(r['Red Checkpoint In'])}</td>
+        <td class="time-val">${fmtTime(r['FINISH TIME (Scan)'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['Total Elapsed Time'])}</td>`;
+    } else if (tab === 'ascent') {
+      const isBigCat = data.fiftyk.some(f => (f.Name||'').trim().toUpperCase() === (r.NAME||'').trim().toUpperCase());
+      const cpScanTime = data.ascent_cp && data.ascent_cp[String(r.BIB||'').trim()] ? data.ascent_cp[String(r.BIB||'').trim()] : '';
+      html += `<td class="bib">${r.BIB||''}</td>
+        <td class="name">${r.NAME||''}${isBigCat?' <span class="bigcat-icon">🐅</span>':''}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--text-muted)">${r.GENDER||r.Gender||''}</td>
+        <td>${statusBadge(r.STATUS)}</td>
+        <td class="time-val" style="color:#fb923c">${fmtTime(cpScanTime)}</td>
+        <td class="time-val">${fmtTime(r['FINISH TIME (SCAN)'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['ELAPSED TIME'])}</td>`;
+    } else if (tab === 'ambush') {
+      html += `<td class="bib">${r.Bib||''}</td>
+        <td class="team-name">${r['Team Name']||''}</td>
+        <td class="name">${r.Name||''}</td>
+        <td>${statusBadge(r.Status)}</td>
+        <td class="time-val">${fmtTime(r['Green Checkpoint'])}</td>
+        <td>${loopTag(r['Loop Color'])}</td>
+        <td class="time-val">${fmtTime(r['Loop Bottom'])}</td>
+        <td class="time-val">${fmtTime(r['Loop Top'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['Loop Elapsed'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['Blue Descent Elapsed'])}</td>
+        <td class="time-val">${fmtTime(r['Red Checkpoint In'])}</td>
+        <td class="time-val">${fmtTime(r['Red Checkpoint Out'])}</td>
+        <td class="time-val">${fmtTime(r['FINISH TIME (Scan)'])}</td>
+        <td class="elapsed-val">${fmtElapsed(r['Team Elapsed Time'])}</td>`;
+    } else if (tab === 'bigcat') {
+      const rank = idx + 1;
+      const rankDisplay = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+      const ascentDone = (r.Status||'').includes('Fin') || r.ascentMs;
+      const fiftyDone = (r.Status||'').includes('FINISHED') || r.fiftyMs;
+      html += `
+        <td class="name" style="display:flex;align-items:center;gap:0.5rem">
+          <span style="font-family:'Bebas Neue';font-size:1rem;color:var(--accent);min-width:2rem">${rankDisplay}</span>
+          ${r.Name||''} 🐅
+        </td>
+        <td style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--text-muted)">${r.gender||''}</td>
+        <td class="bib" style="color:var(--text-dim);font-size:0.8rem">${r.ascentBib||'—'}</td>
+        <td>
+          <span class="elapsed-val">${r.ascentMs ? fmtElapsed(String(r.ascentMs/86400000)) : ''}</span>
+          ${!ascentDone ? '<span style="color:var(--text-dim);font-size:0.7rem"> On Ascent…</span>' : ''}
+        </td>
+        <td class="bib" style="color:var(--text-dim);font-size:0.8rem">${r.fiftyBib||'—'}</td>
+        <td>
+          <span class="elapsed-val">${r.fiftyMs ? fmtElapsed(String(r.fiftyMs/86400000)) : ''}</span>
+          ${ascentDone && !fiftyDone ? '<span style="color:var(--text-dim);font-size:0.7rem"> On 50k…</span>' : ''}
+        </td>
+        <td style="font-family:'Bebas Neue';font-size:1.3rem;color:${r._totalMs?'var(--accent)':'var(--text-dim)'}">
+          ${r._totalMs ? fmtElapsed(String(r._totalMs/86400000)) : '—'}
+        </td>
+        <td>${statusBadge(r.Status)}</td>`;
+    }
+
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+
+  // Sort icons on headers
+  wrap.querySelectorAll('th[data-col]').forEach(th => {
+    const col = th.getAttribute('data-col');
+    if (col === sortCol) th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+    th.addEventListener('click', () => {
+      if (sortCol === col) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortCol = col; sortDir = 'asc'; }
+      renderTable();
+    });
+  });
+
+  // Row click → modal
+  wrap.querySelectorAll('tbody tr').forEach(tr => {
+    tr.style.cursor = 'pointer';
+    tr.addEventListener('click', () => {
+      const bib = tr.getAttribute('data-bib');
+      const t = tr.getAttribute('data-tab');
+      openModal(bib, t);
+    });
+  });
+
+  document.getElementById('rowCount').textContent = `Showing ${rows.length} runner${rows.length!==1?'s':''}`;
+}
+
+// ============================================================
+// RUNNER MODAL
+// ============================================================
+function openModal(bib, tab) {
+  // String compare to handle CSV number/string mismatch
+  const bibStr = String(bib).trim();
+  let runner = null;
+  if (tab === '50k') runner = data.fiftyk.find(r => String(r.Bib).trim() === bibStr);
+  else if (tab === 'ascent') runner = data.ascent.find(r => String(r.BIB).trim() === bibStr);
+  else if (tab === 'ambush') runner = data.ambush.find(r => String(r.Bib).trim() === bibStr);
+  else if (tab === 'bigcat') {
+    runner = data.fiftyk.find(r => String(r.Bib).trim() === bibStr || String(r.fiftyBib).trim() === bibStr);
+  }
+  if (!runner) {
+    debugLog(`openModal: runner not found bib=${bibStr} tab=${tab}`, true);
+    return;
+  }
+
+  const name = runner.Name || runner.NAME || `Bib ${bibStr}`;
+  const status = runner.Status || runner.STATUS || 'On Course';
+
+  document.getElementById('modalName').textContent = name;
+  document.getElementById('modalBib').textContent = `Bib #${bibStr} · ${status}`;
+
+  let bodyHTML = '';
+
+  if (tab === '50k') {
+    const checkpoints = [
+      { label: 'Race Start (7:00 AM)', time: null, fixed: true },
+      { label: 'Green Checkpoint', time: runner['Green Checkpoint'] },
+      { label: `Loop 1 Bottom (${runner['First Loop Color']||'?'})`, time: runner['First Loop Bottom'] },
+      { label: 'Loop 1 Top (Blue Summit)', time: runner['First Loop Top'] },
+      { label: `Loop 2 Bottom (${runner['Second Loop']||'?'})`, time: runner['Second Loop Bottom'] },
+      { label: 'Loop 2 Top (Blue Summit)', time: runner['Second Loop Top'] },
+      { label: `Loop 3 Bottom (${runner['Third Loop']||'?'})`, time: runner['Third Loop Bottom'] },
+      { label: 'Loop 3 Top (Blue Summit)', time: runner['Third Loop Top'] },
+      { label: 'Red Checkpoint', time: runner['Red Checkpoint In'] },
+      { label: 'Finish Line', time: runner['FINISH TIME (Scan)'] },
+    ];
+    let lastDone = -1;
+    checkpoints.forEach((cp, i) => { if (cp.time) lastDone = i; });
+    const currentIdx = lastDone + 1;
+
+    bodyHTML += `<div style="font-family:'Bebas Neue',sans-serif;font-size:0.85rem;letter-spacing:0.1em;color:var(--text-dim);margin:0 0 0.75rem">Race Timeline</div>`;
+    checkpoints.forEach((cp, i) => {
+      const done = !!cp.time || cp.fixed;
+      const isCurrent = i === currentIdx && !runner['FINISH TIME (Scan)'];
+      const color = done ? 'var(--accent)' : isCurrent ? '#60a5fa' : 'var(--border2)';
+      const timeStr = cp.time ? fmtTime(cp.time) : (cp.fixed ? 'May 9, 2026' : isCurrent ? '▶ In progress…' : '—');
+      bodyHTML += `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+        <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;${isCurrent?'box-shadow:0 0 6px #60a5fa':''}"></div>
+        <div style="flex:1;font-size:0.82rem;color:${done||isCurrent?'var(--text)':'var(--text-dim)'}">${cp.label}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:0.78rem;color:${done?'var(--accent)':isCurrent?'#60a5fa':'var(--text-dim)'}">${timeStr}</div>
+      </div>`;
+    });
+
+    const segs = [
+      ['Loop 1 Time', runner['First Loop Elapsed']],
+      ['Descent 1', runner['First Blue Descent Elapsed']],
+      ['Loop 2 Time', runner['Second Loop Elapsed']],
+      ['Descent 2', runner['Second Blue Descent Elapsed']],
+      ['Loop 3 Time', runner['Third Loop Elapsed']],
+      ['Descent 3', runner['Third Blue Descent Elapsed']],
+      ['Total Time', runner['Total Elapsed Time']],
+    ].filter(s => s[1]);
+
+    if (segs.length) {
+      bodyHTML += `<div style="font-family:'Bebas Neue',sans-serif;font-size:0.85rem;letter-spacing:0.1em;color:var(--text-dim);margin:1rem 0 0.5rem">Split Times</div>`;
+      segs.forEach(([label, val]) => {
+        bodyHTML += `<div style="display:flex;justify-content:space-between;padding:0.35rem 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:0.8rem;color:var(--text)">${label}</span>
+          <span style="font-family:'DM Mono',monospace;font-size:0.8rem;color:var(--accent)">${fmtElapsed(val)}</span>
+        </div>`;
+      });
+    }
+
+  } else if (tab === 'ascent') {
+    const bibStr = String(runner.BIB || '').trim();
+    const cpTime = data.ascent_cp && data.ascent_cp[bibStr] ? data.ascent_cp[bibStr] : null;
+    const cps = [
+      { label: 'Start (6:00 PM, May 8)', time: null, fixed: true },
+      { label: '⚡ Ascent Checkpoint (~0.5mi)', time: cpTime },
+      { label: 'Summit Finish', time: runner['FINISH TIME (SCAN)'] },
+    ];
+    bodyHTML += cps.map(cp => `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0;border-bottom:1px solid var(--border);">
+      <div style="width:8px;height:8px;border-radius:50%;background:${cp.time||cp.fixed?'var(--accent)':'var(--border2)'};flex-shrink:0"></div>
+      <div style="flex:1;font-size:0.82rem;color:var(--text)">${cp.label}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--accent)">${cp.time ? fmtTime(cp.time) : (cp.fixed ? '—' : '▶ In progress…')}</div>
+    </div>`).join('');
+    if (runner['ELAPSED TIME']) bodyHTML += `<div style="display:flex;justify-content:space-between;padding:0.5rem 0;margin-top:0.5rem">
+      <span style="font-size:0.82rem;color:var(--text)">Total Time</span>
+      <span style="font-family:'DM Mono',monospace;color:var(--accent)">${fmtElapsed(runner['ELAPSED TIME'])}</span>
+    </div>`;
+
+  } else if (tab === 'ambush') {
+    bodyHTML += `<div style="font-family:'Bebas Neue',sans-serif;font-size:0.85rem;letter-spacing:0.1em;color:var(--text-dim);margin-bottom:0.5rem">Team: ${runner['Team Name']||'Unknown'}</div>`;
+    const cps = [
+      { label: 'Start (10:00 AM, May 9)', time: null, fixed: true },
+      { label: 'Green Checkpoint', time: runner['Green Checkpoint'] },
+      { label: `${runner['Loop Color']||'?'} Loop Bottom`, time: runner['Loop Bottom'] },
+      { label: 'Blue Summit', time: runner['Loop Top'] },
+      { label: 'Red CP In', time: runner['Red Checkpoint In'] },
+      { label: 'Red CP Out', time: runner['Red Checkpoint Out'] },
+      { label: 'Finish', time: runner['FINISH TIME (Scan)'] },
+    ];
+    bodyHTML += cps.map(cp => `<div style="display:flex;align-items:center;gap:0.75rem;padding:0.4rem 0;border-bottom:1px solid var(--border);">
+      <div style="width:8px;height:8px;border-radius:50%;background:${cp.time||cp.fixed?'var(--accent)':'var(--border2)'};flex-shrink:0"></div>
+      <div style="flex:1;font-size:0.82rem;color:var(--text)">${cp.label}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--accent)">${cp.time ? fmtTime(cp.time) : (cp.fixed?'—':'—')}</div>
+    </div>`).join('');
+    if (runner['Team Elapsed Time']) bodyHTML += `<div style="display:flex;justify-content:space-between;padding:0.5rem 0;margin-top:0.5rem">
+      <span style="font-size:0.82rem;color:var(--text)">Team Total</span>
+      <span style="font-family:'DM Mono',monospace;color:var(--accent)">${fmtElapsed(runner['Team Elapsed Time'])}</span>
+    </div>`;
+  }
+
+  document.getElementById('modalBody').innerHTML = bodyHTML;
+
+  // Force overlay visible with inline styles as backup in case CSS class fails
+  const overlay = document.getElementById('modalOverlay');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:10000;display:flex;align-items:center;justify-content:center;padding:1rem;opacity:1;pointer-events:all;';
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden'; // prevent scroll behind modal
+}
+
+function closeModal() {
+  const overlay = document.getElementById('modalOverlay');
+  overlay.classList.remove('open');
+  overlay.style.cssText = '';
+  document.body.style.overflow = '';
+}
+document.getElementById('modalClose').addEventListener('click', closeModal);
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+});
+
+// ============================================================
+// EVENTS
+// ============================================================
+
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    previousTab = activeTab;
+    activeTab = btn.getAttribute('data-tab');
+    sortCol = null;
+    // Close segment focus if open
+    if (activeSegment) {
+      document.getElementById('segmentFocus').style.display = 'none';
+      activeSegment = null;
+      if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
+      document.querySelectorAll('.legend-route').forEach(i => i.classList.remove('active-route'));
+    }
+    renderTable();
+    updateStats();
+    updateRouteVisibility(activeTab);
+    updatePanelVisibility();
+    drawMap();
+  });
+});
+
+// Debounced search
+let searchDebounce = null;
+document.getElementById('searchInput').addEventListener('input', e => {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => { filterText = e.target.value.trim(); renderTable(); }, 200);
+});
+
+// Gender filter
+document.getElementById('genderFilter').addEventListener('change', e => {
+  genderFilter = e.target.value;
+  renderTable();
+});
+
+// Clickable legend routes
+document.querySelectorAll('.legend-route').forEach(item => {
+  item.addEventListener('click', () => {
+    const route = item.getAttribute('data-route');
+    if (!route) return;
+    if (activeSegment === route) {
+      document.getElementById('segmentFocus').style.display = 'none';
+      activeSegment = null;
+      if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
+      resetSegmentStyles();
+      document.querySelectorAll('.legend-route').forEach(i => i.classList.remove('active-route'));
+    } else {
+      document.querySelectorAll('.legend-route').forEach(i => i.classList.remove('active-route'));
+      item.classList.add('active-route');
+      openSegmentFocus(route);
+    }
+  });
+});
+
+// Wrap openSegmentFocus to sync legend highlight
+const _origOpen = openSegmentFocus;
+openSegmentFocus = function(routeName) {
+  document.querySelectorAll('.legend-route').forEach(i => {
+    i.classList.toggle('active-route', i.getAttribute('data-route') === routeName);
+  });
+  _origOpen(routeName);
+};
+
+// Segment focus close
+document.getElementById('segFocusClose').addEventListener('click', () => {
+  document.getElementById('segmentFocus').style.display = 'none';
+  activeSegment = null;
+  if (elevChartInst) { elevChartInst.destroy(); elevChartInst = null; }
+  resetSegmentStyles();
+  document.querySelectorAll('.legend-route').forEach(i => i.classList.remove('active-route'));
+});
+
+// Units toggle
+document.getElementById('unitsMiles').addEventListener('click', () => setUnits('imperial'));
+document.getElementById('unitsKm').addEventListener('click', () => setUnits('metric'));
+
+// ============================================================
+// REPLAY CONTROLLER
+// ============================================================
+function enterReplayMode() {
+  replayMode = true;
+  document.getElementById('replayBar').classList.add('active');
+  document.getElementById('replayToggle').classList.add('active');
+  document.querySelector('.replay-toggle-label').textContent = 'EXIT REPLAY';
+  const range = replayRange();
+  replayTime = range.start;
+  replayUpdateUi();
+  animateStep();  // re-render markers at the new virtual time
+}
+
+function exitReplayMode() {
+  replayMode = false;
+  replayPlaying = false;
+  if (replayRaf) { cancelAnimationFrame(replayRaf); replayRaf = null; }
+  document.getElementById('replayBar').classList.remove('active');
+  document.getElementById('replayToggle').classList.remove('active');
+  document.querySelector('.replay-toggle-label').textContent = 'RACE REPLAY';
+  document.getElementById('replayPlay').textContent = '▶';
+  replayUpdateUi();
+  animateStep();
+}
+
+function replayUpdateUi() {
+  const range = replayRange();
+  const dur = Math.max(1, range.end - range.start);
+  const elapsed = Math.max(0, replayTime - range.start);
+  const pct = Math.min(100, (elapsed / dur) * 100);
+  document.getElementById('rscrubProgress').style.width = pct + '%';
+  document.getElementById('rscrubHandle').style.left = pct + '%';
+
+  const tod = new Date(replayTime);
+  const hh = String(tod.getHours()).padStart(2, '0');
+  const mm = String(tod.getMinutes()).padStart(2, '0');
+  const ss = String(tod.getSeconds()).padStart(2, '0');
+  document.getElementById('replayClock').textContent = `${hh}:${mm}:${ss}`;
+  const totalSec = Math.floor(elapsed / 1000);
+  const eh = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+  const em = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+  const es = String(totalSec % 60).padStart(2, '0');
+  document.getElementById('replayElapsed').textContent = `Race elapsed: ${eh}:${em}:${es}`;
+}
+
+function replayTick() {
+  if (!replayPlaying) return;
+  const now = performance.now();
+  const dt = replayLastTick ? (now - replayLastTick) : 16;
+  replayLastTick = now;
+  replayTime += dt * replaySpeed;
+  const range = replayRange();
+  if (replayTime >= range.end) {
+    replayTime = range.end;
+    replayPlaying = false;
+    document.getElementById('replayPlay').textContent = '▶';
+  }
+  replayUpdateUi();
+  // Cheap path: just nudge positions directly each frame
+  updateRunnerTargets();
+  if (replayPlaying) replayRaf = requestAnimationFrame(replayTick);
+}
+
+function replayPlay() {
+  const range = replayRange();
+  if (replayTime >= range.end) replayTime = range.start;
+  replayPlaying = true;
+  replayLastTick = null;
+  document.getElementById('replayPlay').textContent = '❚❚';
+  replayRaf = requestAnimationFrame(replayTick);
+}
+
+function replayPause() {
+  replayPlaying = false;
+  if (replayRaf) { cancelAnimationFrame(replayRaf); replayRaf = null; }
+  document.getElementById('replayPlay').textContent = '▶';
+}
+
+// Bind UI events
+document.getElementById('replayToggle').addEventListener('click', () => {
+  if (replayMode) exitReplayMode();
+  else enterReplayMode();
+});
+document.getElementById('replayPlay').addEventListener('click', () => {
+  if (!replayMode) enterReplayMode();
+  if (replayPlaying) replayPause(); else replayPlay();
+});
+document.getElementById('replayReset').addEventListener('click', () => {
+  if (!replayMode) enterReplayMode();
+  replayPause();
+  replayTime = replayRange().start;
+  replayUpdateUi();
+  updateRunnerTargets();
+});
+document.querySelectorAll('.rspd').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.rspd').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    replaySpeed = parseInt(b.dataset.speed);
+  });
+});
+// Scrubber drag
+(() => {
+  const scrub = document.getElementById('replayScrub');
+  let dragging = false;
+  function setFromEvent(e) {
+    const rect = scrub.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const pct = Math.max(0, Math.min(1, x / rect.width));
+    const range = replayRange();
+    replayTime = range.start + pct * (range.end - range.start);
+    if (!replayMode) enterReplayMode();
+    replayUpdateUi();
+    updateRunnerTargets();
+  }
+  scrub.addEventListener('mousedown', e => { dragging = true; setFromEvent(e); });
+  window.addEventListener('mousemove', e => { if (dragging) setFromEvent(e); });
+  window.addEventListener('mouseup', () => { dragging = false; });
+  scrub.addEventListener('touchstart', e => { dragging = true; setFromEvent(e); });
+  window.addEventListener('touchmove', e => { if (dragging) setFromEvent(e); });
+  window.addEventListener('touchend', () => { dragging = false; });
+})();
+
+// When the user switches tabs while in replay mode, reset to start of that tab's race
+const _replayObserveTabSwitch = () => {
+  if (replayMode) {
+    replayPause();
+    replayTime = replayRange().start;
+    replayUpdateUi();
+    updateRunnerTargets();
+  }
+};
+document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', _replayObserveTabSwitch));
+
+// ============================================================
+// INIT
+// ============================================================
+updateEventStatus();
+setInterval(updateEventStatus, 60000);
+initSegmentDurations();
+initMap();
+fetchAll();
+updateMapLegend(activeTab);
+setInterval(fetchAll, REFRESH_MS);
+// Tick the "Updated Xs ago" display every second
+setInterval(() => {
+  const el = document.getElementById('lastUpdated');
+  if (!el) return;
+  if (lastConfidentFetch === null) { el.textContent = 'Waiting for first sync…'; return; }
+  const secs = Math.floor((Date.now() - lastConfidentFetch) / 1000);
+  const label = secs < 60 ? `${secs}s ago` : `${Math.floor(secs/60)}m ${secs%60}s ago`;
+  el.textContent = `Updated ${label}`;
+  el.style.color = secs > 90 ? '#facc15' : '#888';
+}, 1000);
+// Refetch when tab becomes visible again — feels more "live" when returning to the tab
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) fetchAll();
+});
+</script>
+</body>
+</html>
